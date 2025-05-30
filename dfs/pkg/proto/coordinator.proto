@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package dfs;
+
+option go_package = "pkg/proto";
+
+import "common.proto";
+
+service CoordinatorService {
+  // File operations
+  rpc UploadFile(UploadRequest) returns (UploadResponse);
+  rpc DownloadFile(DownloadRequest) returns (DownloadResponse);
+  rpc DeleteFile(DeleteRequest) returns (DeleteResponse);
+  rpc ListFiles(ListRequest) returns (ListResponse);
+  
+  // Node management
+  rpc RegisterDataNode(RegisterDataNodeRequest) returns (RegisterDataNodeResponse);
+  rpc DataNodeHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}
+
+// Upload file request/response
+message UploadRequest {
+  string path = 1;
+  int64 size = 2;
+  int64 chunk_size = 3;
+}
+message UploadResponse {
+  repeated ChunkLocation chunk_locations = 1;
+}
+
+message ChunkLocation {
+  string chunk_id = 1;
+  repeated string node_ids = 2;     // Primary + replicas
+  repeated string endpoints = 3;    // Where to upload
+}
+
+// Download file request/response
+message DownloadRequest {
+  string path = 1;
+}
+message DownloadResponse {
+  FileInfo file_info = 1;
+  repeated ChunkLocation chunk_locations = 2;
+}
+
+// Delete file request/response
+message DeleteRequest {
+  string path = 1;
+}
+message DeleteResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// List files request/response
+message ListRequest {
+  string directory = 1;
+}
+message ListResponse {
+  repeated FileInfo files = 1;
+}
+
+// Node management
+message RegisterDataNodeRequest {
+  DataNodeInfo node_info = 1;
+}
+message RegisterDataNodeResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message HeartbeatRequest {
+  string node_id = 1;
+  HealthStatus status = 2;
+}
+message HeartbeatResponse {
+  bool success = 1;
+}

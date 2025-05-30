@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package dfs;
+
+option go_package = "pkg/proto";
+
+import "common.proto";
+
+service DataNodeService {
+  // Chunk operations
+  rpc StoreChunk(StoreChunkRequest) returns (StoreChunkResponse);
+  rpc RetrieveChunk(RetrieveChunkRequest) returns (RetrieveChunkResponse);
+  rpc DeleteChunk(DeleteChunkRequest) returns (DeleteChunkResponse);
+  
+  // Replication
+  rpc ReplicateChunk(ReplicateChunkRequest) returns (ReplicateChunkResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Store chunk request/response
+message StoreChunkRequest {
+  string chunk_id = 1;
+  bytes data = 2;
+  string checksum = 3;
+}
+message StoreChunkResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Retrieve chunk request/response
+message RetrieveChunkRequest {
+  string chunk_id = 1;
+}
+message RetrieveChunkResponse {
+  bytes data = 1;
+  string checksum = 2;
+}
+
+// Delete chunk request/response
+message DeleteChunkRequest {
+  string chunk_id = 1;
+}
+message DeleteChunkResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Replicate chunk request/response
+message ReplicateChunkRequest {
+  string chunk_id = 1;
+  string source_node = 2;
+}
+message ReplicateChunkResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Health check request/response
+message HealthCheckRequest {}
+message HealthCheckResponse {
+  HealthStatus status = 1;
+}
