@@ -95,7 +95,8 @@ func (dr DownloadResponse) ToProto() *proto.DownloadResponse {
 		protoChunkLocations = append(protoChunkLocations, item.ToProto())
 	}
 	return &proto.DownloadResponse{
-		FileInfo: dr.fileInfo.ToProto(),
+		FileInfo:       dr.fileInfo.ToProto(),
+		ChunkLocations: protoChunkLocations,
 	}
 }
 
