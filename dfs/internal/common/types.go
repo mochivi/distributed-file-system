@@ -1,19 +1,11 @@
 package common
 
 import (
-	"context"
 	"time"
 
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-type Node interface {
-	ID() string
-	Start(ctx context.Context) error
-	Stop() error
-	Health() *HealthStatus
-}
 
 // Data types and constants
 type NodeStatus int
@@ -74,6 +66,13 @@ type HealthStatus struct {
 	LastSeen time.Time
 }
 
+func HealthStatusFromProto(pb *proto.HealthStatus) HealthStatus {
+	return HealthStatus{
+		Status:   NodeStatus(pb.Status),
+		LastSeen: pb.LastSeen.AsTime(),
+	}
+}
+
 func (hs HealthStatus) ToProto() *proto.HealthStatus {
 	return &proto.HealthStatus{
 		Status:   proto.NodeStatus(hs.Status),
@@ -86,10 +85,22 @@ type DataNodeInfo struct {
 	ID        string
 	IPAddress string
 	Port      int
-	Capacity  int64 // Total storage capacity in bytes
-	Used      int64 // Currently used storage in bytes
+	Capacity  int // Total storage capacity in bytes
+	Used      int // Currently used storage in bytes
 	Status    NodeStatus
 	LastSeen  time.Time
+}
+
+func NewDataNodeInfoFromProto(pb *proto.DataNodeInfo) DataNodeInfo {
+	return DataNodeInfo{
+		ID:        pb.Id,
+		IPAddress: pb.IpAddress,
+		Port:      int(pb.Port),
+		Capacity:  int(pb.Capacity),
+		Used:      int(pb.Used),
+		Status:    NodeStatus(pb.Status),
+		LastSeen:  pb.LastSeen.AsTime(),
+	}
 }
 
 func (di DataNodeInfo) ToProto() *proto.DataNodeInfo {

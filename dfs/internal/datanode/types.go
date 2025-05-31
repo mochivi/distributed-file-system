@@ -57,5 +57,5 @@ type ReplicateChunkResponse struct {
 
 type HealthCheckRequest struct{}
 type HealthCheckResponse struct {
-	status common.HealthStatus
+	Status common.HealthStatus
 }
