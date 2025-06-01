@@ -33,24 +33,7 @@ func newMetadataManager(commitTimeout int) *metadataManager {
 		commitTimeout: time.Duration(commitTimeout),
 	}
 
-	go manager.checkExpiry()
-
 	return manager
-}
-
-func (m metadataManager) checkExpiry() {
-	for {
-		ticker := time.NewTicker(5 * time.Second)
-
-		for _, session := range m.sessions {
-			if time.Now().After(session.exp) {
-				delete(m.sessions, session.id)
-			}
-		}
-
-		<-ticker.C
-	}
-
 }
 
 func (m *metadataManager) trackUpload(sessionID string, req UploadRequest, numChunks int) {
@@ -62,7 +45,6 @@ func (m *metadataManager) trackUpload(sessionID string, req UploadRequest, numCh
 		CreatedAt:  time.Now(),
 		Checksum:   req.Checksum,
 	}
-
 	m.sessions[sessionID] = newMetadataUploadSession(sessionID, m.commitTimeout, fileInfo)
 }
 
@@ -70,6 +52,11 @@ func (m *metadataManager) commit(sessionID string, chunkInfos []common.ChunkInfo
 	session, ok := m.sessions[sessionID]
 	if !ok {
 		return errors.New("session not found")
+	}
+
+	// This is done to avoid scenarios where the metadata update is pending forever
+	if time.Now().After(session.exp) {
+		return errors.New("session expired")
 	}
 
 	fileInfo := session.fileInfo
