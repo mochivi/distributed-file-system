@@ -7,19 +7,6 @@ import (
 
 // Store all requests, responses and conversions defined in the proto package
 // StoreChunk
-type StoreChunkRequest struct {
-	ChunkID  string
-	Data     []byte
-	Checksum string
-}
-
-func StoreChunkRequestFromProto(pb *proto.StoreChunkRequest) StoreChunkRequest {
-	return StoreChunkRequest{
-		ChunkID:  pb.ChunkID,
-		Data:     pb.Data,
-		Checksum: pb.Checksum,
-	}
-}
 
 type StoreChunkResponse struct {
 	Success bool
@@ -34,13 +21,6 @@ func (scr StoreChunkResponse) ToProto() *proto.StoreChunkResponse {
 }
 
 // RetrieveChunk
-type RetrieveChunkRequest struct {
-	ChunkID string
-}
-
-func RetrieveChunkRequestFromProto(pb *proto.RetrieveChunkRequest) RetrieveChunkRequest {
-	return RetrieveChunkRequest{ChunkID: pb.ChunkId}
-}
 
 type RetrieveChunkResponse struct {
 	Data     []byte
@@ -52,14 +32,6 @@ func (rcr RetrieveChunkResponse) ToProto() *proto.RetrieveChunkResponse {
 		Data:     rcr.Data,
 		Checksum: rcr.Checksum,
 	}
-}
-
-type DeleteChunkRequest struct {
-	ChunkID string
-}
-
-func DeleteChunkRequestFromProto(pb *proto.DeleteChunkRequest) DeleteChunkRequest {
-	return DeleteChunkRequest{ChunkID: pb.ChunkId}
 }
 
 type DeleteChunkResponse struct {
@@ -74,20 +46,6 @@ func (dcr DeleteChunkResponse) ToProto() *proto.DeleteChunkResponse {
 	}
 }
 
-type ReplicateChunkRequest struct {
-	ChunkID   string
-	ChunkSize int
-	Checksum  string
-}
-
-func ReplicateChunkRequestFromProto(pb *proto.ReplicateChunkRequest) ReplicateChunkRequest {
-	return ReplicateChunkRequest{
-		ChunkID:   pb.ChunkId,
-		ChunkSize: int(pb.ChunkSize),
-		Checksum:  pb.Checksum,
-	}
-}
-
 type ReplicateChunkResponse struct {
 	Accept    bool
 	Message   string
@@ -99,26 +57,6 @@ func (rcr ReplicateChunkResponse) ToProto() *proto.ReplicateChunkResponse {
 		Accept:    rcr.Accept,
 		Message:   rcr.Message,
 		SessionId: rcr.SessionID,
-	}
-}
-
-type ChunkDataStream struct {
-	SessionID       string
-	ChunkID         string
-	Data            []byte
-	Offset          int
-	IsFinal         bool
-	PartialChecksum string
-}
-
-func ChunkDataStreamFromProto(pb *proto.ChunkDataStream) ChunkDataStream {
-	return ChunkDataStream{
-		SessionID:       pb.SessionId,
-		ChunkID:         pb.ChunkId,
-		Data:            pb.Data,
-		Offset:          int(pb.Offset),
-		IsFinal:         pb.IsFinal,
-		PartialChecksum: pb.PartialChecksum,
 	}
 }
 
@@ -140,7 +78,6 @@ func (cda ChunkDataAck) ToProto() *proto.ChunkDataAck {
 	}
 }
 
-type HealthCheckRequest struct{}
 type HealthCheckResponse struct {
 	Status common.HealthStatus
 }

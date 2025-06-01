@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"sync"
+	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
@@ -22,13 +23,14 @@ type Coordinator struct {
 	metadataManager *metadataManager
 }
 
-func NewCoordinator(metaStore storage.MetadataStore, metadataManager *metadataManager, replication int) *Coordinator {
-	return &Coordinator{
-		metaStore:       metaStore,
-		dataNodes:       make(map[string]*common.DataNodeInfo),
-		replication:     replication,
-		metadataManager: metadataManager,
-	}
+type metadataManager struct {
+	sessions      map[string]metadataUploadSession
+	commitTimeout time.Duration
+}
+type metadataUploadSession struct {
+	id       string
+	exp      time.Time
+	fileInfo *common.FileInfo
 }
 
 // ChunkLocation represents where some chunk should be stored (primary node + endpoint)
@@ -51,5 +53,31 @@ func (cs *ChunkLocation) ToProto() *proto.ChunkLocation {
 		ChunkId:  cs.ChunkID,
 		NodeId:   cs.NodeID,
 		Endpoint: cs.Endpoint,
+	}
+}
+
+func NewCoordinator(metaStore storage.MetadataStore, metadataManager *metadataManager, replication int) *Coordinator {
+	return &Coordinator{
+		metaStore:       metaStore,
+		dataNodes:       make(map[string]*common.DataNodeInfo),
+		replication:     replication,
+		metadataManager: metadataManager,
+	}
+}
+
+func NewMetadataManager(commitTimeout int) *metadataManager {
+	manager := &metadataManager{
+		sessions:      make(map[string]metadataUploadSession),
+		commitTimeout: time.Duration(commitTimeout),
+	}
+
+	return manager
+}
+
+func newMetadataUploadSession(sessionID string, exp time.Duration, fileInfo *common.FileInfo) metadataUploadSession {
+	return metadataUploadSession{
+		id:       sessionID,
+		exp:      time.Now().Add(exp),
+		fileInfo: fileInfo,
 	}
 }

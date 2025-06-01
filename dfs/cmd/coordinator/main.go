@@ -14,13 +14,15 @@ import (
 )
 
 const (
-	REPLICATION_DEFAULT = 3
-	COORDINATOR_PORT    = "5244"
+	REPLICATION_DEFAULT    = 3
+	COORDINATOR_PORT       = "5244"
+	DEFAULT_COMMIT_TIMEOUT = 15 // max time to wait for replication to commit metadata
 )
 
 func main() {
 	metadataStore := metadata.NewMetadataLocalStorage()
-	server := coordinator.NewCoordinator(metadataStore, REPLICATION_DEFAULT)
+	metadataManager := coordinator.NewMetadataManager(DEFAULT_COMMIT_TIMEOUT)
+	server := coordinator.NewCoordinator(metadataStore, metadataManager, REPLICATION_DEFAULT)
 	grpcServer := grpc.NewServer()
 
 	proto.RegisterCoordinatorServiceServer(grpcServer, server)

@@ -2,12 +2,13 @@ package datanode
 
 import (
 	"bytes"
-	"context"
 	"hash"
 	"sync"
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/pkg/proto"
 )
 
 const (
@@ -23,14 +24,14 @@ const (
 	SessionExpired
 )
 
-type DataNodeService interface {
-	// Chunk operations
-	StoreChunk(ctx context.Context, chunkID string, data []byte) error
-	RetrieveChunk(ctx context.Context, chunkID string) ([]byte, error)
-	DeleteChunk(ctx context.Context, chunkID string) error
+type DataNodeServer struct {
+	proto.UnimplementedDataNodeServiceServer
 
-	// Replication
-	ReplicateChunk(ctx context.Context, chunkID string, sourceNode string) error
+	store              storage.ChunkStorage
+	replicationManager IReplicationManager
+	sessionManager     ISessionManager
+
+	config DataNodeConfig
 }
 
 type NodeSelector interface {
@@ -64,4 +65,11 @@ type StreamingSession struct {
 	// Concurrency control
 	mutex  sync.RWMutex
 	Status SessionStatus
+}
+
+func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager) *DataNodeServer {
+	return &DataNodeServer{
+		store:              store,
+		replicationManager: replicationManager,
+	}
 }

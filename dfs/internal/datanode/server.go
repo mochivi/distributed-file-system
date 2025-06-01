@@ -9,36 +9,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-type DataNodeServer struct {
-	proto.UnimplementedDataNodeServiceServer
-
-	store              storage.ChunkStorage
-	replicationManager IReplicationManager
-	sessionManager     ISessionManager
-
-	config DataNodeConfig
-}
-
-func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager) *DataNodeServer {
-	return &DataNodeServer{
-		store:              store,
-		replicationManager: replicationManager,
-	}
-}
-
 // StoreChunk is received only if the node is a primary receiver
 // 1. Verify chunk checksum is the same as expected
 // 2. Store chunk, given storage method
 // 3. Kickoff replication
 func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkRequest) (*proto.StoreChunkResponse, error) {
-	req := StoreChunkRequestFromProto(pb)
+	req := common.StoreChunkRequestFromProto(pb)
 
 	if !common.VerifyChecksum(req.Data, req.Checksum) {
 		return StoreChunkResponse{
@@ -63,7 +45,7 @@ func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkReq
 
 // Any node, replica or primary, can serve chunk reads at any moment
 func (s *DataNodeServer) RetrieveChunk(ctx context.Context, pb *proto.RetrieveChunkRequest) (*proto.RetrieveChunkResponse, error) {
-	req := RetrieveChunkRequestFromProto(pb)
+	req := common.RetrieveChunkRequestFromProto(pb)
 
 	// Move to store layer later
 	if !s.store.Exists(req.ChunkID) {
@@ -82,7 +64,7 @@ func (s *DataNodeServer) RetrieveChunk(ctx context.Context, pb *proto.RetrieveCh
 }
 
 func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkRequest) (*proto.DeleteChunkResponse, error) {
-	req := DeleteChunkRequestFromProto(pb)
+	req := common.DeleteChunkRequestFromProto(pb)
 
 	if !s.store.Exists(req.ChunkID) {
 		return DeleteChunkResponse{
@@ -107,7 +89,7 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 // 1. Check if node has enough capacity to handle storing the chunk
 // 2. Send accept response to innitiate data stream for chunk
 func (s *DataNodeServer) ReplicateChunk(ctx context.Context, pb *proto.ReplicateChunkRequest) (*proto.ReplicateChunkResponse, error) {
-	req := ReplicateChunkRequestFromProto(pb)
+	req := common.ReplicateChunkRequestFromProto(pb)
 
 	if req.ChunkID == "" || req.ChunkSize <= 0 {
 		return ReplicateChunkResponse{
@@ -148,7 +130,7 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 		}
 
 		// Convert to internal struct
-		chunk := ChunkDataStreamFromProto(chunkpb)
+		chunk := common.ChunkDataStreamFromProto(chunkpb)
 
 		// First chunk establishes session
 		if session == nil {

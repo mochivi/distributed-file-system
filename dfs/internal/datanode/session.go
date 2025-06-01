@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"sync"
 	"time"
+
+	"github.com/mochivi/distributed-file-system/internal/common"
 )
 
 type SessionManager struct {
@@ -25,7 +27,6 @@ func (sm *SessionManager) Load(sessionID string) (*StreamingSession, bool) {
 		return nil, false
 	}
 	return session, true
-
 }
 
 func (sm *SessionManager) Delete(sessionID string) {
@@ -35,7 +36,7 @@ func (sm *SessionManager) Delete(sessionID string) {
 }
 
 // DataNode creates and stores a session
-func (s *DataNodeServer) createStreamingSession(sessionId string, req ReplicateChunkRequest) {
+func (s *DataNodeServer) createStreamingSession(sessionId string, req common.ReplicateChunkRequest) {
 	session := &StreamingSession{
 		SessionID:    sessionId,
 		ChunkID:      req.ChunkID,
