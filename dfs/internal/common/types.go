@@ -35,7 +35,7 @@ func (fi FileInfo) ToProto() *proto.FileInfo {
 
 	return &proto.FileInfo{
 		Path:       fi.Path,
-		Size:       fi.Size,
+		Size:       int64(fi.Size),
 		ChunkCount: int32(fi.ChunkCount),
 		Chunks:     protoChunks,
 		CreatedAt:  timestamppb.New(fi.CreatedAt),
