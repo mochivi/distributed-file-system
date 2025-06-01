@@ -9,3 +9,9 @@ type DataNodeConfig struct {
 type SessionManagerConfig struct {
 	SessionTimeout time.Duration
 }
+
+type ReplicateManagerConfig struct {
+	ReplicateTimeout time.Duration
+	ChunkStreamSize  int
+	MaxChunkRetries  int
+}

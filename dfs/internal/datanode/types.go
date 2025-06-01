@@ -2,10 +2,12 @@ package datanode
 
 import (
 	"bytes"
+	"context"
 	"hash"
 	"sync"
 	"time"
 
+	"github.com/mochivi/distributed-file-system/internal/client"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -39,7 +41,9 @@ type NodeSelector interface {
 }
 
 type IReplicationManager interface {
-	replicate(chunkID string, data []byte, requiredReplicas int) error
+	paralellReplicate(req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error
+	replicate(ctx context.Context, client *client.DataNodeClient, req common.ReplicateChunkRequest, data []byte) error
+	streamChunkData(ctx context.Context, client *client.DataNodeClient, sessionID string, req common.ReplicateChunkRequest, data []byte) error
 }
 
 type ISessionManager interface {

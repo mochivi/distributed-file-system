@@ -23,7 +23,7 @@ func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkReq
 	req := common.StoreChunkRequestFromProto(pb)
 
 	if !common.VerifyChecksum(req.Data, req.Checksum) {
-		return StoreChunkResponse{
+		return common.StoreChunkResponse{
 			Success: false,
 			Message: "checksum does not match",
 		}.ToProto(), nil
@@ -33,11 +33,17 @@ func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkReq
 		return nil, status.Errorf(codes.Internal, "failed to store chunk: %v", err)
 	}
 
-	if err := s.replicationManager.replicate(req.ChunkID, req.Data, 3); err != nil {
+	replicateReq := common.ReplicateChunkRequest{
+		ChunkID:   req.ChunkID,
+		ChunkSize: 4 * 1024 * 1024,
+		Checksum:  common.CalculateChecksum(req.Data),
+	}
+
+	if err := s.replicationManager.paralellReplicate(replicateReq, req.Data, 3); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to replicate chunk: %v", err)
 	}
 
-	return StoreChunkResponse{
+	return common.StoreChunkResponse{
 		Success: true,
 		Message: "chunk stored",
 	}.ToProto(), nil
@@ -57,7 +63,7 @@ func (s *DataNodeServer) RetrieveChunk(ctx context.Context, pb *proto.RetrieveCh
 		return nil, status.Errorf(codes.Internal, "failed to retrieve chunk: %v", err)
 	}
 
-	return RetrieveChunkResponse{
+	return common.RetrieveChunkResponse{
 		Data:     data,
 		Checksum: common.CalculateChecksum(data),
 	}.ToProto(), nil
@@ -67,7 +73,7 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 	req := common.DeleteChunkRequestFromProto(pb)
 
 	if !s.store.Exists(req.ChunkID) {
-		return DeleteChunkResponse{
+		return common.DeleteChunkResponse{
 			Success: false,
 			Message: "chunk not found",
 		}.ToProto(), nil
@@ -77,7 +83,7 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 		return nil, status.Errorf(codes.Internal, "failed to delete chunk: %v", err)
 	}
 
-	return DeleteChunkResponse{
+	return common.DeleteChunkResponse{
 		Success: true,
 		Message: "chunk deleted",
 	}.ToProto(), nil
@@ -92,7 +98,7 @@ func (s *DataNodeServer) ReplicateChunk(ctx context.Context, pb *proto.Replicate
 	req := common.ReplicateChunkRequestFromProto(pb)
 
 	if req.ChunkID == "" || req.ChunkSize <= 0 {
-		return ReplicateChunkResponse{
+		return common.ReplicateChunkResponse{
 			Accept:  false,
 			Message: "Invalid chunk metadata",
 		}.ToProto(), nil
@@ -108,7 +114,7 @@ func (s *DataNodeServer) ReplicateChunk(ctx context.Context, pb *proto.Replicate
 	sessionID := uuid.NewString()
 	s.createStreamingSession(sessionID, req)
 
-	return ReplicateChunkResponse{
+	return common.ReplicateChunkResponse{
 		Accept:    true,
 		Message:   "Ready to receive chunk data",
 		SessionID: sessionID,
@@ -168,7 +174,7 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 		// readyForNext := buffer.Len() < int(s.config.BufferThreshold)
 
 		// Send acknowledgment with flow control
-		ack := &ChunkDataAck{
+		ack := &common.ChunkDataAck{
 			SessionID:     chunk.SessionID,
 			Success:       true,
 			BytesReceived: totalReceived,
@@ -196,7 +202,7 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 			}
 
 			// Send final ack with verification result
-			finalAck := ChunkDataAck{
+			finalAck := common.ChunkDataAck{
 				SessionID:     chunk.SessionID,
 				Success:       true,
 				Message:       "Chunk stored successfully",

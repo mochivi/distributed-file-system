@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -23,9 +22,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to get cwd: %v", err)
 	}
-	rootDDir := fmt.Sprintf("%s%schunks", cwd, filepath.Separator)
+	rootDDir := filepath.Join(cwd, "chunks")
 	chunkStore := chunk.NewChunkDiskStorage(rootDDir)
-	replicationManager := datanode.ReplicationManager{}
+	replicationManager := datanode.ReplicationManager{
+		Config: datanode.ReplicateManagerConfig{
+			ReplicateTimeout: 1,  // minutes
+			ChunkStreamSize:  64, // kB
+			MaxChunkRetries:  3,
+		},
+	}
 
 	server := datanode.NewDataNodeServer(chunkStore, &replicationManager)
 	grpcServer := grpc.NewServer()
