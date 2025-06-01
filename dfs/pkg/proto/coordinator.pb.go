@@ -27,6 +27,7 @@ type UploadRequest struct {
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
 	Size          int64                  `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`
 	ChunkSize     int64                  `protobuf:"varint,3,opt,name=chunk_size,json=chunkSize,proto3" json:"chunk_size,omitempty"`
+	Checksum      string                 `protobuf:"bytes,4,opt,name=checksum,proto3" json:"checksum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -82,6 +83,13 @@ func (x *UploadRequest) GetChunkSize() int64 {
 	return 0
 }
 
+func (x *UploadRequest) GetChecksum() string {
+	if x != nil {
+		return x.Checksum
+	}
+	return ""
+}
+
 type UploadResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ChunkLocations []*ChunkLocation       `protobuf:"bytes,1,rep,name=chunk_locations,json=chunkLocations,proto3" json:"chunk_locations,omitempty"`
@@ -129,8 +137,8 @@ func (x *UploadResponse) GetChunkLocations() []*ChunkLocation {
 type ChunkLocation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ChunkId       string                 `protobuf:"bytes,1,opt,name=chunk_id,json=chunkId,proto3" json:"chunk_id,omitempty"`
-	NodeIds       []string               `protobuf:"bytes,2,rep,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"` // Primary + replicas
-	Endpoints     []string               `protobuf:"bytes,3,rep,name=endpoints,proto3" json:"endpoints,omitempty"`            // Where to upload
+	NodeId        string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Endpoint      string                 `protobuf:"bytes,3,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -172,18 +180,18 @@ func (x *ChunkLocation) GetChunkId() string {
 	return ""
 }
 
-func (x *ChunkLocation) GetNodeIds() []string {
+func (x *ChunkLocation) GetNodeId() string {
 	if x != nil {
-		return x.NodeIds
+		return x.NodeId
 	}
-	return nil
+	return ""
 }
 
-func (x *ChunkLocation) GetEndpoints() []string {
+func (x *ChunkLocation) GetEndpoint() string {
 	if x != nil {
-		return x.Endpoints
+		return x.Endpoint
 	}
-	return nil
+	return ""
 }
 
 // Download file request/response
@@ -666,18 +674,19 @@ var File_coordinator_proto protoreflect.FileDescriptor
 
 const file_coordinator_proto_rawDesc = "" +
 	"\n" +
-	"\x11coordinator.proto\x12\x03dfs\x1a\fcommon.proto\"V\n" +
+	"\x11coordinator.proto\x12\x03dfs\x1a\fcommon.proto\"r\n" +
 	"\rUploadRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x1d\n" +
 	"\n" +
-	"chunk_size\x18\x03 \x01(\x03R\tchunkSize\"M\n" +
+	"chunk_size\x18\x03 \x01(\x03R\tchunkSize\x12\x1a\n" +
+	"\bchecksum\x18\x04 \x01(\tR\bchecksum\"M\n" +
 	"\x0eUploadResponse\x12;\n" +
-	"\x0fchunk_locations\x18\x01 \x03(\v2\x12.dfs.ChunkLocationR\x0echunkLocations\"c\n" +
+	"\x0fchunk_locations\x18\x01 \x03(\v2\x12.dfs.ChunkLocationR\x0echunkLocations\"_\n" +
 	"\rChunkLocation\x12\x19\n" +
-	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12\x19\n" +
-	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\x12\x1c\n" +
-	"\tendpoints\x18\x03 \x03(\tR\tendpoints\"%\n" +
+	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1a\n" +
+	"\bendpoint\x18\x03 \x01(\tR\bendpoint\"%\n" +
 	"\x0fDownloadRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"{\n" +
 	"\x10DownloadResponse\x12*\n" +

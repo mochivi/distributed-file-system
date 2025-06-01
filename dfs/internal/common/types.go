@@ -20,7 +20,7 @@ const (
 // FileInfo + proto conversions
 type FileInfo struct {
 	Path       string
-	Size       int64
+	Size       int
 	ChunkCount int
 	Chunks     []ChunkInfo
 	CreatedAt  time.Time

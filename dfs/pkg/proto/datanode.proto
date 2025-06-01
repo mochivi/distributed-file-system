@@ -14,6 +14,7 @@ service DataNodeService {
   
   // Replication
   rpc ReplicateChunk(ReplicateChunkRequest) returns (ReplicateChunkResponse);
+  rpc StreamChunkData(stream ChunkDataStream) returns (stream ChunkDataAck);
   
   // Health check
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
@@ -51,11 +52,29 @@ message DeleteChunkResponse {
 // Replicate chunk request/response
 message ReplicateChunkRequest {
   string chunk_id = 1;
-  string source_node = 2;
+  int64 chunk_size = 2;           // Size for capacity check
+  string checksum = 3;            // Expected hash for verification
 }
 message ReplicateChunkResponse {
-  bool success = 1;
-  string message = 2;
+  bool accept = 1;                // Accept to receive chunk or not
+  string message = 2;             // Message to deliver with accept
+  string session_id = 3;          // Unique ID for the streaming session
+}
+
+message ChunkDataStream {
+  string session_id = 1;
+  string chunk_id = 2;
+  bytes data = 3;                 // Chunk of the actual data
+  int64 offset = 4;               // Byte offset in the full chunk
+  bool is_final = 5;              // True for the last chunk
+  string partial_checksum = 6;    // Optional: checksum of this data segment
+}
+message ChunkDataAck {
+  string session_id = 1;
+  bool success = 2;
+  string message = 3;
+  int64 bytes_received = 4;       // Total bytes received so far
+  bool ready_for_next = 5;        // Flow control: ready for next chunk
 }
 
 // Health check request/response

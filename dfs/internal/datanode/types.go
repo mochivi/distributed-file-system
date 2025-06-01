@@ -1,9 +1,26 @@
 package datanode
 
 import (
+	"bytes"
 	"context"
+	"hash"
+	"sync"
+	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+)
+
+const (
+	DEFAULT_REPLICAS = 3
+)
+
+type SessionStatus int
+
+const (
+	SessionActive SessionStatus = iota
+	SessionCompleted
+	SessionFailed
+	SessionExpired
 )
 
 type DataNodeService interface {
@@ -16,46 +33,35 @@ type DataNodeService interface {
 	ReplicateChunk(ctx context.Context, chunkID string, sourceNode string) error
 }
 
-type StoreChunkRequest struct {
-	ChunkID  string
-	Data     []byte
-	Checksum string
+type NodeSelector interface {
+	selectBestNodes(n int) []common.DataNodeInfo
 }
 
-type StoreChunkResponse struct {
-	Success bool
-	Message string
+type IReplicationManager interface {
+	replicate(chunkID string, data []byte, requiredReplicas int) error
 }
 
-type RetrieveChunkRequest struct {
-	ChunkID string
+type ISessionManager interface {
+	Store(sessionID string, session *StreamingSession)
+	Load(sessionID string) (*StreamingSession, bool)
+	Delete(sessionID string)
 }
 
-type RetrieveChunkResponse struct {
-	Data     []byte
-	Checksum string
-}
-
-type DeleteChunkRequest struct {
-	ChunkID string
-}
-
-type DeleteChunkResponse struct {
-	Success bool
-	Message string
-}
-
-type ReplicateChunkRequest struct {
+// StreamingSession controls the data flow during a chunk streaming session
+type StreamingSession struct {
+	SessionID    string
 	ChunkID      string
-	SourceNodeID string
-}
+	ExpectedSize int
+	ExpectedHash string
+	CreatedAt    time.Time
+	ExpiresAt    time.Time
 
-type ReplicateChunkResponse struct {
-	Success bool
-	Message string
-}
+	// Runtime state
+	BytesReceived int64
+	Buffer        *bytes.Buffer
+	Checksum      hash.Hash // Running checksum calculation
 
-type HealthCheckRequest struct{}
-type HealthCheckResponse struct {
-	Status common.HealthStatus
+	// Concurrency control
+	mutex  sync.RWMutex
+	Status SessionStatus
 }

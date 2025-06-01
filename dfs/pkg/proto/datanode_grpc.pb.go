@@ -19,11 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DataNodeService_StoreChunk_FullMethodName     = "/dfs.DataNodeService/StoreChunk"
-	DataNodeService_RetrieveChunk_FullMethodName  = "/dfs.DataNodeService/RetrieveChunk"
-	DataNodeService_DeleteChunk_FullMethodName    = "/dfs.DataNodeService/DeleteChunk"
-	DataNodeService_ReplicateChunk_FullMethodName = "/dfs.DataNodeService/ReplicateChunk"
-	DataNodeService_HealthCheck_FullMethodName    = "/dfs.DataNodeService/HealthCheck"
+	DataNodeService_StoreChunk_FullMethodName      = "/dfs.DataNodeService/StoreChunk"
+	DataNodeService_RetrieveChunk_FullMethodName   = "/dfs.DataNodeService/RetrieveChunk"
+	DataNodeService_DeleteChunk_FullMethodName     = "/dfs.DataNodeService/DeleteChunk"
+	DataNodeService_ReplicateChunk_FullMethodName  = "/dfs.DataNodeService/ReplicateChunk"
+	DataNodeService_StreamChunkData_FullMethodName = "/dfs.DataNodeService/StreamChunkData"
+	DataNodeService_HealthCheck_FullMethodName     = "/dfs.DataNodeService/HealthCheck"
 )
 
 // DataNodeServiceClient is the client API for DataNodeService service.
@@ -36,6 +37,7 @@ type DataNodeServiceClient interface {
 	DeleteChunk(ctx context.Context, in *DeleteChunkRequest, opts ...grpc.CallOption) (*DeleteChunkResponse, error)
 	// Replication
 	ReplicateChunk(ctx context.Context, in *ReplicateChunkRequest, opts ...grpc.CallOption) (*ReplicateChunkResponse, error)
+	StreamChunkData(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChunkDataStream, ChunkDataAck], error)
 	// Health check
 	HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 }
@@ -88,6 +90,19 @@ func (c *dataNodeServiceClient) ReplicateChunk(ctx context.Context, in *Replicat
 	return out, nil
 }
 
+func (c *dataNodeServiceClient) StreamChunkData(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChunkDataStream, ChunkDataAck], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataNodeService_ServiceDesc.Streams[0], DataNodeService_StreamChunkData_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ChunkDataStream, ChunkDataAck]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataNodeService_StreamChunkDataClient = grpc.BidiStreamingClient[ChunkDataStream, ChunkDataAck]
+
 func (c *dataNodeServiceClient) HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HealthCheckResponse)
@@ -108,6 +123,7 @@ type DataNodeServiceServer interface {
 	DeleteChunk(context.Context, *DeleteChunkRequest) (*DeleteChunkResponse, error)
 	// Replication
 	ReplicateChunk(context.Context, *ReplicateChunkRequest) (*ReplicateChunkResponse, error)
+	StreamChunkData(grpc.BidiStreamingServer[ChunkDataStream, ChunkDataAck]) error
 	// Health check
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	mustEmbedUnimplementedDataNodeServiceServer()
@@ -131,6 +147,9 @@ func (UnimplementedDataNodeServiceServer) DeleteChunk(context.Context, *DeleteCh
 }
 func (UnimplementedDataNodeServiceServer) ReplicateChunk(context.Context, *ReplicateChunkRequest) (*ReplicateChunkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReplicateChunk not implemented")
+}
+func (UnimplementedDataNodeServiceServer) StreamChunkData(grpc.BidiStreamingServer[ChunkDataStream, ChunkDataAck]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamChunkData not implemented")
 }
 func (UnimplementedDataNodeServiceServer) HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
@@ -228,6 +247,13 @@ func _DataNodeService_ReplicateChunk_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DataNodeService_StreamChunkData_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(DataNodeServiceServer).StreamChunkData(&grpc.GenericServerStream[ChunkDataStream, ChunkDataAck]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataNodeService_StreamChunkDataServer = grpc.BidiStreamingServer[ChunkDataStream, ChunkDataAck]
+
 func _DataNodeService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HealthCheckRequest)
 	if err := dec(in); err != nil {
@@ -274,6 +300,13 @@ var DataNodeService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DataNodeService_HealthCheck_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamChunkData",
+			Handler:       _DataNodeService_StreamChunkData_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "datanode.proto",
 }

@@ -1,4 +1,4 @@
-package local
+package metadata
 
 import (
 	"sync"
@@ -8,7 +8,7 @@ import (
 
 const BASE_DIR = "./metadata"
 
-type MetadataLocalStorage struct {
+type MetadataDiskStorage struct {
 	baseDir   string
 	mu        sync.RWMutex
 	cacheSize int // max entries in cache
@@ -16,8 +16,8 @@ type MetadataLocalStorage struct {
 	autoFlush bool // autoFlush changes to disk
 }
 
-func NewMetadataLocalStorage() *MetadataLocalStorage {
-	return &MetadataLocalStorage{
+func NewMetadataLocalStorage() *MetadataDiskStorage {
+	return &MetadataDiskStorage{
 		baseDir:   BASE_DIR,
 		cacheSize: 1000,
 		cache:     make(map[string]*common.FileInfo),
@@ -25,15 +25,15 @@ func NewMetadataLocalStorage() *MetadataLocalStorage {
 	}
 }
 
-func (m *MetadataLocalStorage) PutFile(path string, info *common.FileInfo) error {
+func (m *MetadataDiskStorage) PutFile(path string, info *common.FileInfo) error {
 	return nil
 }
-func (m *MetadataLocalStorage) GetFile(path string) (*common.FileInfo, error) {
+func (m *MetadataDiskStorage) GetFile(path string) (*common.FileInfo, error) {
 	return nil, nil
 }
-func (m *MetadataLocalStorage) DeleteFile(path string) error {
+func (m *MetadataDiskStorage) DeleteFile(path string) error {
 	return nil
 }
-func (m *MetadataLocalStorage) ListFiles(directory string) ([]*common.FileInfo, error) {
+func (m *MetadataDiskStorage) ListFiles(directory string) ([]*common.FileInfo, error) {
 	return nil, nil
 }
