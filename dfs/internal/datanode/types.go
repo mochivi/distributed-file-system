@@ -7,10 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mochivi/distributed-file-system/internal/client"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -26,6 +27,7 @@ const (
 	SessionExpired
 )
 
+// Implements the proto.DataNodeServiceServer interface
 type DataNodeServer struct {
 	proto.UnimplementedDataNodeServiceServer
 
@@ -36,14 +38,20 @@ type DataNodeServer struct {
 	config DataNodeConfig
 }
 
+// Wrapper over the proto.DataNodeServiceClient interface
+type DataNodeClient struct {
+	client proto.DataNodeServiceClient
+	conn   *grpc.ClientConn
+}
+
 type NodeSelector interface {
 	selectBestNodes(n int) []common.DataNodeInfo
 }
 
 type IReplicationManager interface {
 	paralellReplicate(req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error
-	replicate(ctx context.Context, client *client.DataNodeClient, req common.ReplicateChunkRequest, data []byte) error
-	streamChunkData(ctx context.Context, client *client.DataNodeClient, sessionID string, req common.ReplicateChunkRequest, data []byte) error
+	replicate(ctx context.Context, client *DataNodeClient, req common.ReplicateChunkRequest, data []byte) error
+	streamChunkData(ctx context.Context, client *DataNodeClient, sessionID string, req common.ReplicateChunkRequest, data []byte) error
 }
 
 type ISessionManager interface {
@@ -76,4 +84,21 @@ func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicati
 		store:              store,
 		replicationManager: replicationManager,
 	}
+}
+
+func NewDataNodeClient(serverAddress string) (*DataNodeClient, error) {
+	conn, err := grpc.NewClient(
+		serverAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()), // Update to TLS in prod
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client := proto.NewDataNodeServiceClient(conn)
+
+	return &DataNodeClient{
+		client: client,
+		conn:   conn,
+	}, nil
 }

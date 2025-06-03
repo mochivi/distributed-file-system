@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mochivi/distributed-file-system/internal/client"
 	"github.com/mochivi/distributed-file-system/internal/common"
 )
 
@@ -19,13 +18,12 @@ type ReplicationManager struct {
 
 func (rm *ReplicationManager) paralellReplicate(req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error {
 	nodes := rm.NodeSelector.selectBestNodes(requiredReplicas + 3)
-
 	if len(nodes) == 0 {
 		return fmt.Errorf("no node endpoints provided")
 	}
 
 	// Create clients
-	var clients []*client.DataNodeClient
+	var clients []*DataNodeClient
 	var clientsMutex sync.Mutex
 	defer func() {
 		// Clean up all clients
@@ -38,7 +36,7 @@ func (rm *ReplicationManager) paralellReplicate(req common.ReplicateChunkRequest
 
 	for _, node := range nodes {
 		endpoint := fmt.Sprintf("%s:%d", node.IPAddress, node.Port)
-		client, err := client.NewDataNodeClient(endpoint)
+		client, err := NewDataNodeClient(endpoint)
 		if err != nil {
 			return fmt.Errorf("failed to create client for %s: %v", endpoint, err)
 		}
@@ -57,7 +55,7 @@ func (rm *ReplicationManager) paralellReplicate(req common.ReplicateChunkRequest
 
 	for i, rangeClient := range clients {
 		wg.Add(1)
-		go func(clientIndex int, c *client.DataNodeClient) {
+		go func(clientIndex int, c *DataNodeClient) {
 			defer wg.Done()
 
 			ctx, cancel := context.WithTimeout(context.Background(), rm.Config.ReplicateTimeout)
@@ -90,7 +88,7 @@ func (rm *ReplicationManager) paralellReplicate(req common.ReplicateChunkRequest
 	return nil
 }
 
-func (rm *ReplicationManager) replicate(ctx context.Context, client *client.DataNodeClient, req common.ReplicateChunkRequest, data []byte) error {
+func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeClient, req common.ReplicateChunkRequest, data []byte) error {
 	// Request replication session
 	resp, err := client.ReplicateChunk(ctx, req)
 	if err != nil {
@@ -109,7 +107,7 @@ func (rm *ReplicationManager) replicate(ctx context.Context, client *client.Data
 	return nil
 }
 
-func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *client.DataNodeClient, sessionID string, req common.ReplicateChunkRequest, data []byte) error {
+func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataNodeClient, sessionID string, req common.ReplicateChunkRequest, data []byte) error {
 	stream, err := client.StreamChunkData(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create stream: %v", err)
