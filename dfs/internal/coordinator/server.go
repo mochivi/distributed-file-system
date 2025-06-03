@@ -27,13 +27,6 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 	}
 	numChunks := (req.Size + chunkSize - 1) / chunkSize
 
-	// type ChunkInfo struct {
-	// 	ID       string
-	// 	Size     int64
-	// 	Replicas []string // DataNode IDs storing this chunk
-	// 	Checksum string
-	// }
-
 	// Select nodes for each chunk, locking the nodes until complete
 	assignments := make([]ChunkLocation, 0, numChunks)
 	c.nodesMutex.RLock()
