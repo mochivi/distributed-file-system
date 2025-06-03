@@ -11,8 +11,8 @@ import (
 )
 
 // client -> node
-func (c *DataNodeClient) StoreChunk(ctx context.Context, req common.StoreChunkRequest) error {
-	resp, err := c.client.StoreChunk(ctx, req.ToProto())
+func (c *DataNodeClient) StoreChunk(ctx context.Context, req common.StoreChunkRequest, opts ...grpc.CallOption) error {
+	resp, err := c.client.StoreChunk(ctx, req.ToProto(), opts...)
 	if err != nil {
 		return handlegRPCError(err, req.ChunkID)
 	}
@@ -26,8 +26,8 @@ func (c *DataNodeClient) StoreChunk(ctx context.Context, req common.StoreChunkRe
 }
 
 // client -> node
-func (c *DataNodeClient) RetrieveChunk(ctx context.Context, req common.RetrieveChunkRequest) (common.RetrieveChunkResponse, error) {
-	resp, err := c.client.RetrieveChunk(ctx, req.ToProto())
+func (c *DataNodeClient) RetrieveChunk(ctx context.Context, req common.RetrieveChunkRequest, opts ...grpc.CallOption) (common.RetrieveChunkResponse, error) {
+	resp, err := c.client.RetrieveChunk(ctx, req.ToProto(), opts...)
 	if err != nil {
 		err = handlegRPCError(err, req.ChunkID)
 		return common.RetrieveChunkResponse{}, err
@@ -36,8 +36,8 @@ func (c *DataNodeClient) RetrieveChunk(ctx context.Context, req common.RetrieveC
 }
 
 // client -> node
-func (c *DataNodeClient) DeleteChunk(ctx context.Context, req common.DeleteChunkRequest) (common.DeleteChunkResponse, error) {
-	resp, err := c.client.DeleteChunk(ctx, req.ToProto())
+func (c *DataNodeClient) DeleteChunk(ctx context.Context, req common.DeleteChunkRequest, opts ...grpc.CallOption) (common.DeleteChunkResponse, error) {
+	resp, err := c.client.DeleteChunk(ctx, req.ToProto(), opts...)
 	if err != nil {
 		err = handlegRPCError(err, req.ChunkID)
 		return common.DeleteChunkResponse{}, err
@@ -47,8 +47,8 @@ func (c *DataNodeClient) DeleteChunk(ctx context.Context, req common.DeleteChunk
 
 // node -> node
 // add context cancellation support
-func (c *DataNodeClient) ReplicateChunk(ctx context.Context, req common.ReplicateChunkRequest) (common.ReplicateChunkResponse, error) {
-	resp, err := c.client.ReplicateChunk(ctx, req.ToProto())
+func (c *DataNodeClient) ReplicateChunk(ctx context.Context, req common.ReplicateChunkRequest, opts ...grpc.CallOption) (common.ReplicateChunkResponse, error) {
+	resp, err := c.client.ReplicateChunk(ctx, req.ToProto(), opts...)
 	if err != nil {
 		err = handlegRPCError(err, req.ChunkID)
 		return common.ReplicateChunkResponse{}, err
@@ -58,12 +58,16 @@ func (c *DataNodeClient) ReplicateChunk(ctx context.Context, req common.Replicat
 
 // node -> node
 func (c *DataNodeClient) StreamChunkData(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck], error) {
-	return nil, nil
+	return c.client.StreamChunkData(ctx, opts...)
 }
 
 // node -> node
-func (c *DataNodeClient) HealthCheck(ctx context.Context, in *proto.HealthCheckRequest, opts ...grpc.CallOption) (common.HealthCheckResponse, error) {
-	return common.HealthCheckResponse{}, nil
+func (c *DataNodeClient) HealthCheck(ctx context.Context, req common.HealthCheckRequest, opts ...grpc.CallOption) (common.HealthCheckResponse, error) {
+	resp, err := c.client.HealthCheck(ctx, req.ToProto(), opts...)
+	if err != nil {
+		return common.HealthCheckResponse{}, err
+	}
+	return common.HealthCheckResponseFromProto(resp), nil
 }
 
 // Close closes the underlying connection

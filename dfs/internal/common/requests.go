@@ -214,6 +214,10 @@ type HealthCheckResponse struct {
 	Status HealthStatus
 }
 
+func HealthCheckResponseFromProto(pb *proto.HealthCheckResponse) HealthCheckResponse {
+	return HealthCheckResponse{Status: HealthStatusFromProto(pb.Status)}
+}
+
 func (hcr HealthCheckResponse) ToProto() *proto.HealthCheckResponse {
 	return &proto.HealthCheckResponse{Status: hcr.Status.ToProto()}
 }

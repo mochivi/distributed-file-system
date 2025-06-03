@@ -6,7 +6,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// Implements proto.DataNodeServiceClient
+// Wrapper over the proto.DataNodeServiceClient interface
 type DataNodeClient struct {
 	client proto.DataNodeServiceClient
 	conn   *grpc.ClientConn

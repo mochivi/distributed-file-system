@@ -231,6 +231,7 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *clien
 	}
 	finalAck := common.ChunkDataAckFromProto(finalResp)
 
+	// Update with server side calculated final checksum return
 	PLACEHOLDER_checksum := "placeholder"
 	calculatedChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
 	if PLACEHOLDER_checksum != calculatedChecksum {
