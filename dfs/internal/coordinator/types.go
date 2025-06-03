@@ -7,6 +7,8 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const CHUNK_SIZE = 8 // 8MB default chunk size
@@ -21,6 +23,12 @@ type Coordinator struct {
 	replication int
 
 	metadataManager *metadataManager
+}
+
+// Wrapper over the proto.CoordinatorServiceClient interface
+type CoordinatorClient struct {
+	client proto.CoordinatorServiceClient
+	conn   *grpc.ClientConn
 }
 
 type metadataManager struct {
@@ -40,7 +48,7 @@ type ChunkLocation struct {
 	Endpoint string
 }
 
-func NewChunkLocationFromProto(pb *proto.ChunkLocation) ChunkLocation {
+func ChunkLocationFromProto(pb *proto.ChunkLocation) ChunkLocation {
 	return ChunkLocation{
 		ChunkID:  pb.ChunkId,
 		NodeID:   pb.NodeId,
@@ -63,6 +71,23 @@ func NewCoordinator(metaStore storage.MetadataStore, metadataManager *metadataMa
 		replication:     replication,
 		metadataManager: metadataManager,
 	}
+}
+
+func NewCoordinatorClient(serverAddress string) (*CoordinatorClient, error) {
+	conn, err := grpc.NewClient(
+		serverAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()), // Update to TLS in prod
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client := proto.NewCoordinatorServiceClient(conn)
+
+	return &CoordinatorClient{
+		client: client,
+		conn:   conn,
+	}, nil
 }
 
 func NewMetadataManager(commitTimeout int) *metadataManager {

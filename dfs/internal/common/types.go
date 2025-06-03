@@ -27,6 +27,21 @@ type FileInfo struct {
 	Checksum   string
 }
 
+func FileInfoFromProto(pb *proto.FileInfo) FileInfo {
+	chunks := make([]ChunkInfo, 0, len(pb.Chunks))
+	for _, chunk := range pb.Chunks {
+		chunks = append(chunks, ChunkInfoFromProto(chunk))
+	}
+	return FileInfo{
+		Path:       pb.Path,
+		Size:       int(pb.Size),
+		ChunkCount: int(pb.ChunkCount),
+		Chunks:     chunks,
+		CreatedAt:  pb.CreatedAt.AsTime(),
+		Checksum:   pb.Checksum,
+	}
+}
+
 func (fi FileInfo) ToProto() *proto.FileInfo {
 	protoChunks := make([]*proto.ChunkInfo, len(fi.Chunks))
 	for _, item := range fi.Chunks {
@@ -46,15 +61,24 @@ func (fi FileInfo) ToProto() *proto.FileInfo {
 // ChunkInfo + proto conversions
 type ChunkInfo struct {
 	ID       string
-	Size     int64
+	Size     int
 	Replicas []string // DataNode IDs storing this chunk
 	Checksum string
+}
+
+func ChunkInfoFromProto(pb *proto.ChunkInfo) ChunkInfo {
+	return ChunkInfo{
+		ID:       pb.Id,
+		Size:     int(pb.Size),
+		Replicas: pb.Replicas,
+		Checksum: pb.Checksum,
+	}
 }
 
 func (ci ChunkInfo) ToProto() *proto.ChunkInfo {
 	return &proto.ChunkInfo{
 		Id:       ci.ID,
-		Size:     ci.Size,
+		Size:     int64(ci.Size),
 		Replicas: ci.Replicas,
 		Checksum: ci.Checksum,
 	}
@@ -91,7 +115,7 @@ type DataNodeInfo struct {
 	LastSeen  time.Time
 }
 
-func NewDataNodeInfoFromProto(pb *proto.DataNodeInfo) DataNodeInfo {
+func DataNodeInfoFromProto(pb *proto.DataNodeInfo) DataNodeInfo {
 	return DataNodeInfo{
 		ID:        pb.Id,
 		IPAddress: pb.IpAddress,

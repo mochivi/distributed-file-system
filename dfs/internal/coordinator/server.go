@@ -102,7 +102,7 @@ func (c *Coordinator) RegisterDataNode(ctx context.Context, req *proto.RegisterD
 	defer c.nodesMutex.Unlock()
 
 	// Convert request node info into internal representation
-	nodeInfo := common.NewDataNodeInfoFromProto(req.NodeInfo)
+	nodeInfo := common.DataNodeInfoFromProto(req.NodeInfo)
 	c.dataNodes[nodeInfo.ID] = &nodeInfo
 
 	return RegisterDataNodeResponse{
