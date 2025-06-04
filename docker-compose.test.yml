@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+
+  # Launch just one coordinator node, not yet HA
+  coordinator:
+    build:
+      context: .
+      dockerfile: ./dfs/deploy/docker/coordinator.Dockerfile
+    ports:
+      - "8080:8080"
+    networks:
+      - dfs-network
+
+  datanode1:
+    build:
+      context: .
+      dockerfile: ./dfs/deploy/docker/datanode.Dockerfile
+    depends_on:
+      - coordinator
+    networks:
+      - dfs-network
+
+  datanode2:
+    build:
+      context: .
+      dockerfile: ./dfs/deploy/docker/datanode.Dockerfile
+    depends_on:
+      - coordinator
+    networks:
+      - dfs-network
+
+  datanode3:
+    build:
+      context: .
+      dockerfile: ./dfs/deploy/docker/datanode.Dockerfile
+    depends_on:
+      - coordinator
+    networks:
+      - dfs-network
+
+  datanode4:
+    build:
+      context: .
+      dockerfile: ./dfs/deploy/docker/datanode.Dockerfile
+    depends_on:
+      - coordinator
+    networks:
+      - dfs-network
+
+  datanode5:
+    build:
+      context: .
+      dockerfile: ./dfs/deploy/docker/datanode.Dockerfile
+    depends_on:
+      - coordinator
+    networks:
+      - dfs-network
+
+  # Test runner service - runs integration tests against the cluster
+  integration-runner:
+    build:
+      context: .
+      dockerfile: ./dfs/deploy/docker/integration.Dockerfile
+    environment:
+      - DFS_COORDINATOR_ADDR=coordinator:8080
+      - DFS_TEST_FILES_DIR=./test-files
+    depends_on:
+      - coordinator
+      - datanode1
+      - datanode2
+      - datanode3
+      - datanode4
+      - datanode5
+    networks:
+      - dfs-network
+    profiles:
+      - test
+
+networks:
+  dfs-network:
+    driver: bridge

@@ -10,6 +10,7 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
+	"github.com/mochivi/distributed-file-system/internal/datanode"
 )
 
 func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chunksize int) error {
@@ -35,8 +36,14 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 	uploadCtx, cancel := context.WithCancel(ctx)
 	defer cancel() // any early return will terminate the created goroutines
 
+	// Define the datatype that workers will receive
+	type Work struct {
+		req    common.StoreChunkRequest
+		client *datanode.DataNodeClient
+	}
+
 	// Make one channel to receive the work, one to write any errors into
-	workChan := make(chan common.StoreChunkRequest, len(uploadResponse.ChunkLocations))
+	workChan := make(chan Work, len(uploadResponse.ChunkLocations))
 	errChan := make(chan error, len(uploadResponse.ChunkLocations))
 
 	// Worker pool
@@ -48,10 +55,10 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 		log.Printf("initializing worker %d...\n", i)
 		go func(workerID int) {
 			defer wg.Done()
-			for req := range workChan {
-				log.Printf("worker %d received work: %+v", workerID, req)
-				if err := c.datanodeClient.StoreChunk(uploadCtx, req); err != nil {
-					errChan <- fmt.Errorf("failed to store chunk %s: %w", req.ChunkID, err)
+			for work := range workChan {
+				log.Printf("worker %d received work: %+v", workerID, work.req)
+				if err := work.client.StoreChunk(uploadCtx, work.req); err != nil {
+					errChan <- fmt.Errorf("failed to store chunk %s: %w", work.req.ChunkID, err)
 				}
 			}
 		}(i)
@@ -65,12 +72,23 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 			close(workChan)
 			return fmt.Errorf("failed to read chunk %d: %w", i, err)
 		}
-
 		chunkData = chunkData[:n]
-		workChan <- common.StoreChunkRequest{
+
+		req := common.StoreChunkRequest{
 			ChunkID:  chunkUploadLocation.ChunkID,
 			Data:     chunkData,
 			Checksum: common.CalculateChecksum(chunkData),
+		}
+
+		client, err := datanode.NewDataNodeClient(chunkUploadLocation.Endpoint)
+		if err != nil {
+			// can be retried later
+			return fmt.Errorf("failed to create connection to datanode client: %w", err)
+		}
+
+		workChan <- Work{
+			req:    req,
+			client: client,
 		}
 	}
 
