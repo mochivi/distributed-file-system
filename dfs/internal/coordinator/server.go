@@ -104,7 +104,7 @@ func (c *Coordinator) RegisterDataNode(ctx context.Context, req *proto.RegisterD
 	}.ToProto(), nil
 }
 
-// Request from client to verify if some DataNode is healthly and able to process requests
+// DataNodes periodically communicate their status to the coordinator
 func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, req *proto.HeartbeatRequest) (*proto.HeartbeatResponse, error) {
 	c.nodesMutex.Lock()
 	defer c.nodesMutex.Unlock()

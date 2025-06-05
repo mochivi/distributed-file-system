@@ -1,16 +1,42 @@
 package datanode
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"hash"
 	"sync"
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 )
 
+// SessionManager handles currently open chunk streaming sessions with clients
 type SessionManager struct {
 	sessions map[string]*StreamingSession
 	mu       sync.RWMutex
+}
+
+// StreamingSession controls the data flow during a chunk streaming session
+type StreamingSession struct {
+	SessionID    string
+	ChunkID      string
+	ExpectedSize int
+	ExpectedHash string
+	CreatedAt    time.Time
+	ExpiresAt    time.Time
+
+	// Runtime state
+	BytesReceived int64
+	Buffer        *bytes.Buffer
+	Checksum      hash.Hash // Running checksum calculation
+
+	// Concurrency control
+	mutex  sync.RWMutex
+	Status SessionStatus
+}
+
+func NewSessionManager() *SessionManager {
+	return &SessionManager{sessions: make(map[string]*StreamingSession)}
 }
 
 func (sm *SessionManager) Store(sessionID string, session *StreamingSession) {
@@ -43,7 +69,7 @@ func (s *DataNodeServer) createStreamingSession(sessionId string, req common.Rep
 		ExpectedSize: req.ChunkSize,
 		ExpectedHash: req.Checksum,
 		CreatedAt:    time.Now(),
-		ExpiresAt:    time.Now().Add(s.config.SessionTimeout),
+		ExpiresAt:    time.Now().Add(s.Config.SessionTimeout),
 		Status:       SessionActive,
 		Checksum:     sha256.New(),
 	}

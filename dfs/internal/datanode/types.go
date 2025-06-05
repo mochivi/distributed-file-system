@@ -1,11 +1,7 @@
 package datanode
 
 import (
-	"bytes"
 	"context"
-	"hash"
-	"sync"
-	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
@@ -35,7 +31,8 @@ type DataNodeServer struct {
 	replicationManager IReplicationManager
 	sessionManager     ISessionManager
 
-	config DataNodeConfig
+	Info   common.DataNodeInfo
+	Config DataNodeConfig
 }
 
 // Wrapper over the proto.DataNodeServiceClient interface
@@ -60,29 +57,14 @@ type ISessionManager interface {
 	Delete(sessionID string)
 }
 
-// StreamingSession controls the data flow during a chunk streaming session
-type StreamingSession struct {
-	SessionID    string
-	ChunkID      string
-	ExpectedSize int
-	ExpectedHash string
-	CreatedAt    time.Time
-	ExpiresAt    time.Time
-
-	// Runtime state
-	BytesReceived int64
-	Buffer        *bytes.Buffer
-	Checksum      hash.Hash // Running checksum calculation
-
-	// Concurrency control
-	mutex  sync.RWMutex
-	Status SessionStatus
-}
-
-func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager) *DataNodeServer {
+func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
+	info common.DataNodeInfo, config DataNodeConfig) *DataNodeServer {
 	return &DataNodeServer{
 		store:              store,
 		replicationManager: replicationManager,
+		sessionManager:     sessionManager,
+		Config:             config,
+		Info:               info,
 	}
 }
 

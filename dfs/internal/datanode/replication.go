@@ -16,6 +16,13 @@ type ReplicationManager struct {
 	NodeSelector NodeSelector
 }
 
+func NewReplicationManager(config ReplicateManagerConfig, nodeSelector NodeSelector) *ReplicationManager {
+	return &ReplicationManager{
+		Config:       config,
+		NodeSelector: nodeSelector,
+	}
+}
+
 func (rm *ReplicationManager) paralellReplicate(req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error {
 	nodes := rm.NodeSelector.selectBestNodes(requiredReplicas + 3)
 	if len(nodes) == 0 {
