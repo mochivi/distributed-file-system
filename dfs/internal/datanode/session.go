@@ -69,7 +69,7 @@ func (s *DataNodeServer) createStreamingSession(sessionId string, req common.Rep
 		ExpectedSize: req.ChunkSize,
 		ExpectedHash: req.Checksum,
 		CreatedAt:    time.Now(),
-		ExpiresAt:    time.Now().Add(s.Config.SessionTimeout),
+		ExpiresAt:    time.Now().Add(s.Config.Session.SessionTimeout),
 		Status:       SessionActive,
 		Checksum:     sha256.New(),
 	}

@@ -2,7 +2,6 @@ package coordinator
 
 import (
 	"sync"
-	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
@@ -11,18 +10,28 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const CHUNK_SIZE = 8 // 8MB default chunk size
-
 // Implements proto.CoordinatorServiceServer interface
 type Coordinator struct {
 	proto.UnimplementedCoordinatorServiceServer // Embed
 
-	metaStore   storage.MetadataStore
-	dataNodes   map[string]*common.DataNodeInfo
-	nodesMutex  sync.RWMutex
-	replication int
+	// Coordinates data nodes access
+	dataNodes  map[string]*common.DataNodeInfo
+	nodesMutex sync.RWMutex
 
-	metadataManager *metadataManager
+	// Coordinates metadata storage
+	metaStore       storage.MetadataStore
+	metadataManager *metadataManager // Coordinates when to actually commit metadata
+
+	config CoordinatorConfig
+}
+
+func NewCoordinator(metaStore storage.MetadataStore, metadataManager *metadataManager, cfg CoordinatorConfig) *Coordinator {
+	return &Coordinator{
+		metaStore:       metaStore,
+		dataNodes:       make(map[string]*common.DataNodeInfo),
+		config:          cfg,
+		metadataManager: metadataManager,
+	}
 }
 
 // Wrapper over the proto.CoordinatorServiceClient interface
@@ -31,14 +40,21 @@ type CoordinatorClient struct {
 	conn   *grpc.ClientConn
 }
 
-type metadataManager struct {
-	sessions      map[string]metadataUploadSession
-	commitTimeout time.Duration
-}
-type metadataUploadSession struct {
-	id       string
-	exp      time.Time
-	fileInfo *common.FileInfo
+func NewCoordinatorClient(serverAddress string) (*CoordinatorClient, error) {
+	conn, err := grpc.NewClient(
+		serverAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()), // Update to TLS in prod
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client := proto.NewCoordinatorServiceClient(conn)
+
+	return &CoordinatorClient{
+		client: client,
+		conn:   conn,
+	}, nil
 }
 
 // ChunkLocation represents where some chunk should be stored (primary node + endpoint)
@@ -61,48 +77,5 @@ func (cs *ChunkLocation) ToProto() *proto.ChunkLocation {
 		ChunkId:  cs.ChunkID,
 		NodeId:   cs.NodeID,
 		Endpoint: cs.Endpoint,
-	}
-}
-
-func NewCoordinator(metaStore storage.MetadataStore, metadataManager *metadataManager, replication int) *Coordinator {
-	return &Coordinator{
-		metaStore:       metaStore,
-		dataNodes:       make(map[string]*common.DataNodeInfo),
-		replication:     replication,
-		metadataManager: metadataManager,
-	}
-}
-
-func NewCoordinatorClient(serverAddress string) (*CoordinatorClient, error) {
-	conn, err := grpc.NewClient(
-		serverAddress,
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // Update to TLS in prod
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	client := proto.NewCoordinatorServiceClient(conn)
-
-	return &CoordinatorClient{
-		client: client,
-		conn:   conn,
-	}, nil
-}
-
-func NewMetadataManager(commitTimeout int) *metadataManager {
-	manager := &metadataManager{
-		sessions:      make(map[string]metadataUploadSession),
-		commitTimeout: time.Duration(commitTimeout),
-	}
-
-	return manager
-}
-
-func newMetadataUploadSession(sessionID string, exp time.Duration, fileInfo *common.FileInfo) metadataUploadSession {
-	return metadataUploadSession{
-		id:       sessionID,
-		exp:      time.Now().Add(exp),
-		fileInfo: fileInfo,
 	}
 }

@@ -21,6 +21,14 @@ build: proto
 	@go build -o bin/client ./cmd/client
 	@echo "Build complete"
 
+integration:
+	@echo "Running integration tests"
+	@docker compose -f docker-compose.test.yml up --build
+
+integration-down:
+	@echo "Running integration tests"
+	@docker compose -f docker-compose.test.yml down
+
 # Run tests
 test:
 	@echo "Running tests..."

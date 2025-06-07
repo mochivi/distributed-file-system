@@ -29,7 +29,6 @@ head -c 104857600 /dev/urandom > large_test.txt
 echo "All test files created:"
 ls -lh *test*.txt
 
-# Start datanode
 cd ..
-echo "Starting datanode..."
-exec ./datanode
+echo "running tests..."
+go test -v -timeout=300s ./tests/integration/...

@@ -2,21 +2,21 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/mochivi/distributed-file-system/internal/client"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
+	"github.com/mochivi/distributed-file-system/internal/datanode"
 )
 
 func TestClientUpload(t *testing.T) {
-	// The coordinator IP address is just a environment variable for internal tests
-	coordinatorAddr := os.Getenv("DFS_COORDINATOR_ADDR")
-	if coordinatorAddr == "" {
-		t.Fatalf("missing required DFS_COORDINATOR_ADDR environment variable")
-	}
+	// Setup coordinator default config
+	nodeConfig := datanode.DefaultDatanodeConfig()
+	nodeConfig.Coordinator.Host = "coordinator" // Overwriting manually for now so docker can find the coordinator
 
-	coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorAddr)
+	coordinatorClient, err := coordinator.NewCoordinatorClient(fmt.Sprintf("%s:%d", nodeConfig.Coordinator.Host, nodeConfig.Coordinator.Port))
 	if err != nil {
 		t.Fatalf("failed to create coordinator client: %v", err)
 	}

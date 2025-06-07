@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -13,21 +14,20 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	REPLICATION_DEFAULT    = 3
-	COORDINATOR_PORT       = "5244"
-	DEFAULT_COMMIT_TIMEOUT = 15 // max time to wait for replication to commit metadata
-)
-
 func main() {
-	metadataStore := metadata.NewMetadataLocalStorage()
-	metadataManager := coordinator.NewMetadataManager(DEFAULT_COMMIT_TIMEOUT)
-	server := coordinator.NewCoordinator(metadataStore, metadataManager, REPLICATION_DEFAULT)
-	grpcServer := grpc.NewServer()
+	cfg := coordinator.DefaultCoordinatorConfig()
 
+	metadataStore := metadata.NewMetadataLocalStorage()
+	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout)
+
+	// Create coordinator server
+	server := coordinator.NewCoordinator(metadataStore, metadataManager, cfg)
+
+	// gRPC server and register
+	grpcServer := grpc.NewServer()
 	proto.RegisterCoordinatorServiceServer(grpcServer, server)
 
-	listener, err := net.Listen("tcp", COORDINATOR_PORT)
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
@@ -40,7 +40,7 @@ func main() {
 			}
 		}()
 
-		log.Printf("Starting gRPC server on :%s", COORDINATOR_PORT)
+		log.Printf("Starting coordinator gRPC server on :%d", cfg.Port)
 		if err := grpcServer.Serve(listener); err != nil {
 			log.Fatalf("Failed to server gRPC server: %v", err)
 		}
@@ -51,7 +51,7 @@ func main() {
 	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 	<-ch
 
-	log.Println("Stopping gRPC server...")
+	log.Println("Stopping coordinator gRPC server...")
 	grpcServer.GracefulStop()
-	log.Println("Server stopped, exiting...")
+	log.Println("Coordinator server stopped, exiting...")
 }

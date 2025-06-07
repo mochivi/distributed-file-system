@@ -31,7 +31,6 @@ type DataNodeServer struct {
 	replicationManager IReplicationManager
 	sessionManager     ISessionManager
 
-	Info   common.DataNodeInfo
 	Config DataNodeConfig
 }
 
@@ -58,13 +57,12 @@ type ISessionManager interface {
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
-	info common.DataNodeInfo, config DataNodeConfig) *DataNodeServer {
+	config DataNodeConfig) *DataNodeServer {
 	return &DataNodeServer{
 		store:              store,
 		replicationManager: replicationManager,
 		sessionManager:     sessionManager,
 		Config:             config,
-		Info:               info,
 	}
 }
 

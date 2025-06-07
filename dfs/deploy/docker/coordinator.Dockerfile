@@ -4,13 +4,13 @@ FROM golang:1.24-alpine AS builder
 WORKDIR /app
 
 # Copy go.mod and go.sum first for better caching
-COPY dfs/go.mod dfs/go.sum ./
+COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
 # Copy the entire dfs directory
-COPY dfs/ .
+COPY . .
 
 # Build the datanode binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o coordinator ./cmd/coordinator/main.go

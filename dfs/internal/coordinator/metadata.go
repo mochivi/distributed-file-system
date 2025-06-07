@@ -8,6 +8,34 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/storage"
 )
 
+type metadataManager struct {
+	sessions      map[string]metadataUploadSession
+	commitTimeout time.Duration
+}
+
+type metadataUploadSession struct {
+	id       string
+	exp      time.Time
+	fileInfo *common.FileInfo
+}
+
+func NewMetadataManager(commitTimeout time.Duration) *metadataManager {
+	manager := &metadataManager{
+		sessions:      make(map[string]metadataUploadSession),
+		commitTimeout: commitTimeout,
+	}
+
+	return manager
+}
+
+func newMetadataUploadSession(sessionID string, exp time.Duration, fileInfo *common.FileInfo) metadataUploadSession {
+	return metadataUploadSession{
+		id:       sessionID,
+		exp:      time.Now().Add(exp),
+		fileInfo: fileInfo,
+	}
+}
+
 func (m *metadataManager) trackUpload(sessionID string, req UploadRequest, numChunks int) {
 	fileInfo := &common.FileInfo{
 		Path:       req.Path,

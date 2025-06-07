@@ -7,12 +7,13 @@ RUN apk add --no-cache wget curl
 WORKDIR /app
 
 # Copy go.mod and go.sum first for better caching
-COPY dfs/go.mod dfs/go.sum ./
+COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
 # Copy the entire dfs directory
-COPY dfs/ .
+COPY . .
 
-ENTRYPOINT ["go", "test", "-v", "-timeout=300s", "./tests/integration/..."]
+# Sets up test-files directory in client for upload tests
+ENTRYPOINT ["./deploy/scripts/client-test.sh"]

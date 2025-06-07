@@ -23,7 +23,7 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 	// Calculate number of chunks needed
 	chunkSize := req.ChunkSize
 	if chunkSize == 0 {
-		chunkSize = CHUNK_SIZE * 1024 * 1024
+		chunkSize = c.config.ChunkSize * 1024 * 1024
 	}
 	numChunks := (req.Size + chunkSize - 1) / chunkSize
 
