@@ -34,7 +34,7 @@ func (ur UploadRequest) ToProto() *proto.UploadRequest {
 }
 
 type UploadResponse struct {
-	ChunkLocations []ChunkLocation //
+	ChunkLocations []ChunkLocation
 }
 
 func UploadResponseFromProto(pb *proto.UploadResponse) UploadResponse {
@@ -46,7 +46,7 @@ func UploadResponseFromProto(pb *proto.UploadResponse) UploadResponse {
 }
 
 func (ur UploadResponse) ToProto() *proto.UploadResponse {
-	chunkLocations := make([]*proto.ChunkLocation, len(ur.ChunkLocations))
+	chunkLocations := make([]*proto.ChunkLocation, 0, len(ur.ChunkLocations))
 	for _, item := range ur.ChunkLocations {
 		chunkLocations = append(chunkLocations, item.ToProto())
 	}

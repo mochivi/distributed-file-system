@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
@@ -45,6 +46,7 @@ func (m *metadataManager) trackUpload(sessionID string, req UploadRequest, numCh
 		CreatedAt:  time.Now(),
 		Checksum:   req.Checksum,
 	}
+	log.Printf("Tracking upload session: %s", sessionID)
 	m.sessions[sessionID] = newMetadataUploadSession(sessionID, m.commitTimeout, fileInfo)
 }
 

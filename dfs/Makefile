@@ -26,7 +26,7 @@ integration:
 	@docker compose -f docker-compose.test.yml up --build
 
 integration-down:
-	@echo "Running integration tests"
+	@echo "Downing containers..."
 	@docker compose -f docker-compose.test.yml down
 
 # Run tests

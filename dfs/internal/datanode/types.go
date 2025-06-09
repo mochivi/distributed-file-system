@@ -36,8 +36,9 @@ type DataNodeServer struct {
 
 // Wrapper over the proto.DataNodeServiceClient interface
 type DataNodeClient struct {
-	client proto.DataNodeServiceClient
-	conn   *grpc.ClientConn
+	client  proto.DataNodeServiceClient
+	conn    *grpc.ClientConn
+	address string
 }
 
 type NodeSelector interface {
@@ -78,7 +79,8 @@ func NewDataNodeClient(serverAddress string) (*DataNodeClient, error) {
 	client := proto.NewDataNodeServiceClient(conn)
 
 	return &DataNodeClient{
-		client: client,
-		conn:   conn,
+		client:  client,
+		conn:    conn,
+		address: serverAddress,
 	}, nil
 }

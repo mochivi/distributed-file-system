@@ -16,4 +16,5 @@ RUN go mod download
 COPY . .
 
 # Sets up test-files directory in client for upload tests
-ENTRYPOINT ["./deploy/scripts/client-test.sh"]
+RUN chmod +x /app/deploy/scripts/client-test.sh
+ENTRYPOINT ["/app/deploy/scripts/client-test.sh"]

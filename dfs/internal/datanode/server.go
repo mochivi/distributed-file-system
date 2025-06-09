@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -217,6 +220,29 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 
 func (s *DataNodeServer) HealthCheck(ctx context.Context, pb *proto.HealthCheckRequest) (*proto.HealthCheckResponse, error) {
 	return nil, nil
+}
+
+func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context, coordinatorAddress string) error {
+	log.Printf("Registering with coordinator at address: %s", coordinatorAddress)
+
+	coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorAddress)
+	if err != nil {
+		log.Fatalf("failed to create coordinator client: %v", err)
+	}
+
+	req := coordinator.RegisterDataNodeRequest{NodeInfo: s.Config.Info}
+	resp, err := coordinatorClient.RegisterDataNode(context.Background(), req)
+	if err != nil {
+		return fmt.Errorf("failed to register datanode with coordinator: %v", err)
+	}
+
+	if !resp.Success {
+		return fmt.Errorf("failed to register datanode with coordinator: %s", resp.Message)
+	}
+
+	log.Printf("Datanode %s registered with coordinator succesfully", s.Config.Info.ID)
+
+	return nil
 }
 
 // Helper functions

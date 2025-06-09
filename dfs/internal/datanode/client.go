@@ -12,6 +12,7 @@ import (
 
 // client -> node
 func (c *DataNodeClient) StoreChunk(ctx context.Context, req common.StoreChunkRequest, opts ...grpc.CallOption) error {
+	log.Printf("Sending StoreChunk request to DataNode at: %s", c.address)
 	resp, err := c.client.StoreChunk(ctx, req.ToProto(), opts...)
 	if err != nil {
 		return handlegRPCError(err, req.ChunkID)

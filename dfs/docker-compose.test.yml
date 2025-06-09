@@ -10,78 +10,34 @@ services:
     networks:
       - dfs-network
 
-  datanode1:
+  datanode:
     build:
       context: .
       dockerfile: ./deploy/docker/datanode.Dockerfile
     ports:
       - "8081:8081"
+    environment:
+      - COORDINATOR_HOST=coordinator
+      - COORDINATOR_PORT=8080
     depends_on:
       - coordinator
     networks:
       - dfs-network
-
-  # datanode2:
-  #   build:
-  #     context: .
-  #     dockerfile: ./deploy/docker/datanode.Dockerfile
-  #   depends_on:
-  #     - coordinator
-  #   networks:
-  #     - dfs-network
-
-  # datanode3:
-  #   build:
-  #     context: .
-  #     dockerfile: ./deploy/docker/datanode.Dockerfile
-  #   environment:
-  #     - COORDINATOR_ADDRESS=coordinator
-  #     - COORDINATOR_PORT=8080
-  #   depends_on:
-  #     - coordinator
-  #   networks:
-  #     - dfs-network
-
-  # datanode4:
-  #   build:
-  #     context: .
-  #     dockerfile: ./deploy/docker/datanode.Dockerfile
-  #   environment:
-  #     - COORDINATOR_ADDRESS=coordinator
-  #     - COORDINATOR_PORT=8080
-  #   depends_on:
-  #     - coordinator
-  #   networks:
-  #     - dfs-network
-
-  # datanode5:
-  #   build:
-  #     context: .
-  #     dockerfile: ./deploy/docker/datanode.Dockerfile
-  #   environment:
-  #     - COORDINATOR_ADDRESS=coordinator
-  #     - COORDINATOR_PORT=8080
-  #   depends_on:
-  #     - coordinator
-  #   networks:
-  #     - dfs-network
 
   # Test runner service - runs integration tests against the cluster
   integration-runner:
     build:
       context: .
       dockerfile: ./deploy/docker/integration.Dockerfile
+    environment:
+      - TEST_FILES_DIR=/app/test-files
+      - COORDINATOR_HOST=coordinator
+      - COORDINATOR_PORT=8080
     depends_on:
       - coordinator
-      - datanode1
-      # - datanode2
-      # - datanode3
-      # - datanode4
-      # - datanode5
+      - datanode
     networks:
       - dfs-network
-    profiles:
-      - test
 
 networks:
   dfs-network:

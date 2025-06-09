@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
@@ -19,6 +20,7 @@ import (
 func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (*proto.UploadResponse, error) {
 	// transform into internal representation
 	req := newUploadRequestFromProto(pb)
+	log.Printf("Received UploadRequest: %+v", req)
 
 	// Calculate number of chunks needed
 	chunkSize := req.ChunkSize
@@ -28,9 +30,9 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 	numChunks := (req.Size + chunkSize - 1) / chunkSize
 
 	// Select nodes for each chunk, locking the nodes until complete
-	assignments := make([]ChunkLocation, 0, numChunks)
+	assignments := make([]ChunkLocation, numChunks)
 	c.nodesMutex.RLock()
-	for i := range numChunks {
+	for i := 0; i < numChunks; i++ {
 		chunkID := common.FormatChunkID(req.Path, i)
 
 		// Select nodes for this chunk (primary + replicas)

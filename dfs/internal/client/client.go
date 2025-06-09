@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
@@ -19,18 +20,24 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 		return fmt.Errorf("failed to stat file: %w", err)
 	}
 
-	// Prepare upload request to coordinator
+	checksum, err := common.CalculateFileChecksum(file)
+	if err != nil {
+		return fmt.Errorf("failed to calculate checksum")
+	}
+
 	uploadRequest := coordinator.UploadRequest{
-		Path:      path,
+		Path:      filepath.Join(path, fileInfo.Name()),
 		Size:      int(fileInfo.Size()),
 		ChunkSize: chunksize,
-		Checksum:  common.CalculateChecksum([]byte{1, 2, 3, 4, 1, 2, 4, 5}), // TODO: implement actual file checksum
+		Checksum:  checksum,
 	}
+	log.Printf("Prepared UploadRequest: %+v\n", uploadRequest)
 
 	uploadResponse, err := c.coordinatorClient.UploadFile(ctx, uploadRequest)
 	if err != nil {
 		return fmt.Errorf("failed to submit upload request: %w", err)
 	}
+	log.Printf("Received UploadResponse: %+v", uploadResponse)
 
 	// Control all the goroutines and requests we will make
 	uploadCtx, cancel := context.WithCancel(ctx)
@@ -56,7 +63,7 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 		go func(workerID int) {
 			defer wg.Done()
 			for work := range workChan {
-				log.Printf("worker %d received work: %+v", workerID, work.req)
+				log.Printf("worker %d received work for chunk: %s", workerID, work.req.ChunkID)
 				if err := work.client.StoreChunk(uploadCtx, work.req); err != nil {
 					errChan <- fmt.Errorf("failed to store chunk %s: %w", work.req.ChunkID, err)
 				}

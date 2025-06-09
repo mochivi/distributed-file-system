@@ -10,10 +10,11 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
+	"github.com/joho/godotenv"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"github.com/mochivi/distributed-file-system/pkg/utils"
 	"google.golang.org/grpc"
 )
 
@@ -37,24 +38,11 @@ func initServer() (*datanode.DataNodeServer, error) {
 	return datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeConfig), nil
 }
 
-func registerDataNode(config datanode.DataNodeConfig) {
-	coordinatorClient, err := coordinator.NewCoordinatorClient(fmt.Sprintf("%s:%d", config.Coordinator.Host, config.Coordinator.Port))
-	if err != nil {
-		log.Fatalf("failed to create coordinator client: %v", err)
-	}
-
-	req := coordinator.RegisterDataNodeRequest{NodeInfo: config.Info}
-	resp, err := coordinatorClient.RegisterDataNode(context.Background(), req)
-	if err != nil {
-		log.Fatalf("failed to register datanode with coordinator: %v", err)
-	}
-
-	if !resp.Success {
-		log.Fatalf("failed to register datanode with coordinator: %s", resp.Message)
-	}
-}
-
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("failed to load environment: %v", err)
+	}
+
 	// Datanode server
 	server, err := initServer()
 	if err != nil {
@@ -66,7 +54,7 @@ func main() {
 	proto.RegisterDataNodeServiceServer(grpcServer, server)
 
 	// Setup listener for gRPC server
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", server.Config.Info.Port))
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", server.Config.Info.Port))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
@@ -86,7 +74,14 @@ func main() {
 	}()
 
 	// Register datanode with coordinator - if fails, should crash
-	registerDataNode(server.Config)
+	coordinatorHost := utils.GetEnvString("COORDINATOR_HOST", "coordinator")
+	coordinatorPort := utils.GetEnvInt("COORDINATOR_PORT", 8080)
+	coordinatorAddress := fmt.Sprintf("%s:%d", coordinatorHost, coordinatorPort)
+
+	// Temporarily, overwrite the datanode IP address with the docker dns name
+	server.Config.Info.IPAddress = "datanode"
+
+	server.RegisterWithCoordinator(context.TODO(), coordinatorAddress)
 
 	// Graceful shutdown on SIGINT/SIGTERM
 	ch := make(chan os.Signal, 1)
