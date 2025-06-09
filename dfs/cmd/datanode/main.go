@@ -20,12 +20,16 @@ import (
 
 func initServer() (*datanode.DataNodeServer, error) {
 	// ChunkStore implementation is chosen here
-	cwd, err := os.Getwd()
+	baseDir := utils.GetEnvString("DISK_STORAGE_BASE_DIR", "/app")
+	rootDir := filepath.Join(baseDir, "data")
+	chunkStore, err := chunk.NewChunkDiskStorage(chunk.DiskStorageConfig{
+		Enabled: true,
+		Kind:    "block",
+		RootDir: rootDir,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("unable to get cwd: %v", err)
+		log.Fatal(err.Error())
 	}
-	rootDir := filepath.Join(cwd, "chunks")
-	chunkStore := chunk.NewChunkDiskStorage(rootDir)
 
 	// Create default datanode config
 	nodeConfig := datanode.DefaultDatanodeConfig()

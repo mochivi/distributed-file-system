@@ -5,12 +5,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 )
 
 type DataNodeConfig struct {
 	Info        common.DataNodeInfo
 	Session     SessionManagerConfig
 	Replication ReplicateManagerConfig
+	DiskStorage chunk.DiskStorageConfig
 }
 
 type SessionManagerConfig struct {

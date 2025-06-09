@@ -19,6 +19,7 @@ services:
     environment:
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
+      - DISK_STORAGE_BASE_DIR=/app
     depends_on:
       - coordinator
     networks:
