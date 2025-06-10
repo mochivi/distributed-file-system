@@ -11,6 +11,8 @@ import (
 	"syscall"
 
 	"github.com/joho/godotenv"
+	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -85,7 +87,44 @@ func main() {
 	// Temporarily, overwrite the datanode IP address with the docker dns name
 	server.Config.Info.IPAddress = "datanode"
 
-	server.RegisterWithCoordinator(context.TODO(), coordinatorAddress)
+	// Register datanode with coordinator
+	if err := server.RegisterWithCoordinator(context.TODO(), coordinatorAddress); err != nil {
+		log.Fatalf("Failed to register with coordinator: %v", err)
+	}
+
+	// Subscribe to node updates
+	coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorAddress)
+	if err != nil {
+		log.Fatalf("Failed to create coordinator client: %v", err)
+	}
+
+	// Start node update subscription in a goroutine
+	go func() {
+		req := &proto.SubscribeToNodeUpdatesRequest{
+			NodeId: server.Config.Info.ID,
+		}
+		stream, err := coordinatorClient.SubscribeToNodeUpdates(context.Background(), req)
+		if err != nil {
+			log.Printf("Failed to subscribe to node updates: %v", err)
+			return
+		}
+
+		for {
+			update, err := stream.Recv()
+			if err != nil {
+				log.Printf("Error receiving node update: %v", err)
+				return
+			}
+
+			switch update.Type {
+			case proto.NodeUpdate_NODE_ADDED, proto.NodeUpdate_NODE_UPDATED:
+				nodeInfo := common.DataNodeInfoFromProto(update.Node)
+				server.nodeSelector.UpdateNodes([]common.DataNodeInfo{nodeInfo})
+			case proto.NodeUpdate_NODE_REMOVED:
+				server.nodeSelector.RemoveNode(update.Node.Id)
+			}
+		}
+	}()
 
 	// Graceful shutdown on SIGINT/SIGTERM
 	ch := make(chan os.Signal, 1)

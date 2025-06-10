@@ -1,8 +1,11 @@
 package coordinator
 
 import (
+	"time"
+
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Request/response pairs
@@ -174,52 +177,172 @@ func (rr RegisterDataNodeRequest) ToProto() *proto.RegisterDataNodeRequest {
 }
 
 type RegisterDataNodeResponse struct {
-	Success bool
-	Message string
+	Success        bool
+	Message        string
+	FullNodeList   []*common.DataNodeInfo
+	CurrentVersion int64
 }
 
 func RegisterDataNodeResponseFromProto(pb *proto.RegisterDataNodeResponse) RegisterDataNodeResponse {
+	fullNodeList := make([]*common.DataNodeInfo, 0, len(pb.FullNodeList))
+	for _, protoNode := range pb.FullNodeList {
+		node := common.DataNodeInfoFromProto(protoNode)
+		fullNodeList = append(fullNodeList, &node)
+	}
+
 	return RegisterDataNodeResponse{
-		Success: pb.Success,
-		Message: pb.Message,
+		Success:        pb.Success,
+		Message:        pb.Message,
+		FullNodeList:   fullNodeList,
+		CurrentVersion: pb.CurrentVersion,
 	}
 }
 
 func (r RegisterDataNodeResponse) ToProto() *proto.RegisterDataNodeResponse {
+	fullNodeList := make([]*proto.DataNodeInfo, 0, len(r.FullNodeList))
+	for _, node := range r.FullNodeList {
+		fullNodeList = append(fullNodeList, node.ToProto())
+	}
+
 	return &proto.RegisterDataNodeResponse{
-		Success: r.Success,
-		Message: r.Message,
+		Success:        r.Success,
+		Message:        r.Message,
+		FullNodeList:   fullNodeList,
+		CurrentVersion: r.CurrentVersion,
 	}
 }
 
 // Heartbeat
 type HeartbeatRequest struct {
-	NodeID string
-	Status common.HealthStatus
+	NodeID          string
+	Status          common.HealthStatus
+	LastSeenVersion int64
 }
 
 func HeartbeatRequestFromProto(pb *proto.HeartbeatRequest) HeartbeatRequest {
 	return HeartbeatRequest{
-		NodeID: pb.NodeId,
-		Status: common.HealthStatusFromProto(pb.Status),
+		NodeID:          pb.NodeId,
+		Status:          common.HealthStatusFromProto(pb.Status),
+		LastSeenVersion: pb.LastSeenVersion,
 	}
 }
 
 func (hr HeartbeatRequest) ToProto() *proto.HeartbeatRequest {
 	return &proto.HeartbeatRequest{
-		NodeId: hr.NodeID,
-		Status: hr.Status.ToProto(),
+		NodeId:          hr.NodeID,
+		Status:          hr.Status.ToProto(),
+		LastSeenVersion: hr.LastSeenVersion,
 	}
 }
 
 type HeartbeatResponse struct {
-	Success bool
+	Success            bool
+	Message            string
+	Updates            []NodeUpdate
+	FromVersion        int64
+	ToVersion          int64
+	RequiresFullResync bool
 }
 
 func HeartbeatResponseFromProto(pb *proto.HeartbeatResponse) HeartbeatResponse {
-	return HeartbeatResponse{Success: pb.Success}
+	updates := make([]NodeUpdate, 0, len(pb.Updates))
+	for _, update := range pb.Updates {
+		updates = append(updates, NodeUpdateFromProto(update))
+	}
+
+	return HeartbeatResponse{
+		Success:            pb.Success,
+		Message:            pb.Message,
+		Updates:            updates,
+		FromVersion:        pb.FromVersion,
+		ToVersion:          pb.ToVersion,
+		RequiresFullResync: pb.RequiresFullResync,
+	}
 }
 
 func (hr HeartbeatResponse) ToProto() *proto.HeartbeatResponse {
-	return &proto.HeartbeatResponse{Success: hr.Success}
+	updates := make([]*proto.NodeUpdate, 0, len(hr.Updates))
+	for _, update := range hr.Updates {
+		updates = append(updates, update.ToProto())
+	}
+
+	return &proto.HeartbeatResponse{
+		Success:            hr.Success,
+		Message:            hr.Message,
+		Updates:            updates,
+		FromVersion:        hr.FromVersion,
+		ToVersion:          hr.ToVersion,
+		RequiresFullResync: hr.RequiresFullResync,
+	}
+}
+
+type ListNodesRequest struct {
+}
+
+func ListNodesRequestFromProto(pb *proto.ListNodesRequest) ListNodesRequest {
+	return ListNodesRequest{}
+}
+
+func (lnr ListNodesRequest) ToProto() *proto.ListNodesRequest { return &proto.ListNodesRequest{} }
+
+type ListNodesResponse struct {
+	Nodes          []*common.DataNodeInfo
+	CurrentVersion int64
+}
+
+func ListNodesResponseFromProto(pb *proto.ListNodesResponse) ListNodesResponse {
+	nodes := make([]*common.DataNodeInfo, 0, len(pb.Nodes))
+	for _, node := range pb.Nodes {
+		nodeInfo := common.DataNodeInfoFromProto(node)
+		nodes = append(nodes, &nodeInfo)
+	}
+	return ListNodesResponse{
+		Nodes:          nodes,
+		CurrentVersion: pb.CurrentVersion,
+	}
+}
+
+func (lnr ListNodesResponse) ToProto() *proto.ListNodesResponse {
+	nodes := make([]*proto.DataNodeInfo, 0, len(lnr.Nodes))
+	for _, node := range lnr.Nodes {
+		nodes = append(nodes, (*node).ToProto())
+	}
+	return &proto.ListNodesResponse{
+		Nodes:          nodes,
+		CurrentVersion: lnr.CurrentVersion,
+	}
+}
+
+type NodeUpdateType int
+
+const (
+	NODE_ADDED NodeUpdateType = iota
+	NODE_REMOVED
+	NODE_UPDATED
+)
+
+type NodeUpdate struct {
+	Version   int64
+	Type      NodeUpdateType
+	Node      *common.DataNodeInfo
+	Timestamp time.Time
+}
+
+func NodeUpdateFromProto(pb *proto.NodeUpdate) NodeUpdate {
+	node := common.DataNodeInfoFromProto(pb.Node)
+	return NodeUpdate{
+		Version:   pb.Version,
+		Type:      NodeUpdateType(pb.Type),
+		Node:      &node,
+		Timestamp: pb.Timestamp.AsTime(),
+	}
+}
+
+func (nu NodeUpdate) ToProto() *proto.NodeUpdate {
+	return &proto.NodeUpdate{
+		Version:   nu.Version,
+		Type:      proto.NodeUpdate_UpdateType(nu.Type),
+		Node:      (*nu.Node).ToProto(),
+		Timestamp: timestamppb.New(nu.Timestamp),
+	}
 }

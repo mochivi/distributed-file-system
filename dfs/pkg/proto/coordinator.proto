@@ -5,6 +5,7 @@ package dfs;
 option go_package = "pkg/proto";
 
 import "common.proto";
+import "google/protobuf/timestamp.proto";
 
 service CoordinatorService {
   // File operations
@@ -16,6 +17,7 @@ service CoordinatorService {
   // Node management
   rpc RegisterDataNode(RegisterDataNodeRequest) returns (RegisterDataNodeResponse);
   rpc DataNodeHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
 }
 
 // Upload file request/response
@@ -68,12 +70,52 @@ message RegisterDataNodeRequest {
 message RegisterDataNodeResponse {
   bool success = 1;
   string message = 2;
+
+  // Initial full snapshot of all nodes
+  repeated DataNodeInfo full_node_list = 3;
+
+  // Current version to track incremental updates
+  int64 current_version = 4;
 }
 
 message HeartbeatRequest {
   string node_id = 1;
   HealthStatus status = 2;
+
+  // For node status updates, provide last seen version
+  int64 last_seen_version = 3;
 }
 message HeartbeatResponse {
   bool success = 1;
+  string message = 2;
+  // Incremental updates since last_seen_version
+  repeated NodeUpdate updates = 3;
+  // Version range for these updates
+  int64 from_version = 4;
+  int64 to_version = 5;
+  // Flag indicating if full resync is needed (e.g., version too old)
+  bool requires_full_resync = 6;
+}
+
+message ListNodesRequest {}
+
+message ListNodesResponse {
+  repeated DataNodeInfo nodes = 1;
+  int64 current_version = 2;
+}
+
+message NodeUpdate {
+  enum UpdateType {
+    NODE_ADDED = 0;
+    NODE_REMOVED = 1;
+    NODE_UPDATED = 2;
+  }
+
+  // Monotonic version number for ordering
+  int64 version = 1;
+  UpdateType type = 2;
+  DataNodeInfo node = 3;
+
+  // Timestamp for debugging/monitoring
+  google.protobuf.Timestamp timestamp = 4;
 }

@@ -218,6 +218,8 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 	return nil
 }
 
+// Even though the general operation is based off of heartbeat requests from the datanode to the coordiantor
+// It might be useful to still have a healthcheck endpoint for the datanode
 func (s *DataNodeServer) HealthCheck(ctx context.Context, pb *proto.HealthCheckRequest) (*proto.HealthCheckResponse, error) {
 	return nil, nil
 }
@@ -240,8 +242,10 @@ func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context, coordinato
 		return fmt.Errorf("failed to register datanode with coordinator: %s", resp.Message)
 	}
 
-	log.Printf("Datanode %s registered with coordinator succesfully", s.Config.Info.ID)
+	// Save information about all nodes
+	s.nodeManager.InitializeNodes(resp.FullNodeList, resp.CurrentVersion)
 
+	log.Printf("Datanode %s registered with coordinator succesfully", s.Config.Info.ID)
 	return nil
 }
 

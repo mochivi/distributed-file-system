@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
@@ -30,6 +31,7 @@ type DataNodeServer struct {
 	store              storage.ChunkStorage
 	replicationManager IReplicationManager
 	sessionManager     ISessionManager
+	nodeManager        *coordinator.NodeManager
 
 	Config DataNodeConfig
 }
@@ -39,10 +41,6 @@ type DataNodeClient struct {
 	client  proto.DataNodeServiceClient
 	conn    *grpc.ClientConn
 	address string
-}
-
-type NodeSelector interface {
-	selectBestNodes(n int) []common.DataNodeInfo
 }
 
 type IReplicationManager interface {
@@ -58,11 +56,12 @@ type ISessionManager interface {
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
-	config DataNodeConfig) *DataNodeServer {
+	nodeManager *coordinator.NodeManager, config DataNodeConfig) *DataNodeServer {
 	return &DataNodeServer{
 		store:              store,
 		replicationManager: replicationManager,
 		sessionManager:     sessionManager,
+		nodeManager:        nodeManager,
 		Config:             config,
 	}
 }

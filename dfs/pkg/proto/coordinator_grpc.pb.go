@@ -25,6 +25,7 @@ const (
 	CoordinatorService_ListFiles_FullMethodName         = "/dfs.CoordinatorService/ListFiles"
 	CoordinatorService_RegisterDataNode_FullMethodName  = "/dfs.CoordinatorService/RegisterDataNode"
 	CoordinatorService_DataNodeHeartbeat_FullMethodName = "/dfs.CoordinatorService/DataNodeHeartbeat"
+	CoordinatorService_ListNodes_FullMethodName         = "/dfs.CoordinatorService/ListNodes"
 )
 
 // CoordinatorServiceClient is the client API for CoordinatorService service.
@@ -39,6 +40,7 @@ type CoordinatorServiceClient interface {
 	// Node management
 	RegisterDataNode(ctx context.Context, in *RegisterDataNodeRequest, opts ...grpc.CallOption) (*RegisterDataNodeResponse, error)
 	DataNodeHeartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
+	ListNodes(ctx context.Context, in *ListNodesRequest, opts ...grpc.CallOption) (*ListNodesResponse, error)
 }
 
 type coordinatorServiceClient struct {
@@ -109,6 +111,16 @@ func (c *coordinatorServiceClient) DataNodeHeartbeat(ctx context.Context, in *He
 	return out, nil
 }
 
+func (c *coordinatorServiceClient) ListNodes(ctx context.Context, in *ListNodesRequest, opts ...grpc.CallOption) (*ListNodesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListNodesResponse)
+	err := c.cc.Invoke(ctx, CoordinatorService_ListNodes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CoordinatorServiceServer is the server API for CoordinatorService service.
 // All implementations must embed UnimplementedCoordinatorServiceServer
 // for forward compatibility.
@@ -121,6 +133,7 @@ type CoordinatorServiceServer interface {
 	// Node management
 	RegisterDataNode(context.Context, *RegisterDataNodeRequest) (*RegisterDataNodeResponse, error)
 	DataNodeHeartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
+	ListNodes(context.Context, *ListNodesRequest) (*ListNodesResponse, error)
 	mustEmbedUnimplementedCoordinatorServiceServer()
 }
 
@@ -148,6 +161,9 @@ func (UnimplementedCoordinatorServiceServer) RegisterDataNode(context.Context, *
 }
 func (UnimplementedCoordinatorServiceServer) DataNodeHeartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DataNodeHeartbeat not implemented")
+}
+func (UnimplementedCoordinatorServiceServer) ListNodes(context.Context, *ListNodesRequest) (*ListNodesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListNodes not implemented")
 }
 func (UnimplementedCoordinatorServiceServer) mustEmbedUnimplementedCoordinatorServiceServer() {}
 func (UnimplementedCoordinatorServiceServer) testEmbeddedByValue()                            {}
@@ -278,6 +294,24 @@ func _CoordinatorService_DataNodeHeartbeat_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CoordinatorService_ListNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListNodesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoordinatorServiceServer).ListNodes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoordinatorService_ListNodes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoordinatorServiceServer).ListNodes(ctx, req.(*ListNodesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CoordinatorService_ServiceDesc is the grpc.ServiceDesc for CoordinatorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -308,6 +342,10 @@ var CoordinatorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DataNodeHeartbeat",
 			Handler:    _CoordinatorService_DataNodeHeartbeat_Handler,
+		},
+		{
+			MethodName: "ListNodes",
+			Handler:    _CoordinatorService_ListNodes_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

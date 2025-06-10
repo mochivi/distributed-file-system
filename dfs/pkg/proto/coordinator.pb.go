@@ -9,6 +9,7 @@ package proto
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -20,6 +21,55 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
+
+type NodeUpdate_UpdateType int32
+
+const (
+	NodeUpdate_NODE_ADDED   NodeUpdate_UpdateType = 0
+	NodeUpdate_NODE_REMOVED NodeUpdate_UpdateType = 1
+	NodeUpdate_NODE_UPDATED NodeUpdate_UpdateType = 2
+)
+
+// Enum value maps for NodeUpdate_UpdateType.
+var (
+	NodeUpdate_UpdateType_name = map[int32]string{
+		0: "NODE_ADDED",
+		1: "NODE_REMOVED",
+		2: "NODE_UPDATED",
+	}
+	NodeUpdate_UpdateType_value = map[string]int32{
+		"NODE_ADDED":   0,
+		"NODE_REMOVED": 1,
+		"NODE_UPDATED": 2,
+	}
+)
+
+func (x NodeUpdate_UpdateType) Enum() *NodeUpdate_UpdateType {
+	p := new(NodeUpdate_UpdateType)
+	*p = x
+	return p
+}
+
+func (x NodeUpdate_UpdateType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (NodeUpdate_UpdateType) Descriptor() protoreflect.EnumDescriptor {
+	return file_coordinator_proto_enumTypes[0].Descriptor()
+}
+
+func (NodeUpdate_UpdateType) Type() protoreflect.EnumType {
+	return &file_coordinator_proto_enumTypes[0]
+}
+
+func (x NodeUpdate_UpdateType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use NodeUpdate_UpdateType.Descriptor instead.
+func (NodeUpdate_UpdateType) EnumDescriptor() ([]byte, []int) {
+	return file_coordinator_proto_rawDescGZIP(), []int{15, 0}
+}
 
 // Upload file request/response
 type UploadRequest struct {
@@ -523,11 +573,15 @@ func (x *RegisterDataNodeRequest) GetNodeInfo() *DataNodeInfo {
 }
 
 type RegisterDataNodeResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Success bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	// Initial full snapshot of all nodes
+	FullNodeList []*DataNodeInfo `protobuf:"bytes,3,rep,name=full_node_list,json=fullNodeList,proto3" json:"full_node_list,omitempty"`
+	// Current version to track incremental updates
+	CurrentVersion int64 `protobuf:"varint,4,opt,name=current_version,json=currentVersion,proto3" json:"current_version,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RegisterDataNodeResponse) Reset() {
@@ -574,12 +628,28 @@ func (x *RegisterDataNodeResponse) GetMessage() string {
 	return ""
 }
 
+func (x *RegisterDataNodeResponse) GetFullNodeList() []*DataNodeInfo {
+	if x != nil {
+		return x.FullNodeList
+	}
+	return nil
+}
+
+func (x *RegisterDataNodeResponse) GetCurrentVersion() int64 {
+	if x != nil {
+		return x.CurrentVersion
+	}
+	return 0
+}
+
 type HeartbeatRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	Status        *HealthStatus          `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Status *HealthStatus          `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	// For node status updates, provide last seen version
+	LastSeenVersion int64 `protobuf:"varint,3,opt,name=last_seen_version,json=lastSeenVersion,proto3" json:"last_seen_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *HeartbeatRequest) Reset() {
@@ -626,11 +696,26 @@ func (x *HeartbeatRequest) GetStatus() *HealthStatus {
 	return nil
 }
 
+func (x *HeartbeatRequest) GetLastSeenVersion() int64 {
+	if x != nil {
+		return x.LastSeenVersion
+	}
+	return 0
+}
+
 type HeartbeatResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Success bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	// Incremental updates since last_seen_version
+	Updates []*NodeUpdate `protobuf:"bytes,3,rep,name=updates,proto3" json:"updates,omitempty"`
+	// Version range for these updates
+	FromVersion int64 `protobuf:"varint,4,opt,name=from_version,json=fromVersion,proto3" json:"from_version,omitempty"`
+	ToVersion   int64 `protobuf:"varint,5,opt,name=to_version,json=toVersion,proto3" json:"to_version,omitempty"`
+	// Flag indicating if full resync is needed (e.g., version too old)
+	RequiresFullResync bool `protobuf:"varint,6,opt,name=requires_full_resync,json=requiresFullResync,proto3" json:"requires_full_resync,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *HeartbeatResponse) Reset() {
@@ -670,11 +755,204 @@ func (x *HeartbeatResponse) GetSuccess() bool {
 	return false
 }
 
+func (x *HeartbeatResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *HeartbeatResponse) GetUpdates() []*NodeUpdate {
+	if x != nil {
+		return x.Updates
+	}
+	return nil
+}
+
+func (x *HeartbeatResponse) GetFromVersion() int64 {
+	if x != nil {
+		return x.FromVersion
+	}
+	return 0
+}
+
+func (x *HeartbeatResponse) GetToVersion() int64 {
+	if x != nil {
+		return x.ToVersion
+	}
+	return 0
+}
+
+func (x *HeartbeatResponse) GetRequiresFullResync() bool {
+	if x != nil {
+		return x.RequiresFullResync
+	}
+	return false
+}
+
+type ListNodesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNodesRequest) Reset() {
+	*x = ListNodesRequest{}
+	mi := &file_coordinator_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNodesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNodesRequest) ProtoMessage() {}
+
+func (x *ListNodesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_coordinator_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNodesRequest.ProtoReflect.Descriptor instead.
+func (*ListNodesRequest) Descriptor() ([]byte, []int) {
+	return file_coordinator_proto_rawDescGZIP(), []int{13}
+}
+
+type ListNodesResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Nodes          []*DataNodeInfo        `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	CurrentVersion int64                  `protobuf:"varint,2,opt,name=current_version,json=currentVersion,proto3" json:"current_version,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListNodesResponse) Reset() {
+	*x = ListNodesResponse{}
+	mi := &file_coordinator_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNodesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNodesResponse) ProtoMessage() {}
+
+func (x *ListNodesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_coordinator_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNodesResponse.ProtoReflect.Descriptor instead.
+func (*ListNodesResponse) Descriptor() ([]byte, []int) {
+	return file_coordinator_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ListNodesResponse) GetNodes() []*DataNodeInfo {
+	if x != nil {
+		return x.Nodes
+	}
+	return nil
+}
+
+func (x *ListNodesResponse) GetCurrentVersion() int64 {
+	if x != nil {
+		return x.CurrentVersion
+	}
+	return 0
+}
+
+type NodeUpdate struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Monotonic version number for ordering
+	Version int64                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	Type    NodeUpdate_UpdateType `protobuf:"varint,2,opt,name=type,proto3,enum=dfs.NodeUpdate_UpdateType" json:"type,omitempty"`
+	Node    *DataNodeInfo         `protobuf:"bytes,3,opt,name=node,proto3" json:"node,omitempty"`
+	// Timestamp for debugging/monitoring
+	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeUpdate) Reset() {
+	*x = NodeUpdate{}
+	mi := &file_coordinator_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeUpdate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeUpdate) ProtoMessage() {}
+
+func (x *NodeUpdate) ProtoReflect() protoreflect.Message {
+	mi := &file_coordinator_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeUpdate.ProtoReflect.Descriptor instead.
+func (*NodeUpdate) Descriptor() ([]byte, []int) {
+	return file_coordinator_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *NodeUpdate) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *NodeUpdate) GetType() NodeUpdate_UpdateType {
+	if x != nil {
+		return x.Type
+	}
+	return NodeUpdate_NODE_ADDED
+}
+
+func (x *NodeUpdate) GetNode() *DataNodeInfo {
+	if x != nil {
+		return x.Node
+	}
+	return nil
+}
+
+func (x *NodeUpdate) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
 var File_coordinator_proto protoreflect.FileDescriptor
 
 const file_coordinator_proto_rawDesc = "" +
 	"\n" +
-	"\x11coordinator.proto\x12\x03dfs\x1a\fcommon.proto\"r\n" +
+	"\x11coordinator.proto\x12\x03dfs\x1a\fcommon.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"r\n" +
 	"\rUploadRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x1d\n" +
@@ -702,15 +980,40 @@ const file_coordinator_proto_rawDesc = "" +
 	"\fListResponse\x12#\n" +
 	"\x05files\x18\x01 \x03(\v2\r.dfs.FileInfoR\x05files\"I\n" +
 	"\x17RegisterDataNodeRequest\x12.\n" +
-	"\tnode_info\x18\x01 \x01(\v2\x11.dfs.DataNodeInfoR\bnodeInfo\"N\n" +
+	"\tnode_info\x18\x01 \x01(\v2\x11.dfs.DataNodeInfoR\bnodeInfo\"\xb0\x01\n" +
 	"\x18RegisterDataNodeResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"V\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x127\n" +
+	"\x0efull_node_list\x18\x03 \x03(\v2\x11.dfs.DataNodeInfoR\ffullNodeList\x12'\n" +
+	"\x0fcurrent_version\x18\x04 \x01(\x03R\x0ecurrentVersion\"\x82\x01\n" +
 	"\x10HeartbeatRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12)\n" +
-	"\x06status\x18\x02 \x01(\v2\x11.dfs.HealthStatusR\x06status\"-\n" +
+	"\x06status\x18\x02 \x01(\v2\x11.dfs.HealthStatusR\x06status\x12*\n" +
+	"\x11last_seen_version\x18\x03 \x01(\x03R\x0flastSeenVersion\"\xe6\x01\n" +
 	"\x11HeartbeatResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess2\x86\x03\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12)\n" +
+	"\aupdates\x18\x03 \x03(\v2\x0f.dfs.NodeUpdateR\aupdates\x12!\n" +
+	"\ffrom_version\x18\x04 \x01(\x03R\vfromVersion\x12\x1d\n" +
+	"\n" +
+	"to_version\x18\x05 \x01(\x03R\ttoVersion\x120\n" +
+	"\x14requires_full_resync\x18\x06 \x01(\bR\x12requiresFullResync\"\x12\n" +
+	"\x10ListNodesRequest\"e\n" +
+	"\x11ListNodesResponse\x12'\n" +
+	"\x05nodes\x18\x01 \x03(\v2\x11.dfs.DataNodeInfoR\x05nodes\x12'\n" +
+	"\x0fcurrent_version\x18\x02 \x01(\x03R\x0ecurrentVersion\"\xf9\x01\n" +
+	"\n" +
+	"NodeUpdate\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\x03R\aversion\x12.\n" +
+	"\x04type\x18\x02 \x01(\x0e2\x1a.dfs.NodeUpdate.UpdateTypeR\x04type\x12%\n" +
+	"\x04node\x18\x03 \x01(\v2\x11.dfs.DataNodeInfoR\x04node\x128\n" +
+	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"@\n" +
+	"\n" +
+	"UpdateType\x12\x0e\n" +
+	"\n" +
+	"NODE_ADDED\x10\x00\x12\x10\n" +
+	"\fNODE_REMOVED\x10\x01\x12\x10\n" +
+	"\fNODE_UPDATED\x10\x022\xc2\x03\n" +
 	"\x12CoordinatorService\x125\n" +
 	"\n" +
 	"UploadFile\x12\x12.dfs.UploadRequest\x1a\x13.dfs.UploadResponse\x12;\n" +
@@ -719,7 +1022,8 @@ const file_coordinator_proto_rawDesc = "" +
 	"DeleteFile\x12\x12.dfs.DeleteRequest\x1a\x13.dfs.DeleteResponse\x120\n" +
 	"\tListFiles\x12\x10.dfs.ListRequest\x1a\x11.dfs.ListResponse\x12O\n" +
 	"\x10RegisterDataNode\x12\x1c.dfs.RegisterDataNodeRequest\x1a\x1d.dfs.RegisterDataNodeResponse\x12B\n" +
-	"\x11DataNodeHeartbeat\x12\x15.dfs.HeartbeatRequest\x1a\x16.dfs.HeartbeatResponseB\vZ\tpkg/protob\x06proto3"
+	"\x11DataNodeHeartbeat\x12\x15.dfs.HeartbeatRequest\x1a\x16.dfs.HeartbeatResponse\x12:\n" +
+	"\tListNodes\x12\x15.dfs.ListNodesRequest\x1a\x16.dfs.ListNodesResponseB\vZ\tpkg/protob\x06proto3"
 
 var (
 	file_coordinator_proto_rawDescOnce sync.Once
@@ -733,49 +1037,63 @@ func file_coordinator_proto_rawDescGZIP() []byte {
 	return file_coordinator_proto_rawDescData
 }
 
-var file_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_coordinator_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_coordinator_proto_goTypes = []any{
-	(*UploadRequest)(nil),            // 0: dfs.UploadRequest
-	(*UploadResponse)(nil),           // 1: dfs.UploadResponse
-	(*ChunkLocation)(nil),            // 2: dfs.ChunkLocation
-	(*DownloadRequest)(nil),          // 3: dfs.DownloadRequest
-	(*DownloadResponse)(nil),         // 4: dfs.DownloadResponse
-	(*DeleteRequest)(nil),            // 5: dfs.DeleteRequest
-	(*DeleteResponse)(nil),           // 6: dfs.DeleteResponse
-	(*ListRequest)(nil),              // 7: dfs.ListRequest
-	(*ListResponse)(nil),             // 8: dfs.ListResponse
-	(*RegisterDataNodeRequest)(nil),  // 9: dfs.RegisterDataNodeRequest
-	(*RegisterDataNodeResponse)(nil), // 10: dfs.RegisterDataNodeResponse
-	(*HeartbeatRequest)(nil),         // 11: dfs.HeartbeatRequest
-	(*HeartbeatResponse)(nil),        // 12: dfs.HeartbeatResponse
-	(*FileInfo)(nil),                 // 13: dfs.FileInfo
-	(*DataNodeInfo)(nil),             // 14: dfs.DataNodeInfo
-	(*HealthStatus)(nil),             // 15: dfs.HealthStatus
+	(NodeUpdate_UpdateType)(0),       // 0: dfs.NodeUpdate.UpdateType
+	(*UploadRequest)(nil),            // 1: dfs.UploadRequest
+	(*UploadResponse)(nil),           // 2: dfs.UploadResponse
+	(*ChunkLocation)(nil),            // 3: dfs.ChunkLocation
+	(*DownloadRequest)(nil),          // 4: dfs.DownloadRequest
+	(*DownloadResponse)(nil),         // 5: dfs.DownloadResponse
+	(*DeleteRequest)(nil),            // 6: dfs.DeleteRequest
+	(*DeleteResponse)(nil),           // 7: dfs.DeleteResponse
+	(*ListRequest)(nil),              // 8: dfs.ListRequest
+	(*ListResponse)(nil),             // 9: dfs.ListResponse
+	(*RegisterDataNodeRequest)(nil),  // 10: dfs.RegisterDataNodeRequest
+	(*RegisterDataNodeResponse)(nil), // 11: dfs.RegisterDataNodeResponse
+	(*HeartbeatRequest)(nil),         // 12: dfs.HeartbeatRequest
+	(*HeartbeatResponse)(nil),        // 13: dfs.HeartbeatResponse
+	(*ListNodesRequest)(nil),         // 14: dfs.ListNodesRequest
+	(*ListNodesResponse)(nil),        // 15: dfs.ListNodesResponse
+	(*NodeUpdate)(nil),               // 16: dfs.NodeUpdate
+	(*FileInfo)(nil),                 // 17: dfs.FileInfo
+	(*DataNodeInfo)(nil),             // 18: dfs.DataNodeInfo
+	(*HealthStatus)(nil),             // 19: dfs.HealthStatus
+	(*timestamppb.Timestamp)(nil),    // 20: google.protobuf.Timestamp
 }
 var file_coordinator_proto_depIdxs = []int32{
-	2,  // 0: dfs.UploadResponse.chunk_locations:type_name -> dfs.ChunkLocation
-	13, // 1: dfs.DownloadResponse.file_info:type_name -> dfs.FileInfo
-	2,  // 2: dfs.DownloadResponse.chunk_locations:type_name -> dfs.ChunkLocation
-	13, // 3: dfs.ListResponse.files:type_name -> dfs.FileInfo
-	14, // 4: dfs.RegisterDataNodeRequest.node_info:type_name -> dfs.DataNodeInfo
-	15, // 5: dfs.HeartbeatRequest.status:type_name -> dfs.HealthStatus
-	0,  // 6: dfs.CoordinatorService.UploadFile:input_type -> dfs.UploadRequest
-	3,  // 7: dfs.CoordinatorService.DownloadFile:input_type -> dfs.DownloadRequest
-	5,  // 8: dfs.CoordinatorService.DeleteFile:input_type -> dfs.DeleteRequest
-	7,  // 9: dfs.CoordinatorService.ListFiles:input_type -> dfs.ListRequest
-	9,  // 10: dfs.CoordinatorService.RegisterDataNode:input_type -> dfs.RegisterDataNodeRequest
-	11, // 11: dfs.CoordinatorService.DataNodeHeartbeat:input_type -> dfs.HeartbeatRequest
-	1,  // 12: dfs.CoordinatorService.UploadFile:output_type -> dfs.UploadResponse
-	4,  // 13: dfs.CoordinatorService.DownloadFile:output_type -> dfs.DownloadResponse
-	6,  // 14: dfs.CoordinatorService.DeleteFile:output_type -> dfs.DeleteResponse
-	8,  // 15: dfs.CoordinatorService.ListFiles:output_type -> dfs.ListResponse
-	10, // 16: dfs.CoordinatorService.RegisterDataNode:output_type -> dfs.RegisterDataNodeResponse
-	12, // 17: dfs.CoordinatorService.DataNodeHeartbeat:output_type -> dfs.HeartbeatResponse
-	12, // [12:18] is the sub-list for method output_type
-	6,  // [6:12] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	3,  // 0: dfs.UploadResponse.chunk_locations:type_name -> dfs.ChunkLocation
+	17, // 1: dfs.DownloadResponse.file_info:type_name -> dfs.FileInfo
+	3,  // 2: dfs.DownloadResponse.chunk_locations:type_name -> dfs.ChunkLocation
+	17, // 3: dfs.ListResponse.files:type_name -> dfs.FileInfo
+	18, // 4: dfs.RegisterDataNodeRequest.node_info:type_name -> dfs.DataNodeInfo
+	18, // 5: dfs.RegisterDataNodeResponse.full_node_list:type_name -> dfs.DataNodeInfo
+	19, // 6: dfs.HeartbeatRequest.status:type_name -> dfs.HealthStatus
+	16, // 7: dfs.HeartbeatResponse.updates:type_name -> dfs.NodeUpdate
+	18, // 8: dfs.ListNodesResponse.nodes:type_name -> dfs.DataNodeInfo
+	0,  // 9: dfs.NodeUpdate.type:type_name -> dfs.NodeUpdate.UpdateType
+	18, // 10: dfs.NodeUpdate.node:type_name -> dfs.DataNodeInfo
+	20, // 11: dfs.NodeUpdate.timestamp:type_name -> google.protobuf.Timestamp
+	1,  // 12: dfs.CoordinatorService.UploadFile:input_type -> dfs.UploadRequest
+	4,  // 13: dfs.CoordinatorService.DownloadFile:input_type -> dfs.DownloadRequest
+	6,  // 14: dfs.CoordinatorService.DeleteFile:input_type -> dfs.DeleteRequest
+	8,  // 15: dfs.CoordinatorService.ListFiles:input_type -> dfs.ListRequest
+	10, // 16: dfs.CoordinatorService.RegisterDataNode:input_type -> dfs.RegisterDataNodeRequest
+	12, // 17: dfs.CoordinatorService.DataNodeHeartbeat:input_type -> dfs.HeartbeatRequest
+	14, // 18: dfs.CoordinatorService.ListNodes:input_type -> dfs.ListNodesRequest
+	2,  // 19: dfs.CoordinatorService.UploadFile:output_type -> dfs.UploadResponse
+	5,  // 20: dfs.CoordinatorService.DownloadFile:output_type -> dfs.DownloadResponse
+	7,  // 21: dfs.CoordinatorService.DeleteFile:output_type -> dfs.DeleteResponse
+	9,  // 22: dfs.CoordinatorService.ListFiles:output_type -> dfs.ListResponse
+	11, // 23: dfs.CoordinatorService.RegisterDataNode:output_type -> dfs.RegisterDataNodeResponse
+	13, // 24: dfs.CoordinatorService.DataNodeHeartbeat:output_type -> dfs.HeartbeatResponse
+	15, // 25: dfs.CoordinatorService.ListNodes:output_type -> dfs.ListNodesResponse
+	19, // [19:26] is the sub-list for method output_type
+	12, // [12:19] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_coordinator_proto_init() }
@@ -789,13 +1107,14 @@ func file_coordinator_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_coordinator_proto_rawDesc), len(file_coordinator_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   13,
+			NumEnums:      1,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_coordinator_proto_goTypes,
 		DependencyIndexes: file_coordinator_proto_depIdxs,
+		EnumInfos:         file_coordinator_proto_enumTypes,
 		MessageInfos:      file_coordinator_proto_msgTypes,
 	}.Build()
 	File_coordinator_proto = out.File

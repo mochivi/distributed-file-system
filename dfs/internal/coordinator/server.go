@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
@@ -29,17 +30,19 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 	}
 	numChunks := (req.Size + chunkSize - 1) / chunkSize
 
-	// Select nodes for each chunk, locking the nodes until complete
+	// Get a list of the best nodes to upload to
+	nodes, err := c.nodeManager.SelectBestNodes(numChunks)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "no available nodes")
+	}
+
 	assignments := make([]ChunkLocation, numChunks)
-	c.nodesMutex.RLock()
 	for i := 0; i < numChunks; i++ {
 		chunkID := common.FormatChunkID(req.Path, i)
 
-		// Select nodes for this chunk (primary + replicas)
-		node, ok := c.selectNodeForChunk()
-		if !ok {
-			return nil, status.Error(codes.NotFound, "no available nodes")
-		}
+		// Randomly select a node from the available nodes
+		nodeIndex := rand.Intn(len(nodes))
+		node := nodes[nodeIndex]
 
 		// Add chunk location to assignment
 		assignments[i] = ChunkLocation{
@@ -48,7 +51,6 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 			Endpoint: fmt.Sprintf("%s:%d", node.IPAddress, node.Port),
 		}
 	}
-	c.nodesMutex.RUnlock()
 
 	sessionID := uuid.NewString()
 	go c.metadataManager.trackUpload(sessionID, req, numChunks) // todo: add response from client to commit metadata
@@ -70,9 +72,8 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 	chunkLocations := make([]ChunkLocation, 0, len(fileInfo.Chunks))
 
 	// Find available nodes to download from for this chunk
-	c.nodesMutex.RLock()
 	for i, chunk := range fileInfo.Chunks {
-		node, ok := c.getAvailableNodeForChunk(chunk.Replicas)
+		node, ok := c.nodeManager.GetAvailableNodeForChunk(chunk.Replicas)
 		if !ok {
 			return nil, status.Error(codes.NotFound, "no available nodes")
 		}
@@ -83,7 +84,6 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 			Endpoint: fmt.Sprintf("%s:%d", node.IPAddress, node.Port),
 		}
 	}
-	c.nodesMutex.RUnlock()
 
 	return DownloadResponse{
 		fileInfo:       *fileInfo,
@@ -91,60 +91,75 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 	}.ToProto(), nil
 }
 
-// DataNode ingress mechanism
-func (c *Coordinator) RegisterDataNode(ctx context.Context, req *proto.RegisterDataNodeRequest) (*proto.RegisterDataNodeResponse, error) {
-	c.nodesMutex.Lock()
-	defer c.nodesMutex.Unlock()
+// Client request to list files from some directory
+func (c *Coordinator) ListFiles(context.Context, *ListRequest) (*ListResponse, error) {
+	return nil, nil
+}
 
-	// Convert request node info into internal representation
-	nodeInfo := common.DataNodeInfoFromProto(req.NodeInfo)
-	c.dataNodes[nodeInfo.ID] = &nodeInfo
+// Client request to delete a file
+func (c *Coordinator) DeleteFile(context.Context, *DeleteRequest) (*DeleteResponse, error) {
+	return nil, nil
+}
+
+// node -> coordinator requests below
+
+// DataNode ingress mechanism
+func (c *Coordinator) RegisterDataNode(ctx context.Context, pb *proto.RegisterDataNodeRequest) (*proto.RegisterDataNodeResponse, error) {
+	nodeInfo := common.DataNodeInfoFromProto(pb.NodeInfo)
+
+	c.nodeManager.AddNode(&nodeInfo)
+	nodes, version := c.nodeManager.ListNodes()
 
 	return RegisterDataNodeResponse{
-		Success: true,
-		Message: "Node registered successfully",
+		Success:        true,
+		Message:        "Node registered successfully",
+		FullNodeList:   nodes,
+		CurrentVersion: version,
 	}.ToProto(), nil
 }
 
 // DataNodes periodically communicate their status to the coordinator
-func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, req *proto.HeartbeatRequest) (*proto.HeartbeatResponse, error) {
-	c.nodesMutex.Lock()
-	defer c.nodesMutex.Unlock()
+func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, pb *proto.HeartbeatRequest) (*proto.HeartbeatResponse, error) {
+	req := HeartbeatRequestFromProto(pb)
 
-	heartbeatRequest := HeartbeatRequestFromProto(req)
-
-	if node, exists := c.dataNodes[req.NodeId]; exists {
-		node.Status = heartbeatRequest.Status.Status
-		node.LastSeen = heartbeatRequest.Status.LastSeen
-
+	node, exists := c.nodeManager.GetNode(req.NodeID)
+	if !exists {
 		return HeartbeatResponse{
-			Success: true,
+			Success: false,
+			Message: "node is not registered",
+		}.ToProto(), nil
+	}
+
+	node.Status = req.Status.Status
+	node.LastSeen = req.Status.LastSeen
+
+	updates, currentVersion, err := c.nodeManager.GetUpdatesSince(req.LastSeenVersion)
+	if err != nil {
+		return HeartbeatResponse{
+			Success:            true, // heartbeat was a success, as lastSeen & status were updated, but node requires resync
+			Message:            "version too old",
+			FromVersion:        req.LastSeenVersion,
+			ToVersion:          currentVersion,
+			RequiresFullResync: true,
 		}.ToProto(), nil
 	}
 
 	return HeartbeatResponse{
-		Success: false,
+		Success:            true,
+		Message:            "ok",
+		Updates:            updates,
+		FromVersion:        req.LastSeenVersion,
+		ToVersion:          currentVersion,
+		RequiresFullResync: false,
 	}.ToProto(), nil
+
 }
 
-// Helper functions
-// TODO: implement selection algorithm, right now, just picking the first healthy nodes
-// Selects nodes that could receive some chunk for storage
-func (c *Coordinator) selectNodeForChunk() (*common.DataNodeInfo, bool) {
-	for _, node := range c.dataNodes {
-		if node.Status == common.NodeHealthy {
-			return node, true
-		}
-	}
-	return nil, false
-}
-
-// Retrieves which nodes have some chunk
-func (c *Coordinator) getAvailableNodeForChunk(replicaIDs []string) (*common.DataNodeInfo, bool) {
-	for _, replicaID := range replicaIDs {
-		if node, exists := c.dataNodes[replicaID]; exists && node.Status == common.NodeHealthy {
-			return node, true
-		}
-	}
-	return nil, false
+// ListNodes returns a list of all registered data nodes
+func (c *Coordinator) ListNodes(ctx context.Context, req *proto.ListNodesRequest) (*proto.ListNodesResponse, error) {
+	nodes, version := c.nodeManager.ListNodes()
+	return ListNodesResponse{
+		Nodes:          nodes,
+		CurrentVersion: version,
+	}.ToProto(), nil
 }

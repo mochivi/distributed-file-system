@@ -1,13 +1,8 @@
 package coordinator
 
 import (
-	"sync"
-
-	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Implements proto.CoordinatorServiceServer interface
@@ -15,8 +10,7 @@ type Coordinator struct {
 	proto.UnimplementedCoordinatorServiceServer // Embed
 
 	// Coordinates data nodes access
-	dataNodes  map[string]*common.DataNodeInfo
-	nodesMutex sync.RWMutex
+	nodeManager *NodeManager
 
 	// Coordinates metadata storage
 	metaStore       storage.MetadataStore
@@ -25,36 +19,14 @@ type Coordinator struct {
 	config CoordinatorConfig
 }
 
-func NewCoordinator(metaStore storage.MetadataStore, metadataManager *metadataManager, cfg CoordinatorConfig) *Coordinator {
+func NewCoordinator(cfg CoordinatorConfig, metaStore storage.MetadataStore, metadataManager *metadataManager,
+	nodeManager *NodeManager) *Coordinator {
 	return &Coordinator{
 		metaStore:       metaStore,
-		dataNodes:       make(map[string]*common.DataNodeInfo),
+		nodeManager:     nodeManager,
 		config:          cfg,
 		metadataManager: metadataManager,
 	}
-}
-
-// Wrapper over the proto.CoordinatorServiceClient interface
-type CoordinatorClient struct {
-	client proto.CoordinatorServiceClient
-	conn   *grpc.ClientConn
-}
-
-func NewCoordinatorClient(serverAddress string) (*CoordinatorClient, error) {
-	conn, err := grpc.NewClient(
-		serverAddress,
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // Update to TLS in prod
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	client := proto.NewCoordinatorServiceClient(conn)
-
-	return &CoordinatorClient{
-		client: client,
-		conn:   conn,
-	}, nil
 }
 
 // ChunkLocation represents where some chunk should be stored (primary node + endpoint)

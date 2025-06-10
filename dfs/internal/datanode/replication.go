@@ -13,10 +13,10 @@ import (
 
 type ReplicationManager struct {
 	Config       ReplicateManagerConfig
-	NodeSelector NodeSelector
+	NodeSelector common.NodeSelector
 }
 
-func NewReplicationManager(config ReplicateManagerConfig, nodeSelector NodeSelector) *ReplicationManager {
+func NewReplicationManager(config ReplicateManagerConfig, nodeSelector common.NodeSelector) *ReplicationManager {
 	return &ReplicationManager{
 		Config:       config,
 		NodeSelector: nodeSelector,
@@ -24,7 +24,7 @@ func NewReplicationManager(config ReplicateManagerConfig, nodeSelector NodeSelec
 }
 
 func (rm *ReplicationManager) paralellReplicate(req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error {
-	nodes := rm.NodeSelector.selectBestNodes(requiredReplicas + 3)
+	nodes := rm.NodeSelector.SelectBestNodes(requiredReplicas + 3)
 	if len(nodes) == 0 {
 		return fmt.Errorf("no node endpoints provided")
 	}

@@ -1,0 +1,201 @@
+package coordinator
+
+import (
+	"errors"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/mochivi/distributed-file-system/internal/common"
+)
+
+type NodeManager struct {
+	nodes    map[string]*common.DataNodeInfo
+	mu       sync.RWMutex
+	selector common.NodeSelector
+
+	// Version control fields
+	currentVersion int64
+	updateHistory  []NodeUpdate // Circular buffer for recent updates
+	maxHistorySize int
+	historyIndex   int // Current position in circular buffer
+}
+
+func NewNodeManager(selector common.NodeSelector) *NodeManager {
+	return &NodeManager{
+		nodes:          make(map[string]*common.DataNodeInfo),
+		selector:       selector,
+		currentVersion: 0,
+		updateHistory:  make([]NodeUpdate, 1000), // Keep last 1000 node updates in stash
+		maxHistorySize: 1000,
+		historyIndex:   0,
+	}
+}
+
+func (m *NodeManager) GetNode(nodeID string) (*common.DataNodeInfo, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	node, ok := m.nodes[nodeID]
+	if !ok {
+		return nil, false
+	}
+	return node, true
+}
+
+func (m *NodeManager) AddNode(node *common.DataNodeInfo) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.nodes[node.ID] = node
+	m.addToHistory(NODE_ADDED, node)
+}
+
+func (m *NodeManager) RemoveNode(nodeID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	node, ok := m.nodes[nodeID]
+	if !ok {
+		return fmt.Errorf("node with ID %s not found", nodeID)
+	}
+	delete(m.nodes, nodeID)
+	m.addToHistory(NODE_REMOVED, node)
+	return nil
+}
+
+func (m *NodeManager) UpdateNode(node *common.DataNodeInfo) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	node, ok := m.nodes[node.ID]
+	if !ok {
+		return fmt.Errorf("node with ID %s not found", node.ID)
+	}
+	m.nodes[node.ID] = node
+	m.addToHistory(NODE_UPDATED, node)
+	return nil
+}
+
+func (m *NodeManager) ListNodes() ([]*common.DataNodeInfo, int64) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	nodes := make([]*common.DataNodeInfo, 0, len(m.nodes))
+	for _, node := range m.nodes {
+		nodes = append(nodes, node)
+	}
+	return nodes, m.currentVersion
+}
+
+// GetUpdatesSince returns all updates since the given version
+func (m *NodeManager) GetUpdatesSince(sinceVersion int64) ([]NodeUpdate, int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Check if requested version is too old (not in our history buffer)
+	oldestVersion := m.getOldestVersionInHistory()
+	if sinceVersion < oldestVersion {
+		return nil, 0, fmt.Errorf("version %d too old, oldest available: %d", sinceVersion, oldestVersion)
+	}
+
+	// If already up to date
+	if sinceVersion >= m.currentVersion {
+		return []NodeUpdate{}, m.currentVersion, nil
+	}
+
+	// Collect updates since requested version
+	var updates []NodeUpdate
+	for i := 0; i < m.maxHistorySize; i++ {
+		update := m.updateHistory[i]
+		if update.Version > sinceVersion && update.Version <= m.currentVersion {
+			updates = append(updates, update)
+		}
+	}
+
+	return updates, m.currentVersion, nil
+}
+
+// getOldestVersionInHistory returns the oldest version still available in history
+func (m *NodeManager) getOldestVersionInHistory() int64 {
+	if m.currentVersion < int64(m.maxHistorySize) {
+		return 0 // We have full history
+	}
+	return m.currentVersion - int64(m.maxHistorySize) + 1
+}
+
+// GetCurrentVersion returns the current version number
+func (m *NodeManager) GetCurrentVersion() int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.currentVersion
+}
+
+// IsVersionTooOld checks if a version is too old to serve incrementally
+func (m *NodeManager) IsVersionTooOld(version int64) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return version < m.getOldestVersionInHistory()
+}
+
+// TODO: implement selection algorithm, right now, just picking the first healthy nodes
+// Selects nodes that could receive some chunk for storage
+func (m *NodeManager) SelectBestNodes(numChunks int) ([]*common.DataNodeInfo, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	nodes := make([]*common.DataNodeInfo, 0, len(m.nodes))
+	for _, node := range m.nodes {
+		nodes = append(nodes, node)
+	}
+
+	bestNodes := m.selector.SelectBestNodes(nodes, numChunks)
+
+	if len(bestNodes) == 0 {
+		return nil, errors.New("no available nodes")
+	}
+
+	return bestNodes, nil
+}
+
+// Retrieves which nodes have some chunk
+func (m *NodeManager) GetAvailableNodeForChunk(replicaIDs []string) (*common.DataNodeInfo, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, replicaID := range replicaIDs {
+		if node, exists := m.nodes[replicaID]; exists && node.Status == common.NodeHealthy {
+			return node, true
+		}
+	}
+
+	return nil, false
+}
+
+// addToHistory adds an update to the circular buffer
+func (m *NodeManager) addToHistory(updateType NodeUpdateType, node *common.DataNodeInfo) {
+	m.currentVersion++
+
+	update := NodeUpdate{
+		Version:   m.currentVersion,
+		Type:      updateType,
+		Node:      node,
+		Timestamp: time.Now(),
+	}
+
+	m.updateHistory[m.historyIndex] = update
+	m.historyIndex = (m.historyIndex + 1) % m.maxHistorySize
+}
+
+// Given an array of NodeUpdate, apply changes to nodes in order
+// Only used by data nodes
+func (m *NodeManager) ApplyHistory(updates []NodeUpdate) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+}
+
+// Given an array of DataNodeInfo, initialize the no
+// Only used by data nodes
+func (m *NodeManager) InitializeNodes(nodes []*common.DataNodeInfo, currentVersion int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, node := range nodes {
+		m.nodes[node.ID] = node
+	}
+	m.currentVersion = currentVersion
+}
