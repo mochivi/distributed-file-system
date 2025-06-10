@@ -138,3 +138,37 @@ func (di DataNodeInfo) ToProto() *proto.DataNodeInfo {
 		LastSeen:  timestamppb.New(di.LastSeen),
 	}
 }
+
+type NodeUpdateType int
+
+const (
+	NODE_ADDED NodeUpdateType = iota
+	NODE_REMOVED
+	NODE_UPDATED
+)
+
+type NodeUpdate struct {
+	Version   int64
+	Type      NodeUpdateType
+	Node      *DataNodeInfo
+	Timestamp time.Time
+}
+
+func NodeUpdateFromProto(pb *proto.NodeUpdate) NodeUpdate {
+	node := DataNodeInfoFromProto(pb.Node)
+	return NodeUpdate{
+		Version:   pb.Version,
+		Type:      NodeUpdateType(pb.Type),
+		Node:      &node,
+		Timestamp: pb.Timestamp.AsTime(),
+	}
+}
+
+func (nu NodeUpdate) ToProto() *proto.NodeUpdate {
+	return &proto.NodeUpdate{
+		Version:   nu.Version,
+		Type:      proto.NodeUpdate_UpdateType(nu.Type),
+		Node:      (*nu.Node).ToProto(),
+		Timestamp: timestamppb.New(nu.Timestamp),
+	}
+}

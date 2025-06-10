@@ -91,15 +91,15 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 	}.ToProto(), nil
 }
 
-// Client request to list files from some directory
-func (c *Coordinator) ListFiles(context.Context, *ListRequest) (*ListResponse, error) {
-	return nil, nil
-}
+// // Client request to list files from some directory
+// func (c *Coordinator) ListFiles(ctx context.Context, pb *proto.ListRequest) (*proto.ListResponse, error) {
+// 	return nil, nil
+// }
 
-// Client request to delete a file
-func (c *Coordinator) DeleteFile(context.Context, *DeleteRequest) (*DeleteResponse, error) {
-	return nil, nil
-}
+// // Client request to delete a file
+// func (c *Coordinator) DeleteFile(ctx context.Context, pb *proto.DeleteRequest) (*proto.DeleteResponse, error) {
+// 	return nil, nil
+// }
 
 // node -> coordinator requests below
 

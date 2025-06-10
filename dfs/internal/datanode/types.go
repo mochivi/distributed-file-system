@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
@@ -31,7 +30,7 @@ type DataNodeServer struct {
 	store              storage.ChunkStorage
 	replicationManager IReplicationManager
 	sessionManager     ISessionManager
-	nodeManager        *coordinator.NodeManager
+	nodeManager        *common.NodeManager
 
 	Config DataNodeConfig
 }
@@ -56,7 +55,7 @@ type ISessionManager interface {
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
-	nodeManager *coordinator.NodeManager, config DataNodeConfig) *DataNodeServer {
+	nodeManager *common.NodeManager, config DataNodeConfig) *DataNodeServer {
 	return &DataNodeServer{
 		store:              store,
 		replicationManager: replicationManager,

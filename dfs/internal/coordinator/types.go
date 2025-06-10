@@ -1,6 +1,7 @@
 package coordinator
 
 import (
+	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 )
@@ -10,7 +11,7 @@ type Coordinator struct {
 	proto.UnimplementedCoordinatorServiceServer // Embed
 
 	// Coordinates data nodes access
-	nodeManager *NodeManager
+	nodeManager *common.NodeManager
 
 	// Coordinates metadata storage
 	metaStore       storage.MetadataStore
@@ -20,7 +21,7 @@ type Coordinator struct {
 }
 
 func NewCoordinator(cfg CoordinatorConfig, metaStore storage.MetadataStore, metadataManager *metadataManager,
-	nodeManager *NodeManager) *Coordinator {
+	nodeManager *common.NodeManager) *Coordinator {
 	return &Coordinator{
 		metaStore:       metaStore,
 		nodeManager:     nodeManager,

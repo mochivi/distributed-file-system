@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -17,11 +18,14 @@ import (
 func main() {
 	cfg := coordinator.DefaultCoordinatorConfig()
 
+	// Coordinator dependencies
 	metadataStore := metadata.NewMetadataLocalStorage()
 	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout)
+	nodeSelector := common.NewNodeSelector()
+	nodeManager := common.NewNodeManager(nodeSelector)
 
 	// Create coordinator server
-	server := coordinator.NewCoordinator(metadataStore, metadataManager, cfg)
+	server := coordinator.NewCoordinator(cfg, metadataStore, metadataManager, nodeManager)
 
 	// gRPC server and register
 	grpcServer := grpc.NewServer()

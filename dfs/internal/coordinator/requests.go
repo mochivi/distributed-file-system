@@ -1,11 +1,8 @@
 package coordinator
 
 import (
-	"time"
-
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Request/response pairs
@@ -238,16 +235,16 @@ func (hr HeartbeatRequest) ToProto() *proto.HeartbeatRequest {
 type HeartbeatResponse struct {
 	Success            bool
 	Message            string
-	Updates            []NodeUpdate
+	Updates            []common.NodeUpdate
 	FromVersion        int64
 	ToVersion          int64
 	RequiresFullResync bool
 }
 
 func HeartbeatResponseFromProto(pb *proto.HeartbeatResponse) HeartbeatResponse {
-	updates := make([]NodeUpdate, 0, len(pb.Updates))
+	updates := make([]common.NodeUpdate, 0, len(pb.Updates))
 	for _, update := range pb.Updates {
-		updates = append(updates, NodeUpdateFromProto(update))
+		updates = append(updates, common.NodeUpdateFromProto(update))
 	}
 
 	return HeartbeatResponse{
@@ -310,39 +307,5 @@ func (lnr ListNodesResponse) ToProto() *proto.ListNodesResponse {
 	return &proto.ListNodesResponse{
 		Nodes:          nodes,
 		CurrentVersion: lnr.CurrentVersion,
-	}
-}
-
-type NodeUpdateType int
-
-const (
-	NODE_ADDED NodeUpdateType = iota
-	NODE_REMOVED
-	NODE_UPDATED
-)
-
-type NodeUpdate struct {
-	Version   int64
-	Type      NodeUpdateType
-	Node      *common.DataNodeInfo
-	Timestamp time.Time
-}
-
-func NodeUpdateFromProto(pb *proto.NodeUpdate) NodeUpdate {
-	node := common.DataNodeInfoFromProto(pb.Node)
-	return NodeUpdate{
-		Version:   pb.Version,
-		Type:      NodeUpdateType(pb.Type),
-		Node:      &node,
-		Timestamp: pb.Timestamp.AsTime(),
-	}
-}
-
-func (nu NodeUpdate) ToProto() *proto.NodeUpdate {
-	return &proto.NodeUpdate{
-		Version:   nu.Version,
-		Type:      proto.NodeUpdate_UpdateType(nu.Type),
-		Node:      (*nu.Node).ToProto(),
-		Timestamp: timestamppb.New(nu.Timestamp),
 	}
 }
