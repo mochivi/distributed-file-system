@@ -29,12 +29,14 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		chunkSize = c.config.ChunkSize * 1024 * 1024
 	}
 	numChunks := (req.Size + chunkSize - 1) / chunkSize
+	log.Printf("File will be split into %d chunks of size %d bytes", numChunks, chunkSize)
 
 	// Get a list of the best nodes to upload to
 	nodes, err := c.nodeManager.SelectBestNodes(numChunks)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "no available nodes")
 	}
+	log.Printf("Selected %d nodes for chunk distribution", len(nodes))
 
 	assignments := make([]ChunkLocation, numChunks)
 	for i := 0; i < numChunks; i++ {
@@ -53,7 +55,8 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 	}
 
 	sessionID := uuid.NewString()
-	go c.metadataManager.trackUpload(sessionID, req, numChunks) // todo: add response from client to commit metadata
+	go c.metadataManager.trackUpload(sessionID, req, numChunks)
+	log.Printf("Created upload session %s for file %s", sessionID, req.Path)
 
 	return UploadResponse{
 		ChunkLocations: assignments,

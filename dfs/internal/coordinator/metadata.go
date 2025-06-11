@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -38,15 +39,27 @@ func newMetadataUploadSession(sessionID string, exp time.Duration, fileInfo *com
 }
 
 func (m *metadataManager) trackUpload(sessionID string, req UploadRequest, numChunks int) {
+	// Create chunk info array
+	chunks := make([]common.ChunkInfo, numChunks)
+	for i := 0; i < numChunks; i++ {
+		chunkID := common.FormatChunkID(req.Path, i)
+		chunks[i] = common.ChunkInfo{
+			ID:       chunkID,
+			Size:     0,   // Will be updated when chunk is stored
+			Replicas: nil, // Will be updated when replicas are created
+			Checksum: "",  // Will be updated when chunk is stored
+		}
+	}
+
 	fileInfo := &common.FileInfo{
 		Path:       req.Path,
 		Size:       req.Size,
 		ChunkCount: numChunks,
-		Chunks:     nil,
+		Chunks:     chunks,
 		CreatedAt:  time.Now(),
 		Checksum:   req.Checksum,
 	}
-	log.Printf("Tracking upload session: %s", sessionID)
+	log.Printf("Tracking upload session: %s for file %s with %d chunks", sessionID, req.Path, numChunks)
 	m.sessions[sessionID] = newMetadataUploadSession(sessionID, m.commitTimeout, fileInfo)
 }
 
@@ -64,6 +77,12 @@ func (m *metadataManager) commit(sessionID string, chunkInfos []common.ChunkInfo
 	fileInfo := session.fileInfo
 	fileInfo.Chunks = chunkInfos
 
-	metaStore.PutFile(fileInfo.Path, fileInfo)
+	log.Printf("Committing metadata for file %s with %d chunks", fileInfo.Path, len(chunkInfos))
+	if err := metaStore.PutFile(fileInfo.Path, fileInfo); err != nil {
+		return fmt.Errorf("failed to store file metadata: %w", err)
+	}
+
+	// Clean up the session
+	delete(m.sessions, sessionID)
 	return nil
 }
