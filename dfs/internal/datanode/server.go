@@ -233,7 +233,7 @@ func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context, coordinato
 	}
 
 	req := coordinator.RegisterDataNodeRequest{NodeInfo: s.Config.Info}
-	resp, err := coordinatorClient.RegisterDataNode(context.Background(), req)
+	resp, err := coordinatorClient.RegisterDataNode(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to register datanode with coordinator: %v", err)
 	}
