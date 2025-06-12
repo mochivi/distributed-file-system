@@ -20,8 +20,8 @@ import (
 
 // TODO: make this configurable by the client
 const (
-	N_NODES    int = 5
-	N_REPLICAS int = 3
+	N_NODES    int = 1
+	N_REPLICAS int = 1
 )
 
 // StoreChunk is received only if the node is a primary receiver
@@ -31,7 +31,8 @@ const (
 func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkRequest) (*proto.StoreChunkResponse, error) {
 	req := common.StoreChunkRequestFromProto(pb)
 
-	if !common.VerifyChecksum(req.Data, req.Checksum) {
+	calculatedChecksum := common.CalculateChecksum(req.Data)
+	if calculatedChecksum != req.Checksum {
 		return common.StoreChunkResponse{
 			Success: false,
 			Message: "checksum does not match",
@@ -45,16 +46,16 @@ func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkReq
 	replicateReq := common.ReplicateChunkRequest{
 		ChunkID:   req.ChunkID,
 		ChunkSize: 4 * 1024 * 1024,
-		Checksum:  common.CalculateChecksum(req.Data),
+		Checksum:  req.Checksum,
 	}
 
-	// Select 3 possible nodes to replicate to
+	// Select N_NODES possible nodes to replicate to
 	nodes, err := s.nodeManager.SelectBestNodes(N_NODES)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to select nodes: %v", err)
 	}
 
-	// Replicate to 3 nodes
+	// Replicate to N_REPLICAS nodes
 	if err := s.replicationManager.paralellReplicate(nodes, replicateReq, req.Data, N_REPLICAS); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to replicate chunk: %v", err)
 	}
@@ -112,6 +113,7 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 // 2. Send accept response to innitiate data stream for chunk
 func (s *DataNodeServer) ReplicateChunk(ctx context.Context, pb *proto.ReplicateChunkRequest) (*proto.ReplicateChunkResponse, error) {
 	req := common.ReplicateChunkRequestFromProto(pb)
+	log.Printf("Node %s: ReplicatChunk request for chunk: %s", s.Config.Info.ID, req.ChunkID)
 
 	if req.ChunkID == "" || req.ChunkSize <= 0 {
 		return common.ReplicateChunkResponse{
@@ -129,6 +131,7 @@ func (s *DataNodeServer) ReplicateChunk(ctx context.Context, pb *proto.Replicate
 
 	sessionID := uuid.NewString()
 	s.createStreamingSession(sessionID, req)
+	log.Printf("Created streaming sessionID to receive the chunk: %s", req.ChunkID)
 
 	return common.ReplicateChunkResponse{
 		Accept:    true,

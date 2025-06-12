@@ -133,12 +133,20 @@ func (m *NodeManager) IsVersionTooOld(version int64) bool {
 
 // TODO: implement selection algorithm, right now, just picking the first healthy nodes
 // Selects n nodes that could receive some chunk for storage
-func (m *NodeManager) SelectBestNodes(n int) ([]*DataNodeInfo, error) {
+func (m *NodeManager) SelectBestNodes(n int, self ...string) ([]*DataNodeInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
+	var selfID string
+	if len(self) != 0 {
+		selfID = self[0]
+	}
+
 	nodes := make([]*DataNodeInfo, 0, len(m.nodes))
 	for _, node := range m.nodes {
+		if node.ID == selfID {
+			continue // do not select the own node making the request if being used for replication
+		}
 		nodes = append(nodes, node)
 	}
 
@@ -185,6 +193,28 @@ func (m *NodeManager) addToHistory(updateType NodeUpdateType, node *DataNodeInfo
 func (m *NodeManager) ApplyHistory(updates []NodeUpdate) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Apply updates in order
+	for _, update := range updates {
+		switch update.Type {
+		case NODE_ADDED:
+			m.nodes[update.Node.ID] = update.Node
+
+		case NODE_REMOVED:
+			delete(m.nodes, update.Node.ID)
+
+		case NODE_UPDATED:
+			// We should update regardless of whether it exists locally
+			// to stay in sync with the master
+			m.nodes[update.Node.ID] = update.Node
+		}
+
+		// Update our local version to match the update version
+		// This ensures we stay in sync with the master's version
+		if update.Version > m.currentVersion {
+			m.currentVersion = update.Version
+		}
+	}
 }
 
 // Given an array of DataNodeInfo, initialize the no

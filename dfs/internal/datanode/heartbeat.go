@@ -67,6 +67,11 @@ func (s *DataNodeServer) heartbeat(ctx context.Context, client *coordinator.Coor
 		return ErrRequireResync
 	}
 
+	if resp.FromVersion == resp.ToVersion || len(resp.Updates) == 0 {
+		log.Printf("No updates for node %s", s.Config.Info.ID)
+		return nil
+	}
+
 	log.Printf("Updating nodes version from %d to %d", resp.FromVersion, resp.ToVersion)
 	s.nodeManager.ApplyHistory(resp.Updates)
 

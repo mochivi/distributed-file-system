@@ -24,6 +24,7 @@ func NewReplicationManager(config ReplicateManagerConfig) *ReplicationManager {
 
 // paralellReplicate replicates the chunk to the given nodes in parallel
 func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error {
+	log.Printf("Replicating chunk: %s", req.ChunkID)
 	if len(nodes) == 0 {
 		return fmt.Errorf("no node endpoints provided")
 	}
@@ -39,9 +40,9 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, re
 		if client == nil {
 			return fmt.Errorf("client for %s is nil", endpoint)
 		}
-
 		clients = append(clients, client)
 	}
+	log.Printf("Created connection to %d clients", len(clients))
 
 	// Clean up all clients
 	defer func() {
@@ -66,6 +67,7 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, re
 		semaphore <- struct{}{} // Acquire slot (blocks if channel full)
 		wg.Add(1)
 
+		log.Printf("Replicating to client: %s", client.address)
 		go func(clientIndex int, c *DataNodeClient) {
 			defer func() {
 				<-semaphore // Release slot
@@ -123,6 +125,7 @@ func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeCli
 }
 
 func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataNodeClient, sessionID string, req common.ReplicateChunkRequest, data []byte) error {
+	log.Printf("Initializing data stream with client %s, sessionID %s", client.address, sessionID)
 	stream, err := client.StreamChunkData(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create stream: %v", err)
@@ -131,13 +134,14 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 	// Stream data in chunks
 	chunkSize := rm.Config.ChunkStreamSize
 	if chunkSize == 0 {
-		chunkSize = 64 * 1024 // Default 64KB chunks
+		chunkSize = 256 * 1024 // Default 64KB chunks
 	}
 
 	totalSize := len(data)
 	offset := 0
 	hasher := sha256.New()
 
+	iteration := 1
 	for offset < totalSize {
 		// Calculate chunk size for this iteration
 		remainingBytes := totalSize - offset
@@ -164,12 +168,14 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 				SessionID:       sessionID,
 				ChunkID:         req.ChunkID,
 				Data:            chunkData,
-				Offset:          int(offset),
+				Offset:          offset,
 				IsFinal:         isFinal,
 				PartialChecksum: partialChecksum,
 			}
 
 			// Send chunk
+			log.Printf("%d - Session %s - Sending replicate message to client, offset: %d", iteration, sessionID, offset)
+			iteration++
 			if err := stream.Send(streamMsg.ToProto()); err != nil {
 				return fmt.Errorf("failed to send chunk at offset %d: %w", offset, err)
 			}
@@ -244,16 +250,9 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 	}
 	finalAck := common.ChunkDataAckFromProto(finalResp)
 
-	// Update with server side calculated final checksum return
-	PLACEHOLDER_checksum := "placeholder"
+	// Validate if checksum after all partial sections are added up still matches the original
 	calculatedChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
-	if PLACEHOLDER_checksum != calculatedChecksum {
-		return fmt.Errorf("final checksum mismatch: expected %s, calculated %s",
-			PLACEHOLDER_checksum, calculatedChecksum)
-	}
-
-	// Validate against original checksum
-	if req.Checksum != "" && req.Checksum != calculatedChecksum {
+	if calculatedChecksum != req.Checksum {
 		return fmt.Errorf("request checksum mismatch: expected %s, calculated %s",
 			req.Checksum, calculatedChecksum)
 	}

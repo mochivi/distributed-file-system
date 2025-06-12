@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
+	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
 
 type DataNodeConfig struct {
@@ -21,15 +22,16 @@ type SessionManagerConfig struct {
 
 type ReplicateManagerConfig struct {
 	ReplicateTimeout time.Duration // timeout until replication to another node is considered failed
-	ChunkStreamSize  int           // kB
+	ChunkStreamSize  int
 	MaxChunkRetries  int
 }
 
 func DefaultDatanodeConfig() DataNodeConfig {
+	datanodeHost := utils.GetEnvString("DATANODE_HOST", "0.0.0.0")
 	return DataNodeConfig{
 		Info: common.DataNodeInfo{
 			ID:        uuid.NewString(),
-			IPAddress: "0.0.0.0",
+			IPAddress: datanodeHost,
 			Port:      8081,
 			Capacity:  10 * 1024 * 1024 * 1024, // gB
 			Used:      0,
@@ -42,8 +44,8 @@ func DefaultDatanodeConfig() DataNodeConfig {
 		},
 
 		Replication: ReplicateManagerConfig{
-			ReplicateTimeout: 30 * time.Second,
-			ChunkStreamSize:  64,
+			ReplicateTimeout: 2 * time.Minute,
+			ChunkStreamSize:  256 * 1024,
 			MaxChunkRetries:  3,
 		},
 	}

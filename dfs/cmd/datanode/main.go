@@ -129,9 +129,6 @@ func main() {
 	coordinatorPort := utils.GetEnvInt("COORDINATOR_PORT", 8080)
 	coordinatorAddress := fmt.Sprintf("%s:%d", coordinatorHost, coordinatorPort)
 
-	// Temporarily, overwrite the datanode IP address with the docker dns name
-	// server.Config.Info.IPAddress = "datanode"
-
 	// Register datanode with coordinator
 	if err := server.RegisterWithCoordinator(ctx, coordinatorAddress); err != nil {
 		log.Fatalf("Failed to register with coordinator: %v", err)
@@ -151,6 +148,7 @@ func main() {
 		heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)
 		defer heartbeatCancel()
 
+		log.Println("Starting heartbeat loop...")
 		if err := server.HeartbeatLoop(heartbeatCtx, coordinatorAddress); err != nil {
 			// Only send error if it's not due to context cancellation
 			select {

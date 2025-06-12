@@ -29,7 +29,7 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		chunkSize = c.config.ChunkSize * 1024 * 1024
 	}
 	numChunks := (req.Size + chunkSize - 1) / chunkSize
-	log.Printf("File will be split into %d chunks of size %d bytes", numChunks, chunkSize)
+	log.Printf("File will be split into %d chunks of size %d MB", numChunks, chunkSize/(1024*1024))
 
 	// Get a list of the best nodes to upload to
 	nodes, err := c.nodeManager.SelectBestNodes(numChunks)

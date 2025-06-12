@@ -10,7 +10,7 @@ services:
     networks:
       - dfs-network
 
-  datanode:
+  datanode1:
     build:
       context: .
       dockerfile: ./deploy/docker/datanode.Dockerfile
@@ -19,6 +19,87 @@ services:
     environment:
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
+      - DATANODE_HOST=datanode1
+      - DISK_STORAGE_BASE_DIR=/app
+    depends_on:
+      - coordinator
+    networks:
+      - dfs-network
+
+  datanode2:
+    build:
+      context: .
+      dockerfile: ./deploy/docker/datanode.Dockerfile
+    ports:
+      - "8082:8081"
+    environment:
+      - COORDINATOR_HOST=coordinator
+      - COORDINATOR_PORT=8080
+      - DATANODE_HOST=datanode2
+      - DISK_STORAGE_BASE_DIR=/app
+    depends_on:
+      - coordinator
+    networks:
+      - dfs-network
+
+  datanode3:
+    build:
+      context: .
+      dockerfile: ./deploy/docker/datanode.Dockerfile
+    ports:
+      - "8083:8081"
+    environment:
+      - COORDINATOR_HOST=coordinator
+      - COORDINATOR_PORT=8080
+      - DATANODE_HOST=datanode3
+      - DISK_STORAGE_BASE_DIR=/app
+    depends_on:
+      - coordinator
+    networks:
+      - dfs-network
+
+  datanode4:
+    build:
+      context: .
+      dockerfile: ./deploy/docker/datanode.Dockerfile
+    ports:
+      - "8084:8081"
+    environment:
+      - COORDINATOR_HOST=coordinator
+      - COORDINATOR_PORT=8080
+      - DATANODE_HOST=datanode4
+      - DISK_STORAGE_BASE_DIR=/app
+    depends_on:
+      - coordinator
+    networks:
+      - dfs-network
+
+  datanode5:
+    build:
+      context: .
+      dockerfile: ./deploy/docker/datanode.Dockerfile
+    ports:
+      - "8085:8081"
+    environment:
+      - COORDINATOR_HOST=coordinator
+      - COORDINATOR_PORT=8080
+      - DATANODE_HOST=datanode5
+      - DISK_STORAGE_BASE_DIR=/app
+    depends_on:
+      - coordinator
+    networks:
+      - dfs-network
+
+  datanode6:
+    build:
+      context: .
+      dockerfile: ./deploy/docker/datanode.Dockerfile
+    ports:
+      - "8086:8081"
+    environment:
+      - COORDINATOR_HOST=coordinator
+      - COORDINATOR_PORT=8080
+      - DATANODE_HOST=datanode6
       - DISK_STORAGE_BASE_DIR=/app
     depends_on:
       - coordinator
@@ -36,7 +117,12 @@ services:
       - COORDINATOR_PORT=8080
     depends_on:
       - coordinator
-      - datanode
+      - datanode1
+      - datanode2
+      - datanode3
+      - datanode4
+      - datanode5
+      - datanode6
     networks:
       - dfs-network
 

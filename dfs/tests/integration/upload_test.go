@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/client"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
@@ -28,6 +29,8 @@ func TestClientUpload(t *testing.T) {
 		t.Fatalf("missing required test file")
 	}
 	defer file.Close()
+
+	time.Sleep(35 * time.Second)
 
 	uploadAt := "/user/files"
 	chunkSize := 8 * 1024 * 1024 // 8MB
