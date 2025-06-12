@@ -21,11 +21,23 @@ jobs:
       with:
         go-version: '1.24.4'
 
+    - name: Check Go version
+      run: go version
+
     - name: Install dependencies
-      run: go mod download
+      run: |
+        go mod download
+        go mod verify
+        go mod tidy
 
     - name: Build
-      run: go build -v ./...
+      run: |
+        echo "Building packages..."
+        go build -v ./...
+        echo "Build completed"
 
     - name: Test
-      run: go test -v ./...
+      run: |
+        echo "Running tests..."
+        go test -v -race ./...
+        echo "Tests completed"
