@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,35 +13,23 @@ import (
 )
 
 type ReplicationManager struct {
-	Config       ReplicateManagerConfig
-	NodeSelector common.NodeSelector
+	Config ReplicateManagerConfig
 }
 
-func NewReplicationManager(config ReplicateManagerConfig, nodeSelector common.NodeSelector) *ReplicationManager {
+func NewReplicationManager(config ReplicateManagerConfig) *ReplicationManager {
 	return &ReplicationManager{
-		Config:       config,
-		NodeSelector: nodeSelector,
+		Config: config,
 	}
 }
 
-func (rm *ReplicationManager) paralellReplicate(req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error {
-	nodes := rm.NodeSelector.SelectBestNodes(requiredReplicas + 3)
+// paralellReplicate replicates the chunk to the given nodes in parallel
+func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error {
 	if len(nodes) == 0 {
 		return fmt.Errorf("no node endpoints provided")
 	}
 
 	// Create clients
 	var clients []*DataNodeClient
-	var clientsMutex sync.Mutex
-	defer func() {
-		// Clean up all clients
-		clientsMutex.Lock()
-		for _, client := range clients {
-			client.Close()
-		}
-		clientsMutex.Unlock()
-	}()
-
 	for _, node := range nodes {
 		endpoint := fmt.Sprintf("%s:%d", node.IPAddress, node.Port)
 		client, err := NewDataNodeClient(endpoint)
@@ -51,19 +40,37 @@ func (rm *ReplicationManager) paralellReplicate(req common.ReplicateChunkRequest
 			return fmt.Errorf("client for %s is nil", endpoint)
 		}
 
-		clientsMutex.Lock()
 		clients = append(clients, client)
-		clientsMutex.Unlock()
 	}
 
-	var wg sync.WaitGroup
-	errChan := make(chan error, len(clients))
-	var acceptedCount atomic.Int64
+	// Clean up all clients
+	defer func() {
+		for _, client := range clients {
+			client.Close()
+		}
+	}()
 
-	for i, rangeClient := range clients {
+	var (
+		wg            sync.WaitGroup
+		acceptedCount atomic.Int64
+		semaphore     = make(chan struct{}, requiredReplicas)
+	)
+	errChan := make(chan error, len(clients))
+
+	for i, client := range clients {
+		// Stop starting new goroutines if we already have enough replicas
+		if int(acceptedCount.Load()) >= requiredReplicas {
+			break
+		}
+
+		semaphore <- struct{}{} // Acquire slot (blocks if channel full)
 		wg.Add(1)
+
 		go func(clientIndex int, c *DataNodeClient) {
-			defer wg.Done()
+			defer func() {
+				<-semaphore // Release slot
+				wg.Done()
+			}()
 
 			ctx, cancel := context.WithTimeout(context.Background(), rm.Config.ReplicateTimeout)
 			defer cancel()
@@ -74,7 +81,8 @@ func (rm *ReplicationManager) paralellReplicate(req common.ReplicateChunkRequest
 			}
 
 			acceptedCount.Add(1)
-		}(i, rangeClient)
+			log.Printf("replication succeeded for client %d", clientIndex)
+		}(i, client)
 	}
 
 	wg.Wait()

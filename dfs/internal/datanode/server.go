@@ -18,6 +18,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// TODO: make this configurable by the client
+const (
+	N_NODES    int = 5
+	N_REPLICAS int = 3
+)
+
 // StoreChunk is received only if the node is a primary receiver
 // 1. Verify chunk checksum is the same as expected
 // 2. Store chunk, given storage method
@@ -42,7 +48,14 @@ func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkReq
 		Checksum:  common.CalculateChecksum(req.Data),
 	}
 
-	if err := s.replicationManager.paralellReplicate(replicateReq, req.Data, 3); err != nil {
+	// Select 3 possible nodes to replicate to
+	nodes, err := s.nodeManager.SelectBestNodes(N_NODES)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to select nodes: %v", err)
+	}
+
+	// Replicate to 3 nodes
+	if err := s.replicationManager.paralellReplicate(nodes, replicateReq, req.Data, N_REPLICAS); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to replicate chunk: %v", err)
 	}
 

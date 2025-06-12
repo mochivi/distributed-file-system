@@ -10,13 +10,6 @@ import (
 	"strings"
 )
 
-// ChunkIdentifier represents a unique identifier for a chunk with its associated metadata
-type ChunkIdentifier struct {
-	FilePath string
-	ChunkNum int
-	Hash     string // Optional: hash of the chunk content
-}
-
 // FormatChunkID creates a unique identifier for a chunk using a hash of the file path
 // and the chunk number. This avoids issues with long paths and special characters.
 func FormatChunkID(path string, chunkID int) string {

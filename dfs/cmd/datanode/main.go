@@ -38,7 +38,7 @@ func initServer() (*datanode.DataNodeServer, error) {
 	nodeConfig := datanode.DefaultDatanodeConfig()
 	nodeSelector := common.NewNodeSelector()
 	nodeManager := common.NewNodeManager(nodeSelector)
-	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, nodeSelector)
+	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication)
 	sessionManager := datanode.NewSessionManager()
 
 	return datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeConfig), nil

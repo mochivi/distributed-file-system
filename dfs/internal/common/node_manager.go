@@ -132,8 +132,8 @@ func (m *NodeManager) IsVersionTooOld(version int64) bool {
 }
 
 // TODO: implement selection algorithm, right now, just picking the first healthy nodes
-// Selects nodes that could receive some chunk for storage
-func (m *NodeManager) SelectBestNodes(numChunks int) ([]*DataNodeInfo, error) {
+// Selects n nodes that could receive some chunk for storage
+func (m *NodeManager) SelectBestNodes(n int) ([]*DataNodeInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -142,7 +142,7 @@ func (m *NodeManager) SelectBestNodes(numChunks int) ([]*DataNodeInfo, error) {
 		nodes = append(nodes, node)
 	}
 
-	bestNodes := m.selector.SelectBestNodes(nodes, numChunks)
+	bestNodes := m.selector.SelectBestNodes(nodes, n)
 
 	if len(bestNodes) == 0 {
 		return nil, errors.New("no available nodes")

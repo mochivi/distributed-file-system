@@ -43,7 +43,7 @@ type DataNodeClient struct {
 }
 
 type IReplicationManager interface {
-	paralellReplicate(req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error
+	paralellReplicate(nodes []*common.DataNodeInfo, req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error
 	replicate(ctx context.Context, client *DataNodeClient, req common.ReplicateChunkRequest, data []byte) error
 	streamChunkData(ctx context.Context, client *DataNodeClient, sessionID string, req common.ReplicateChunkRequest, data []byte) error
 }
