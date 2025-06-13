@@ -4,27 +4,32 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
 type ReplicationManager struct {
 	Config ReplicateManagerConfig
+	logger *slog.Logger
 }
 
-func NewReplicationManager(config ReplicateManagerConfig) *ReplicationManager {
+func NewReplicationManager(config ReplicateManagerConfig, logger *slog.Logger) *ReplicationManager {
+	logger = logging.ExtendLogger(logger, slog.String("component", "replication_manager"))
 	return &ReplicationManager{
 		Config: config,
+		logger: logger,
 	}
 }
 
 // paralellReplicate replicates the chunk to the given nodes in parallel
 func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error {
-	log.Printf("Replicating chunk: %s", req.ChunkID)
+	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", req.ChunkID))
+
 	if len(nodes) == 0 {
 		return fmt.Errorf("no node endpoints provided")
 	}
@@ -42,7 +47,7 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, re
 		}
 		clients = append(clients, client)
 	}
-	log.Printf("Created connection to %d clients", len(clients))
+	logger.Debug(fmt.Sprintf("Created connection to %d clients", len(clients)))
 
 	// Clean up all clients
 	defer func() {
@@ -59,6 +64,7 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, re
 	errChan := make(chan error, len(clients))
 
 	for i, client := range clients {
+		clientLogger := logging.ExtendLogger(logger, slog.String("client_address", client.address))
 		// Stop starting new goroutines if we already have enough replicas
 		if int(acceptedCount.Load()) >= requiredReplicas {
 			break
@@ -67,7 +73,7 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, re
 		semaphore <- struct{}{} // Acquire slot (blocks if channel full)
 		wg.Add(1)
 
-		log.Printf("Replicating to client: %s", client.address)
+		clientLogger.Debug("Replicating to client")
 		go func(clientIndex int, c *DataNodeClient) {
 			defer func() {
 				<-semaphore // Release slot
@@ -77,13 +83,13 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, re
 			ctx, cancel := context.WithTimeout(context.Background(), rm.Config.ReplicateTimeout)
 			defer cancel()
 
-			if err := rm.replicate(ctx, c, req, data); err != nil {
+			if err := rm.replicate(ctx, c, req, data, clientLogger); err != nil {
 				errChan <- fmt.Errorf("replication failed for client %d: %v", clientIndex, err)
 				return
 			}
 
 			acceptedCount.Add(1)
-			log.Printf("replication succeeded for client %d", clientIndex)
+			clientLogger.Debug("Replication succeeded")
 		}(i, client)
 	}
 
@@ -105,7 +111,7 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, re
 	return nil
 }
 
-func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeClient, req common.ReplicateChunkRequest, data []byte) error {
+func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeClient, req common.ReplicateChunkRequest, data []byte, clientLogger *slog.Logger) error {
 	// Request replication session
 	resp, err := client.ReplicateChunk(ctx, req)
 	if err != nil {
@@ -115,17 +121,22 @@ func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeCli
 	if !resp.Accept {
 		return fmt.Errorf("replication request rejected: %s", resp.Message)
 	}
+	clientLogger.Debug("Replication request accepted")
 
 	// Stream the chunk data
-	if err := rm.streamChunkData(ctx, client, resp.SessionID, req, data); err != nil {
+	streamLogger := logging.OperationLogger(clientLogger, "stream_chunk_data", slog.String("session_id", resp.SessionID))
+	if err := rm.streamChunkData(ctx, client, resp.SessionID, req, data, streamLogger); err != nil {
 		return fmt.Errorf("failed to stream chunk data: %v", err)
 	}
 
 	return nil
 }
 
-func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataNodeClient, sessionID string, req common.ReplicateChunkRequest, data []byte) error {
-	log.Printf("Initializing data stream with client %s, sessionID %s", client.address, sessionID)
+// This is the side that is responsible for sending the chunk data to the client
+func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataNodeClient, sessionID string,
+	req common.ReplicateChunkRequest, data []byte, streamLogger *slog.Logger) error {
+
+	streamLogger.Debug("Initializing chunk data stream")
 	stream, err := client.StreamChunkData(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create stream: %v", err)
@@ -136,12 +147,13 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 	if chunkSize == 0 {
 		chunkSize = 256 * 1024 // Default 64KB chunks
 	}
+	streamLogger.Debug("Chunk data stream created", slog.Int("chunk_size_KB", chunkSize/1024))
 
 	totalSize := len(data)
 	offset := 0
 	hasher := sha256.New()
+	iteration := 1 // just for logging purposes
 
-	iteration := 1
 	for offset < totalSize {
 		// Calculate chunk size for this iteration
 		remainingBytes := totalSize - offset
@@ -162,6 +174,8 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 		var ack common.ChunkDataAck
 		retryCount := 0
 
+		// Retry the same chunk piece if it fails
+		streamLogger.Debug("Sending chunk data", slog.Int("iteration", iteration), slog.Int("offset", offset), slog.Int("chunk_size", currentChunkSize))
 		for retryCount < rm.Config.MaxChunkRetries {
 			// Create stream message
 			streamMsg := &common.ChunkDataStream{
@@ -173,9 +187,7 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 				PartialChecksum: partialChecksum,
 			}
 
-			// Send chunk
-			log.Printf("%d - Session %s - Sending replicate message to client, offset: %d", iteration, sessionID, offset)
-			iteration++
+			// Send chunk piece
 			if err := stream.Send(streamMsg.ToProto()); err != nil {
 				return fmt.Errorf("failed to send chunk at offset %d: %w", offset, err)
 			}
@@ -183,6 +195,7 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 			// Wait for acknowledgment
 			resp, err := stream.Recv()
 			if err != nil {
+				streamLogger.Debug("Failed to receive stream response", slog.Int("retry_count", retryCount), slog.String("error", err.Error()))
 				retryCount++
 				if retryCount >= rm.Config.MaxChunkRetries {
 					return fmt.Errorf("failed to receive stream response after %d retries: %w", rm.Config.MaxChunkRetries, err)
@@ -194,6 +207,7 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 			ack := common.ChunkDataAckFromProto(resp)
 
 			if !ack.Success {
+				streamLogger.Debug("Chunk data failed", slog.Int("retry_count", retryCount), slog.String("error", ack.Message))
 				retryCount++
 				if retryCount >= rm.Config.MaxChunkRetries {
 					return fmt.Errorf("chunk failed after %d retries: %s", rm.Config.MaxChunkRetries, ack.Message)
@@ -205,6 +219,7 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 			// Validate bytes received
 			expectedBytes := offset + currentChunkSize
 			if ack.BytesReceived != expectedBytes {
+				streamLogger.Debug("Byte count mismatch", slog.Int("expected", expectedBytes), slog.Int("got", ack.BytesReceived))
 				retryCount++
 				if retryCount >= rm.Config.MaxChunkRetries {
 					return fmt.Errorf("byte count mismatch after %d retries: expected %d, got %d",
@@ -236,6 +251,8 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 			return ctx.Err()
 		default:
 		}
+
+		iteration++
 	}
 
 	// Close the stream and wait for response
@@ -261,5 +278,6 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 		return fmt.Errorf("stream failed: %s", finalAck.Message)
 	}
 
+	streamLogger.Info("Chunk data stream completed successfully")
 	return nil
 }

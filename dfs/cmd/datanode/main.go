@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -16,12 +17,13 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 	"google.golang.org/grpc"
 )
 
-func initServer() (*datanode.DataNodeServer, error) {
+func initServer(nodeConfig datanode.DataNodeConfig, logger *slog.Logger) (*datanode.DataNodeServer, error) {
 	// ChunkStore implementation is chosen here
 	baseDir := utils.GetEnvString("DISK_STORAGE_BASE_DIR", "/app")
 	rootDir := filepath.Join(baseDir, "data")
@@ -35,13 +37,13 @@ func initServer() (*datanode.DataNodeServer, error) {
 	}
 
 	// Datanode dependencies
-	nodeConfig := datanode.DefaultDatanodeConfig()
+
 	nodeSelector := common.NewNodeSelector()
 	nodeManager := common.NewNodeManager(nodeSelector)
-	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication)
+	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, logger)
 	sessionManager := datanode.NewSessionManager()
 
-	return datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeConfig), nil
+	return datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeConfig, logger), nil
 }
 
 // COORDINATED SHUTDOWN PROCESS:
@@ -87,8 +89,17 @@ func main() {
 	errChan := make(chan error, 2)
 	var wg sync.WaitGroup
 
+	// Create node config
+	nodeConfig := datanode.DefaultDatanodeConfig()
+
+	// Setup structured logging
+	logger, err := logging.InitLogger(nodeConfig.Info.ID)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
 	// Datanode server
-	server, err := initServer()
+	server, err := initServer(nodeConfig, logger)
 	if err != nil {
 		log.Fatalf("failed to initialize datanode server: %v", err)
 	}
@@ -108,16 +119,17 @@ func main() {
 		defer wg.Done()
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("Recovered from panic in gRPC server, writing to errChan...: %v", r)
+				logger.Error("Recovered from panic in gRPC server, writing to errChan...",
+					slog.String("error", err.Error()))
 				errChan <- fmt.Errorf("panic in gRPC server: %v", r)
 			}
 		}()
 
-		log.Printf("Starting datanode gRPC server on :%d", server.Config.Info.Port)
+		logger.Info(fmt.Sprintf("Starting datanode gRPC server on :%d", server.Config.Info.Port))
 		if err := grpcServer.Serve(listener); err != nil {
 			select {
 			case <-ctx.Done():
-				log.Println("gRPC server stopped due to graceful shutdown")
+				logger.Info("gRPC server stopped due to graceful shutdown")
 			default:
 				errChan <- fmt.Errorf("gRPC server failed: %w", err)
 			}
@@ -131,7 +143,7 @@ func main() {
 
 	// Register datanode with coordinator
 	if err := server.RegisterWithCoordinator(ctx, coordinatorAddress); err != nil {
-		log.Fatalf("Failed to register with coordinator: %v", err)
+		logger.Error("Failed to register with coordinator", slog.String("error", err.Error()))
 	}
 
 	// Start heartbeat loop
@@ -148,12 +160,12 @@ func main() {
 		heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)
 		defer heartbeatCancel()
 
-		log.Println("Starting heartbeat loop...")
+		logger.Info("Starting heartbeat loop...")
 		if err := server.HeartbeatLoop(heartbeatCtx, coordinatorAddress); err != nil {
 			// Only send error if it's not due to context cancellation
 			select {
 			case <-ctx.Done():
-				log.Println("Heartbeat loop stopped due to context cancellation")
+				logger.Info("Heartbeat loop stopped due to context cancellation")
 			default:
 				errChan <- fmt.Errorf("heartbeat loop failed: %w", err)
 			}
@@ -167,9 +179,9 @@ func main() {
 	// Wait for shutdown signal or error
 	select {
 	case sig := <-sigCh:
-		log.Printf("Received %s signal, initiating graceful shutdown...", sig.String())
+		logger.Info(fmt.Sprintf("Received %s signal, initiating graceful shutdown...", sig.String()))
 	case err := <-errChan:
-		log.Printf("Received error, initiating shutdown: %v", err)
+		logger.Error("Received error, initiating shutdown", slog.String("error", err.Error()))
 	}
 
 	// Cancel context to signal all goroutines to stop
@@ -193,16 +205,16 @@ func main() {
 	// Wait for goroutines to finish or timeout
 	select {
 	case <-done:
-		log.Println("All goroutines finished gracefully")
+		logger.Info("All goroutines finished gracefully")
 	case <-time.After(15 * time.Second):
-		log.Println("Timeout waiting for goroutines to finish, forcing shutdown")
+		logger.Info("Timeout waiting for goroutines to finish, forcing shutdown")
 	}
 
 	select {
 	case <-stopDone:
-		log.Println("gRPC server stopped gracefully")
+		logger.Info("gRPC server stopped gracefully")
 	case <-time.After(15 * time.Second):
-		log.Println("Timeout waiting for gRPC server to stop gracefully, forcing stop")
+		logger.Info("Timeout waiting for gRPC server to stop gracefully, forcing stop")
 		grpcServer.Stop()
 	}
 

@@ -2,6 +2,7 @@ package datanode
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
@@ -33,6 +34,8 @@ type DataNodeServer struct {
 	nodeManager        *common.NodeManager
 
 	Config DataNodeConfig
+
+	logger *slog.Logger
 }
 
 // Wrapper over the proto.DataNodeServiceClient interface
@@ -44,8 +47,8 @@ type DataNodeClient struct {
 
 type IReplicationManager interface {
 	paralellReplicate(nodes []*common.DataNodeInfo, req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error
-	replicate(ctx context.Context, client *DataNodeClient, req common.ReplicateChunkRequest, data []byte) error
-	streamChunkData(ctx context.Context, client *DataNodeClient, sessionID string, req common.ReplicateChunkRequest, data []byte) error
+	replicate(ctx context.Context, client *DataNodeClient, req common.ReplicateChunkRequest, data []byte, clientLogger *slog.Logger) error
+	streamChunkData(ctx context.Context, client *DataNodeClient, sessionID string, req common.ReplicateChunkRequest, data []byte, streamLogger *slog.Logger) error
 }
 
 type ISessionManager interface {
@@ -55,13 +58,14 @@ type ISessionManager interface {
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
-	nodeManager *common.NodeManager, config DataNodeConfig) *DataNodeServer {
+	nodeManager *common.NodeManager, config DataNodeConfig, logger *slog.Logger) *DataNodeServer {
 	return &DataNodeServer{
 		store:              store,
 		replicationManager: replicationManager,
 		sessionManager:     sessionManager,
 		nodeManager:        nodeManager,
 		Config:             config,
+		logger:             logger,
 	}
 }
 

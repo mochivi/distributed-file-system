@@ -7,11 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -31,8 +32,12 @@ const (
 func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkRequest) (*proto.StoreChunkResponse, error) {
 	req := common.StoreChunkRequestFromProto(pb)
 
+	logger := logging.OperationLogger(s.logger, "store_chunk", slog.String("chunk_id", req.ChunkID))
+	logger.Info("Received StoreChunk request")
+
 	calculatedChecksum := common.CalculateChecksum(req.Data)
 	if calculatedChecksum != req.Checksum {
+		logger.Error("Checksum mismatch", slog.String("expected", req.Checksum), slog.String("calculated", calculatedChecksum))
 		return common.StoreChunkResponse{
 			Success: false,
 			Message: "checksum does not match",
@@ -40,6 +45,7 @@ func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkReq
 	}
 
 	if err := s.store.Store(req.ChunkID, req.Data); err != nil {
+		logger.Error("Failed to store chunk", slog.String("error", err.Error()))
 		return nil, status.Errorf(codes.Internal, "failed to store chunk: %v", err)
 	}
 
@@ -52,13 +58,16 @@ func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkReq
 	// Select N_NODES possible nodes to replicate to
 	nodes, err := s.nodeManager.SelectBestNodes(N_NODES)
 	if err != nil {
+		logger.Error("Failed to select nodes", slog.String("error", err.Error()))
 		return nil, status.Errorf(codes.Internal, "failed to select nodes: %v", err)
 	}
 
 	// Replicate to N_REPLICAS nodes
 	if err := s.replicationManager.paralellReplicate(nodes, replicateReq, req.Data, N_REPLICAS); err != nil {
+		logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
 		return nil, status.Errorf(codes.Internal, "failed to replicate chunk: %v", err)
 	}
+	logger.Info("Chunk replicated successfully")
 
 	return common.StoreChunkResponse{
 		Success: true,
@@ -70,15 +79,22 @@ func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkReq
 func (s *DataNodeServer) RetrieveChunk(ctx context.Context, pb *proto.RetrieveChunkRequest) (*proto.RetrieveChunkResponse, error) {
 	req := common.RetrieveChunkRequestFromProto(pb)
 
+	logger := logging.OperationLogger(s.logger, "retrieve_chunk", slog.String("chunk_id", req.ChunkID))
+	logger.Info("Received RetrieveChunk request")
+
 	// Move to store layer later
 	if !s.store.Exists(req.ChunkID) {
+		logger.Error("Chunk not found")
 		return nil, status.Errorf(codes.NotFound, "file not found")
 	}
 
 	data, err := s.store.Retrieve(req.ChunkID)
 	if err != nil {
+		logger.Error("Failed to retrieve chunk", slog.String("error", err.Error()))
 		return nil, status.Errorf(codes.Internal, "failed to retrieve chunk: %v", err)
 	}
+
+	logger.Info("Chunk retrieved successfully")
 
 	return common.RetrieveChunkResponse{
 		Data:     data,
@@ -89,7 +105,11 @@ func (s *DataNodeServer) RetrieveChunk(ctx context.Context, pb *proto.RetrieveCh
 func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkRequest) (*proto.DeleteChunkResponse, error) {
 	req := common.DeleteChunkRequestFromProto(pb)
 
+	logger := logging.OperationLogger(s.logger, "delete_chunk", slog.String("chunk_id", req.ChunkID))
+	logger.Info("Received DeleteChunk request")
+
 	if !s.store.Exists(req.ChunkID) {
+		logger.Error("Chunk not found")
 		return common.DeleteChunkResponse{
 			Success: false,
 			Message: "chunk not found",
@@ -97,8 +117,11 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 	}
 
 	if err := s.store.Delete(req.ChunkID); err != nil {
+		logger.Error("Failed to delete chunk", slog.String("error", err.Error()))
 		return nil, status.Errorf(codes.Internal, "failed to delete chunk: %v", err)
 	}
+
+	logger.Info("Chunk deleted successfully")
 
 	return common.DeleteChunkResponse{
 		Success: true,
@@ -113,9 +136,12 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 // 2. Send accept response to innitiate data stream for chunk
 func (s *DataNodeServer) ReplicateChunk(ctx context.Context, pb *proto.ReplicateChunkRequest) (*proto.ReplicateChunkResponse, error) {
 	req := common.ReplicateChunkRequestFromProto(pb)
-	log.Printf("Node %s: ReplicatChunk request for chunk: %s", s.Config.Info.ID, req.ChunkID)
+	logger := logging.OperationLogger(s.logger, "receive_replicate_chunk", slog.String("chunk_id", req.ChunkID))
+
+	logger.Info("Received ReplicateChunk request")
 
 	if req.ChunkID == "" || req.ChunkSize <= 0 {
+		logger.Error("Invalid chunk metadata")
 		return common.ReplicateChunkResponse{
 			Accept:  false,
 			Message: "Invalid chunk metadata",
@@ -123,6 +149,7 @@ func (s *DataNodeServer) ReplicateChunk(ctx context.Context, pb *proto.Replicate
 	}
 
 	if !s.hasCapacity(req.ChunkSize) {
+		logger.Error("Insufficient storage capacity")
 		return &proto.ReplicateChunkResponse{
 			Accept:  false,
 			Message: "Insufficient storage capacity",
@@ -130,8 +157,7 @@ func (s *DataNodeServer) ReplicateChunk(ctx context.Context, pb *proto.Replicate
 	}
 
 	sessionID := uuid.NewString()
-	s.createStreamingSession(sessionID, req)
-	log.Printf("Created streaming sessionID to receive the chunk: %s", req.ChunkID)
+	s.createStreamingSession(sessionID, req, logger)
 
 	return common.ReplicateChunkResponse{
 		Accept:    true,
@@ -140,6 +166,7 @@ func (s *DataNodeServer) ReplicateChunk(ctx context.Context, pb *proto.Replicate
 	}.ToProto(), nil
 }
 
+// This is the side that is responsible for receiving the chunk data from the client
 func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
 	var session *StreamingSession
 	var buffer *bytes.Buffer
@@ -148,9 +175,15 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 	for {
 		chunkpb, err := stream.Recv()
 		if err == io.EOF {
+			if session != nil {
+				session.logger.Debug("Received EOF, closing session")
+			}
 			break
 		}
 		if err != nil {
+			if session != nil {
+				session.logger.Error("Failed to receive chunk data", slog.String("error", err.Error()))
+			}
 			return err
 		}
 
@@ -171,10 +204,12 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 
 		// Verify data integrity and ordering
 		if chunk.Offset != totalReceived {
+			session.logger.Error("Data out of order", slog.Int("expected", chunk.Offset), slog.Int("got", totalReceived))
 			return errors.New("data out of order")
 		}
 
 		// Write to buffer/temp file, update checksum
+		session.logger.Debug("Writing chunk data to buffer", slog.Int("offset", chunk.Offset), slog.Int("chunk_size", len(chunk.Data)))
 		buffer.Write(chunk.Data)
 		session.Checksum.Write(chunk.Data)
 		totalReceived += len(chunk.Data)
@@ -200,7 +235,9 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 			ReadyForNext:  true, // Requires flushing to be setup to work
 		}
 
+		session.logger.Debug("Sending acknowledgment", slog.Int("bytes_received", totalReceived))
 		if err := stream.Send(ack.ToProto()); err != nil {
+			session.logger.Error("Failed to send acknowledgment", slog.String("error", err.Error()))
 			return err
 		}
 
@@ -211,12 +248,14 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 			expectedHash, _ := hex.DecodeString(session.ExpectedHash)
 
 			if !bytes.Equal(computedHash, expectedHash) {
+				session.logger.Error("Checksum mismatch", slog.String("expected", session.ExpectedHash), slog.String("computed", hex.EncodeToString(computedHash)))
 				return errors.New("checksum mismatch")
 			}
 
 			// Store the chunk immediately
 			err := s.store.Store(session.ChunkID, buffer.Bytes())
 			if err != nil {
+				session.logger.Error("Failed to store chunk", slog.String("error", err.Error()))
 				return err
 			}
 
@@ -231,6 +270,7 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 		}
 	}
 
+	session.logger.Debug("Received chunk data stream successfully")
 	return nil
 }
 
@@ -241,32 +281,30 @@ func (s *DataNodeServer) HealthCheck(ctx context.Context, pb *proto.HealthCheckR
 }
 
 func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context, coordinatorAddress string) error {
-	log.Printf("Registering with coordinator at address: %s", coordinatorAddress)
+	logger := logging.OperationLogger(s.logger, "register", slog.String("coordinator_address", coordinatorAddress))
+	logger.Info("Registering with coordinator")
 
 	coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorAddress)
 	if err != nil {
-		log.Fatalf("failed to create coordinator client: %v", err)
+		logger.Error("Failed to create coordinator client", slog.String("error", err.Error()))
+		return fmt.Errorf("failed to create coordinator client: %v", err)
 	}
 
 	req := coordinator.RegisterDataNodeRequest{NodeInfo: s.Config.Info}
 	resp, err := coordinatorClient.RegisterDataNode(ctx, req)
 	if err != nil {
+		logger.Error("Failed to register datanode with coordinator", slog.String("error", err.Error()))
 		return fmt.Errorf("failed to register datanode with coordinator: %v", err)
 	}
 
 	if !resp.Success {
+		logger.Error("Failed to register datanode with coordinator", slog.String("error", resp.Message))
 		return fmt.Errorf("failed to register datanode with coordinator: %s", resp.Message)
 	}
 
 	// Save information about all nodes
 	s.nodeManager.InitializeNodes(resp.FullNodeList, resp.CurrentVersion)
 
-	log.Printf("Datanode %s registered with coordinator succesfully", s.Config.Info.ID)
+	logger.Info("Datanode registered with coordinator successfully")
 	return nil
-}
-
-// Helper functions
-
-func (s *DataNodeServer) hasCapacity(chunkSize int) bool {
-	return true
 }

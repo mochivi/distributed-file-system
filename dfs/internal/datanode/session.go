@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"hash"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
 // SessionManager handles currently open chunk streaming sessions with clients
@@ -33,6 +35,9 @@ type StreamingSession struct {
 	// Concurrency control
 	mutex  sync.RWMutex
 	Status SessionStatus
+
+	// scoped logger for this session
+	logger *slog.Logger
 }
 
 func NewSessionManager() *SessionManager {
@@ -62,7 +67,8 @@ func (sm *SessionManager) Delete(sessionID string) {
 }
 
 // DataNode creates and stores a session
-func (s *DataNodeServer) createStreamingSession(sessionId string, req common.ReplicateChunkRequest) {
+func (s *DataNodeServer) createStreamingSession(sessionId string, req common.ReplicateChunkRequest, logger *slog.Logger) {
+	streamLogger := logging.OperationLogger(logger, "create_streaming_session", slog.String("session_id", sessionId))
 	session := &StreamingSession{
 		SessionID:    sessionId,
 		ChunkID:      req.ChunkID,
@@ -72,8 +78,10 @@ func (s *DataNodeServer) createStreamingSession(sessionId string, req common.Rep
 		ExpiresAt:    time.Now().Add(s.Config.Session.SessionTimeout),
 		Status:       SessionActive,
 		Checksum:     sha256.New(),
+		logger:       streamLogger,
 	}
 	s.sessionManager.Store(sessionId, session)
+	streamLogger.Info("Streaming session created")
 }
 
 // DataNode retrieves the streaming session
@@ -88,6 +96,8 @@ func (s *DataNodeServer) getStreamingSession(sessionId string) *StreamingSession
 		s.sessionManager.Delete(sessionId)
 		return nil
 	}
+
+	session.logger.Debug("Streaming session retrieved")
 
 	return session
 }
