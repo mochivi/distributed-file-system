@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
 var (
@@ -29,13 +30,12 @@ func (s *DataNodeServer) HeartbeatLoop(ctx context.Context, coordinatorAddress s
 
 		if err := s.heartbeat(ctx, coordinatorClient); err != nil {
 			coordinatorClient.Close()
-			return fmt.Errorf("heartbeat error: %w", err)
+			return err
 		}
 		coordinatorClient.Close()
 
 		select {
 		case <-ctx.Done():
-			log.Printf("HeartbeatLoop stopping due to context cancellation: %v", ctx.Err())
 			return ctx.Err()
 		case <-ticker.C:
 		}
@@ -43,6 +43,8 @@ func (s *DataNodeServer) HeartbeatLoop(ctx context.Context, coordinatorAddress s
 }
 
 func (s *DataNodeServer) heartbeat(ctx context.Context, client *coordinator.CoordinatorClient) error {
+	logger := logging.OperationLogger(s.logger, "heartbeat", slog.String("coordinator_address", client.Address()))
+
 	req := coordinator.HeartbeatRequest{
 		NodeID: s.Config.Info.ID,
 		Status: common.HealthStatus{
@@ -54,8 +56,7 @@ func (s *DataNodeServer) heartbeat(ctx context.Context, client *coordinator.Coor
 
 	resp, err := client.DataNodeHeartbeat(ctx, req)
 	if err != nil {
-		log.Printf("Heartbeat error: %v", err)
-		return err
+		return ErrUnsucessfulHearbeat
 	}
 
 	if !resp.Success {
@@ -63,16 +64,15 @@ func (s *DataNodeServer) heartbeat(ctx context.Context, client *coordinator.Coor
 	}
 
 	if resp.RequiresFullResync {
-		log.Printf("Node requires resync: %s", resp.Message)
+		logger.Debug(fmt.Sprintf("Node requires resync: %s", resp.Message))
 		return ErrRequireResync
 	}
 
 	if resp.FromVersion == resp.ToVersion || len(resp.Updates) == 0 {
-		log.Printf("No updates for node %s", s.Config.Info.ID)
 		return nil
 	}
 
-	log.Printf("Updating nodes version from %d to %d", resp.FromVersion, resp.ToVersion)
+	logger.Debug("Updating nodes", slog.Int("from_version", int(resp.FromVersion)), slog.Int("to_version", int(resp.ToVersion)))
 	s.nodeManager.ApplyHistory(resp.Updates)
 
 	return nil

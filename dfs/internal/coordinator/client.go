@@ -11,8 +11,9 @@ import (
 
 // Wrapper over the proto.CoordinatorServiceClient interface
 type CoordinatorClient struct {
-	client proto.CoordinatorServiceClient
-	conn   *grpc.ClientConn
+	client  proto.CoordinatorServiceClient
+	conn    *grpc.ClientConn
+	address string
 }
 
 func NewCoordinatorClient(serverAddress string) (*CoordinatorClient, error) {
@@ -27,8 +28,9 @@ func NewCoordinatorClient(serverAddress string) (*CoordinatorClient, error) {
 	client := proto.NewCoordinatorServiceClient(conn)
 
 	return &CoordinatorClient{
-		client: client,
-		conn:   conn,
+		client:  client,
+		conn:    conn,
+		address: serverAddress,
 	}, nil
 }
 
@@ -91,4 +93,8 @@ func (c *CoordinatorClient) ListNodes(ctx context.Context, rqe ListNodesRequest,
 		return ListNodesResponse{}, fmt.Errorf("failed to list nodes: %w", err)
 	}
 	return ListNodesResponseFromProto(resp), nil
+}
+
+func (c *CoordinatorClient) Address() string {
+	return c.address
 }
