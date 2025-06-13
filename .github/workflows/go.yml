@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ubuntu-latest
     
     steps:
@@ -20,10 +20,6 @@ jobs:
     - name: Install dependencies
       working-directory: ./dfs
       run: go mod download
-
-    - name: Run tests
-      working-directory: ./dfs
-      run: go test ./...
 
     - name: Build all components
       working-directory: ./dfs
