@@ -3,7 +3,7 @@ package coordinator
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/rand"
 
 	"github.com/google/uuid"
@@ -21,7 +21,7 @@ import (
 func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (*proto.UploadResponse, error) {
 	// transform into internal representation
 	req := newUploadRequestFromProto(pb)
-	log.Printf("Received UploadRequest: %+v", req)
+	c.logger.Info("Received UploadRequest")
 
 	// Calculate number of chunks needed
 	chunkSize := req.ChunkSize
@@ -29,14 +29,15 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		chunkSize = c.config.ChunkSize * 1024 * 1024
 	}
 	numChunks := (req.Size + chunkSize - 1) / chunkSize
-	log.Printf("File will be split into %d chunks of size %d MB", numChunks, chunkSize/(1024*1024))
+	c.logger.Debug("File will be split into chunks", slog.Int("num_chunks", numChunks), slog.Int("chunk_size", chunkSize/(1024*1024)))
 
 	// Get a list of the best nodes to upload to
 	nodes, err := c.nodeManager.SelectBestNodes(numChunks)
 	if err != nil {
+		c.logger.Error("Failed to select best nodes", slog.String("error", err.Error()))
 		return nil, status.Error(codes.NotFound, "no available nodes")
 	}
-	log.Printf("Selected %d nodes for chunk distribution", len(nodes))
+	c.logger.Debug("Selected nodes for chunk distribution", slog.Int("num_nodes", len(nodes)))
 
 	assignments := make([]ChunkLocation, numChunks)
 	for i := 0; i < numChunks; i++ {
@@ -56,7 +57,7 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 
 	sessionID := uuid.NewString()
 	go c.metadataManager.trackUpload(sessionID, req, numChunks)
-	log.Printf("Created upload session %s for file %s", sessionID, req.Path)
+	c.logger.Debug("Created upload session", slog.String("session_id", sessionID), slog.String("file_path", req.Path))
 
 	return UploadResponse{
 		ChunkLocations: assignments,
@@ -68,7 +69,8 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 	// Try to retrieve information about the file location
 	fileInfo, err := c.metaStore.GetFile(req.Path)
 	if err != nil {
-		return nil, fmt.Errorf("file not found: %v", err)
+		c.logger.Error("Failed to get file info", slog.String("error", err.Error()))
+		return nil, status.Error(codes.NotFound, "file not found")
 	}
 
 	// Build chunk sources
@@ -78,6 +80,7 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 	for i, chunk := range fileInfo.Chunks {
 		node, ok := c.nodeManager.GetAvailableNodeForChunk(chunk.Replicas)
 		if !ok {
+			c.logger.Error("Failed to get available node for chunk", slog.String("chunk_id", chunk.ID), slog.String("file_path", req.Path))
 			return nil, status.Error(codes.NotFound, "no available nodes")
 		}
 
@@ -88,6 +91,7 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 		}
 	}
 
+	c.logger.Debug("Replying to client with chunk locations", slog.Int("num_chunks", len(chunkLocations)))
 	return DownloadResponse{
 		fileInfo:       *fileInfo,
 		chunkLocations: chunkLocations,
@@ -109,10 +113,12 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 // DataNode ingress mechanism
 func (c *Coordinator) RegisterDataNode(ctx context.Context, pb *proto.RegisterDataNodeRequest) (*proto.RegisterDataNodeResponse, error) {
 	nodeInfo := common.DataNodeInfoFromProto(pb.NodeInfo)
+	c.logger.Debug("Received RegisterDataNodeRequest from data node", slog.String("node_id", nodeInfo.ID))
 
 	c.nodeManager.AddNode(&nodeInfo)
 	nodes, version := c.nodeManager.ListNodes()
 
+	c.logger.Debug("Registered datanode, replying with current node list and version", slog.Int("num_nodes", len(nodes)), slog.Int("version", int(version)))
 	return RegisterDataNodeResponse{
 		Success:        true,
 		Message:        "Node registered successfully",
@@ -124,9 +130,11 @@ func (c *Coordinator) RegisterDataNode(ctx context.Context, pb *proto.RegisterDa
 // DataNodes periodically communicate their status to the coordinator
 func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, pb *proto.HeartbeatRequest) (*proto.HeartbeatResponse, error) {
 	req := HeartbeatRequestFromProto(pb)
+	c.logger.Debug("Received HeartbeatRequest from data node", slog.String("node_id", req.NodeID))
 
 	node, exists := c.nodeManager.GetNode(req.NodeID)
 	if !exists {
+		c.logger.Error("Data node not found", slog.String("node_id", req.NodeID))
 		return HeartbeatResponse{
 			Success: false,
 			Message: "node is not registered",
@@ -138,6 +146,7 @@ func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, pb *proto.Heartbeat
 
 	updates, currentVersion, err := c.nodeManager.GetUpdatesSince(req.LastSeenVersion)
 	if err != nil {
+		c.logger.Error("Failed to get updates since provided", slog.String("error", err.Error()))
 		return HeartbeatResponse{
 			Success:            true, // heartbeat was a success, as lastSeen & status were updated, but node requires resync
 			Message:            "version too old",
@@ -147,6 +156,7 @@ func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, pb *proto.Heartbeat
 		}.ToProto(), nil
 	}
 
+	c.logger.Debug("Replying to data node with updates", slog.Int("num_updates", len(updates)))
 	return HeartbeatResponse{
 		Success:            true,
 		Message:            "ok",

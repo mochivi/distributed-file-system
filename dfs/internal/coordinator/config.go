@@ -1,11 +1,16 @@
 package coordinator
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type CoordinatorConfig struct {
+	ID          string
 	Host        string
 	Port        int
-	ChunkSize   int // in MB
+	ChunkSize   int
 	Replication ReplicationConfig
 	Metadata    MetadataConfig
 }
@@ -20,9 +25,10 @@ type ReplicationConfig struct {
 
 func DefaultCoordinatorConfig() CoordinatorConfig {
 	return CoordinatorConfig{
+		ID:        uuid.NewString(),
 		Host:      "localhost",
 		Port:      8080,
-		ChunkSize: 8, // 8MB default chunksize
+		ChunkSize: 8 * 1024 * 1024, // 8MB default chunksize
 		Replication: ReplicationConfig{
 			Factor: 3,
 		},

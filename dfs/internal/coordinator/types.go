@@ -1,6 +1,8 @@
 package coordinator
 
 import (
+	"log/slog"
+
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -18,15 +20,17 @@ type Coordinator struct {
 	metadataManager *metadataManager // Coordinates when to actually commit metadata
 
 	config CoordinatorConfig
+	logger *slog.Logger
 }
 
 func NewCoordinator(cfg CoordinatorConfig, metaStore storage.MetadataStore, metadataManager *metadataManager,
-	nodeManager *common.NodeManager) *Coordinator {
+	nodeManager *common.NodeManager, logger *slog.Logger) *Coordinator {
 	return &Coordinator{
 		metaStore:       metaStore,
 		nodeManager:     nodeManager,
 		config:          cfg,
 		metadataManager: metadataManager,
+		logger:          logger,
 	}
 }
 

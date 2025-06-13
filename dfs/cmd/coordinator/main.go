@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 )
@@ -19,13 +21,19 @@ func main() {
 	cfg := coordinator.DefaultCoordinatorConfig()
 
 	// Coordinator dependencies
+
+	logger, err := logging.InitLogger(cfg.ID)
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+
 	metadataStore := metadata.NewMetadataLocalStorage()
 	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout)
 	nodeSelector := common.NewNodeSelector()
 	nodeManager := common.NewNodeManager(nodeSelector)
 
 	// Create coordinator server
-	server := coordinator.NewCoordinator(cfg, metadataStore, metadataManager, nodeManager)
+	server := coordinator.NewCoordinator(cfg, metadataStore, metadataManager, nodeManager, logger)
 
 	// gRPC server and register
 	grpcServer := grpc.NewServer()
@@ -39,14 +47,14 @@ func main() {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("Recovered from panic in gRPC server: %v", r)
+				logger.Error("Recovered from panic in gRPC server", slog.String("error", fmt.Sprintf("%v", r)))
 				grpcServer.GracefulStop()
 			}
 		}()
 
-		log.Printf("Starting coordinator gRPC server on :%d", cfg.Port)
+		logger.Info(fmt.Sprintf("Starting coordinator gRPC server on :%d", cfg.Port))
 		if err := grpcServer.Serve(listener); err != nil {
-			log.Fatalf("Failed to server gRPC server: %v", err)
+			logger.Error("Failed to server gRPC server", slog.String("error", err.Error()))
 		}
 	}()
 
@@ -55,7 +63,7 @@ func main() {
 	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 	<-ch
 
-	log.Println("Stopping coordinator gRPC server...")
+	logger.Info("Stopping coordinator gRPC server...")
 	grpcServer.GracefulStop()
-	log.Println("Coordinator server stopped, exiting...")
+	logger.Info("Coordinator server stopped, exiting...")
 }
