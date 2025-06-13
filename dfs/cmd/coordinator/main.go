@@ -28,7 +28,7 @@ func main() {
 	}
 
 	metadataStore := metadata.NewMetadataLocalStorage()
-	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout)
+	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout, logger)
 	nodeSelector := common.NewNodeSelector()
 	nodeManager := common.NewNodeManager(nodeSelector)
 

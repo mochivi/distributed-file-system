@@ -3,16 +3,18 @@ package coordinator
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
 type metadataManager struct {
 	sessions      map[string]metadataUploadSession
 	commitTimeout time.Duration
+	logger        *slog.Logger
 }
 
 type metadataUploadSession struct {
@@ -21,12 +23,13 @@ type metadataUploadSession struct {
 	fileInfo *common.FileInfo
 }
 
-func NewMetadataManager(commitTimeout time.Duration) *metadataManager {
+func NewMetadataManager(commitTimeout time.Duration, logger *slog.Logger) *metadataManager {
+	metadataLogger := logging.ExtendLogger(logger, slog.String("component", "metadata_manager"))
 	manager := &metadataManager{
 		sessions:      make(map[string]metadataUploadSession),
 		commitTimeout: commitTimeout,
+		logger:        metadataLogger,
 	}
-
 	return manager
 }
 
@@ -59,7 +62,7 @@ func (m *metadataManager) trackUpload(sessionID string, req UploadRequest, numCh
 		CreatedAt:  time.Now(),
 		Checksum:   req.Checksum,
 	}
-	log.Printf("Tracking upload session: %s for file %s with %d chunks", sessionID, req.Path, numChunks)
+	m.logger.Info("Tracking upload session", slog.String("session_id", sessionID), slog.String("file_path", req.Path), slog.Int("num_chunks", numChunks))
 	m.sessions[sessionID] = newMetadataUploadSession(sessionID, m.commitTimeout, fileInfo)
 }
 
@@ -77,7 +80,7 @@ func (m *metadataManager) commit(sessionID string, chunkInfos []common.ChunkInfo
 	fileInfo := session.fileInfo
 	fileInfo.Chunks = chunkInfos
 
-	log.Printf("Committing metadata for file %s with %d chunks", fileInfo.Path, len(chunkInfos))
+	m.logger.Info("Committing metadata for file", slog.String("file_path", fileInfo.Path), slog.Int("num_chunks", len(chunkInfos)))
 	if err := metaStore.PutFile(fileInfo.Path, fileInfo); err != nil {
 		return fmt.Errorf("failed to store file metadata: %w", err)
 	}

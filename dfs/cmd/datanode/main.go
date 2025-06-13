@@ -31,7 +31,7 @@ func initServer(nodeConfig datanode.DataNodeConfig, logger *slog.Logger) (*datan
 		Enabled: true,
 		Kind:    "block",
 		RootDir: rootDir,
-	})
+	}, logger)
 	if err != nil {
 		log.Fatal(err.Error())
 	}

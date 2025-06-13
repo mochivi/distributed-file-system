@@ -5,22 +5,29 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
 type ChunkDiskStorage struct {
 	config DiskStorageConfig
+	logger *slog.Logger
 }
 
-func NewChunkDiskStorage(config DiskStorageConfig) (*ChunkDiskStorage, error) {
+func NewChunkDiskStorage(config DiskStorageConfig, logger *slog.Logger) (*ChunkDiskStorage, error) {
+	storageLogger := logging.ExtendLogger(logger, slog.String("component", "chunk_storage"))
 	if err := os.MkdirAll(config.RootDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create rootDir for chunk disk storage: %w", err)
 	}
-	log.Printf("Created chunk disk storage rootDir: %s", config.RootDir)
-	return &ChunkDiskStorage{config: config}, nil
+	storageLogger.Info("Created chunk disk storage rootDir", slog.String("root_dir", config.RootDir))
+	return &ChunkDiskStorage{
+		config: config,
+		logger: storageLogger,
+	}, nil
 }
 
 // validateChunkID checks if the chunk ID is in the correct format
@@ -75,7 +82,7 @@ func (d *ChunkDiskStorage) Store(chunkID string, data []byte) error {
 		return fmt.Errorf("failed to write chunk file %s: %w", fullPath, err)
 	}
 
-	log.Printf("Stored chunk %s at %s", chunkID, fullPath)
+	d.logger.Info("Stored chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
 	return nil
 }
 
@@ -90,7 +97,7 @@ func (d *ChunkDiskStorage) Retrieve(chunkID string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read chunk file %s: %w", fullPath, err)
 	}
 
-	log.Printf("Retrieved chunk %s from %s", chunkID, fullPath)
+	d.logger.Info("Retrieved chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
 	return data, nil
 }
 
@@ -110,19 +117,18 @@ func (d *ChunkDiskStorage) Delete(chunkID string) error {
 		if err != nil {
 			// Log error but don't fail the whole operation,
 			// as the file is already deleted.
-			log.Printf("failed to check if dir is empty %s: %v", dirPath, err)
-			return nil
+			return err
 		}
 		if !empty {
 			break
 		}
 		if err := os.Remove(dirPath); err != nil {
-			log.Printf("failed to remove empty dir %s: %v", dirPath, err)
-			return nil
+			return err
 		}
 		dirPath = filepath.Dir(dirPath)
 	}
 
+	d.logger.Info("Deleted chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
 	return nil
 }
 
