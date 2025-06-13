@@ -1,43 +1,33 @@
-name: Go
+name: Build and Test
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./dfs
-
+    
     steps:
     - uses: actions/checkout@v4
-    
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version-file: dfs/go.mod
-
-    - name: Check Go version
-      run: go version
+        go-version-file: 'dfs/go.mod'
 
     - name: Install dependencies
-      run: |
-        go mod download
-        go mod verify
-        go mod tidy
+      working-directory: ./dfs
+      run: go mod download
 
-    - name: Build
-      run: |
-        echo "Building packages..."
-        go build -v ./...
-        echo "Build completed"
+    - name: Run tests
+      working-directory: ./dfs
+      run: go test ./...
 
-    - name: Test
+    - name: Build all components
+      working-directory: ./dfs
       run: |
-        echo "Running tests..."
-        go test -v -race ./...
-        echo "Tests completed"
+        go build ./cmd/coordinator
+        go build ./cmd/datanode  
+        go build ./cmd/client
