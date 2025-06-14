@@ -3,6 +3,8 @@
 A self-contained, **distributed file system written in Go**.  
 It was built as a learning project to sharpen my skills around systems design, gRPC, and distributed systems.
 
+👉 **Read the detailed design document here → [docs/design.md](docs/design.md)**
+
 ## Why I wrote this
 
 1. **Systems design practice** – implement real-world concerns such as chunk replication, leaderless coordination, and node resync.

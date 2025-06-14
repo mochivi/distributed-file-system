@@ -84,5 +84,3 @@ Steps in detail:
 6. **HTTP gateway** and richer CLI UX.
 7. **Observability** – metrics, tracing and log streaming.
 8. **Capacity-aware rebalancer** & erasure coding experiments.
-
-> _Document generated automatically. Last updated: 2025-06-14._ 
