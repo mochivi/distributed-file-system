@@ -21,8 +21,8 @@ import (
 
 // TODO: make this configurable by the client
 const (
-	N_NODES    int = 1
-	N_REPLICAS int = 1
+	N_REPLICAS int = 3
+	N_NODES    int = (N_REPLICAS-1)*2 + 1
 )
 
 // StoreChunk is received only if the node is a primary receiver
@@ -63,7 +63,7 @@ func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkReq
 	}
 
 	// Replicate to N_REPLICAS nodes
-	if err := s.replicationManager.paralellReplicate(nodes, replicateReq, req.Data, N_REPLICAS); err != nil {
+	if err := s.replicationManager.paralellReplicate(nodes, replicateReq, req.Data, N_REPLICAS-1); err != nil {
 		logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
 		return nil, status.Errorf(codes.Internal, "failed to replicate chunk: %v", err)
 	}
