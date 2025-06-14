@@ -130,7 +130,3 @@ Primary write path:
 This design keeps metadata centralized while letting data flow peer-to-peer for better throughput.
 
 * **Streaming replication with back-pressure** – once a replica accepts a `ReplicateChunk` request, the primary opens a bidirectional `ChunkDataStream`.  Each data message carries an `offset`, `isFinal` flag and checksum; the replica replies with `ChunkDataAck{bytesReceived, readyForNext}` enabling TCP-like flow control so a slow disk doesn't overwhelm memory on either side.
-
----
-
-*Author – [Victor Henzel Mochi]* 
