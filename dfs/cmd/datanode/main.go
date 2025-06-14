@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -12,6 +13,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"io/fs"
 
 	"github.com/joho/godotenv"
 	"github.com/mochivi/distributed-file-system/internal/common"
@@ -57,7 +60,9 @@ import (
 // - Buffered error channel prevents goroutines from blocking during shutdown
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Fatalf("failed to load environment: %v", err)
+		if !errors.Is(err, fs.ErrNotExist) {
+			log.Fatalf("failed to load environment: %v", err)
+		}
 	}
 
 	// Shutdown coordination
