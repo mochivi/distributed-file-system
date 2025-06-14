@@ -21,16 +21,36 @@ flowchart LR
     end
 
     subgraph "Storage cluster"
-        DN1["Node 1"]
-        DN2["Node 2"]
-        DN3["Node 3"]
+        DN1["DataNode 1 (primary for chunk)"]
+        DN2["DataNode 2 (replica)"]
+        DN3["DataNode 3 (replica)"]
     end
 
     A -- "Upload / Download" --> C1
     C1 -- "Chunk plan" --> A
-    A -- "Store / Fetch" --> DN1
-    A -- "Store / Fetch" --> DN2
-    A -- "Store / Fetch" --> DN3
+
+    %% Client uploads chunks to primary
+    A -- "StoreChunk" --> DN1
+
+    %% Primary negotiates replication session (request / accept)
+    DN1 -- "ReplicateChunk<br/>(session req)" --> DN2
+    DN2 -- "Accept / SessionID" --> DN1
+
+    DN1 -- "ReplicateChunk<br/>(session req)" --> DN3
+    DN3 -- "Accept / SessionID" --> DN1
+
+    %% Streaming data with flow-control
+    DN1 -- "ChunkDataStream ▶" --> DN2
+    DN2 -- "ChunkDataAck ◀ (back-pressure)" --> DN1
+
+    DN1 -- "ChunkDataStream ▶" --> DN3
+    DN3 -- "ChunkDataAck ◀ (back-pressure)" --> DN1
+
+    %% Any node can serve reads
+    A -- "RetrieveChunk" --> DN2
+    A -- "RetrieveChunk" --> DN3
+
+    %% Health-checks
     DN1 -- "Heartbeat" --> C1
     DN2 -- "Heartbeat" --> C1
     DN3 -- "Heartbeat" --> C1
@@ -98,6 +118,31 @@ GitHub Actions workflow **`integration-tests.yml`** automatically:
 1. Checks out the repo, sets up Go with caching.  
 2. Builds and runs the full Compose environment in the cloud runner.  
 3. Captures structured logs and uploads them as an artifact for post-run analysis.
+
+## Node-management internals
+
+The **NodeManager** in the coordinator (and a read-only copy inside every DataNode) is the single source of truth for cluster membership and health.
+
+Key mechanics:
+
+* **Versioned updates** – every add / remove / status change bumps a monotonically increasing `currentVersion`.  The last *N* updates are kept in a circular buffer so DataNodes can request *only* the diff since their last known version.
+* **Heartbeats** – DataNodes ping the coordinator every 30 s with their ID, disk-usage & health. The coordinator replies with:
+  * `updates[]` – incremental changes since the node's `lastSeenVersion`, or
+  * `requiresFullResync = true` if the node is too far behind.
+* **Selector plug-in** – `NodeSelector` interface lets you swap placement strategy.  The default picks the first healthy nodes; you can inject capacity-aware or network-aware selectors easily.
+* **Local caches** – DataNodes keep a local map so they can service reads without asking the coordinator; they apply the incremental updates lazily.
+
+Primary write path:
+1. Client asks coordinator for an upload plan.  
+2. Coordinator fragments the file, chooses a primary + replica set per chunk, and returns `ChunkLocation{ChunkID, Node}` entries.
+3. Client streams `StoreChunk` to the primary.  
+4. Primary verifies checksum, persists chunk, then issues `ReplicateChunk` RPCs to its peers.  
+5. Peers stream back `ChunkDataAck`; once enough replicas succeed, the primary reports success.
+
+This design keeps metadata centralized while letting data flow peer-to-peer for better throughput.
+
+* **Streaming replication with back-pressure** – once a replica accepts a `ReplicateChunk` request, the primary opens a bidirectional `ChunkDataStream`.  Each data message carries an `offset`, `isFinal` flag and checksum; the replica replies with `ChunkDataAck{bytesReceived, readyForNext}` enabling TCP-like flow control so a slow disk doesn't overwhelm memory on either side.
+
 ---
 
 *Author – [Victor Henzel Mochi]* 
