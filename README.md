@@ -17,7 +17,7 @@ flowchart LR
     end
 
     subgraph "Coordinator"
-        C1["Metadata & API"]
+        C1["gRPC API<br/>gRPC API & Metadata manager"]
     end
 
     subgraph "Storage cluster"
