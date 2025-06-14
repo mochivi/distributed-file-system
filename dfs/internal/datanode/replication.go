@@ -71,6 +71,7 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, re
 
 		semaphore <- struct{}{} // Acquire slot (blocks if channel full)
 		wg.Add(1)
+		acceptedCount.Add(1)
 
 		clientLogger.Debug("Replicating to client")
 		go func(clientIndex int, c *DataNodeClient) {
@@ -87,7 +88,6 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, re
 				return
 			}
 
-			acceptedCount.Add(1)
 			clientLogger.Debug("Replication succeeded")
 		}(i, client)
 	}
@@ -203,7 +203,7 @@ func (rm *ReplicationManager) streamChunkData(ctx context.Context, client *DataN
 				continue
 			}
 
-			ack := common.ChunkDataAckFromProto(resp)
+			ack = common.ChunkDataAckFromProto(resp)
 
 			if !ack.Success {
 				streamLogger.Debug("Chunk data failed", slog.Int("retry_count", retryCount), slog.String("error", ack.Message))
