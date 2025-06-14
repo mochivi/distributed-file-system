@@ -23,6 +23,7 @@ const (
 	CoordinatorService_DownloadFile_FullMethodName      = "/dfs.CoordinatorService/DownloadFile"
 	CoordinatorService_DeleteFile_FullMethodName        = "/dfs.CoordinatorService/DeleteFile"
 	CoordinatorService_ListFiles_FullMethodName         = "/dfs.CoordinatorService/ListFiles"
+	CoordinatorService_ConfirmUpload_FullMethodName     = "/dfs.CoordinatorService/ConfirmUpload"
 	CoordinatorService_RegisterDataNode_FullMethodName  = "/dfs.CoordinatorService/RegisterDataNode"
 	CoordinatorService_DataNodeHeartbeat_FullMethodName = "/dfs.CoordinatorService/DataNodeHeartbeat"
 	CoordinatorService_ListNodes_FullMethodName         = "/dfs.CoordinatorService/ListNodes"
@@ -37,6 +38,8 @@ type CoordinatorServiceClient interface {
 	DownloadFile(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (*DownloadResponse, error)
 	DeleteFile(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
 	ListFiles(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
+	// Metadata commit, sent by the client once all chunks have been uploaded to datanodes
+	ConfirmUpload(ctx context.Context, in *ConfirmUploadRequest, opts ...grpc.CallOption) (*ConfirmUploadResponse, error)
 	// Node management
 	RegisterDataNode(ctx context.Context, in *RegisterDataNodeRequest, opts ...grpc.CallOption) (*RegisterDataNodeResponse, error)
 	DataNodeHeartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
@@ -91,6 +94,16 @@ func (c *coordinatorServiceClient) ListFiles(ctx context.Context, in *ListReques
 	return out, nil
 }
 
+func (c *coordinatorServiceClient) ConfirmUpload(ctx context.Context, in *ConfirmUploadRequest, opts ...grpc.CallOption) (*ConfirmUploadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConfirmUploadResponse)
+	err := c.cc.Invoke(ctx, CoordinatorService_ConfirmUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *coordinatorServiceClient) RegisterDataNode(ctx context.Context, in *RegisterDataNodeRequest, opts ...grpc.CallOption) (*RegisterDataNodeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegisterDataNodeResponse)
@@ -130,6 +143,8 @@ type CoordinatorServiceServer interface {
 	DownloadFile(context.Context, *DownloadRequest) (*DownloadResponse, error)
 	DeleteFile(context.Context, *DeleteRequest) (*DeleteResponse, error)
 	ListFiles(context.Context, *ListRequest) (*ListResponse, error)
+	// Metadata commit, sent by the client once all chunks have been uploaded to datanodes
+	ConfirmUpload(context.Context, *ConfirmUploadRequest) (*ConfirmUploadResponse, error)
 	// Node management
 	RegisterDataNode(context.Context, *RegisterDataNodeRequest) (*RegisterDataNodeResponse, error)
 	DataNodeHeartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
@@ -155,6 +170,9 @@ func (UnimplementedCoordinatorServiceServer) DeleteFile(context.Context, *Delete
 }
 func (UnimplementedCoordinatorServiceServer) ListFiles(context.Context, *ListRequest) (*ListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListFiles not implemented")
+}
+func (UnimplementedCoordinatorServiceServer) ConfirmUpload(context.Context, *ConfirmUploadRequest) (*ConfirmUploadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ConfirmUpload not implemented")
 }
 func (UnimplementedCoordinatorServiceServer) RegisterDataNode(context.Context, *RegisterDataNodeRequest) (*RegisterDataNodeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterDataNode not implemented")
@@ -258,6 +276,24 @@ func _CoordinatorService_ListFiles_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CoordinatorService_ConfirmUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConfirmUploadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoordinatorServiceServer).ConfirmUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoordinatorService_ConfirmUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoordinatorServiceServer).ConfirmUpload(ctx, req.(*ConfirmUploadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CoordinatorService_RegisterDataNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RegisterDataNodeRequest)
 	if err := dec(in); err != nil {
@@ -334,6 +370,10 @@ var CoordinatorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListFiles",
 			Handler:    _CoordinatorService_ListFiles_Handler,
+		},
+		{
+			MethodName: "ConfirmUpload",
+			Handler:    _CoordinatorService_ConfirmUpload_Handler,
 		},
 		{
 			MethodName: "RegisterDataNode",

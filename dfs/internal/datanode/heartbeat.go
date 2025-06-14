@@ -18,12 +18,12 @@ var (
 )
 
 // TODO: datanode should be aware of coordinator rotations
-func (s *DataNodeServer) HeartbeatLoop(ctx context.Context, coordinatorAddress string) error {
+func (s *DataNodeServer) HeartbeatLoop(ctx context.Context, node *common.DataNodeInfo) error {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for {
-		coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorAddress)
+		coordinatorClient, err := coordinator.NewCoordinatorClient(node)
 		if err != nil {
 			return fmt.Errorf("failed to create coordinator client: %w", err)
 		}
@@ -43,7 +43,7 @@ func (s *DataNodeServer) HeartbeatLoop(ctx context.Context, coordinatorAddress s
 }
 
 func (s *DataNodeServer) heartbeat(ctx context.Context, client *coordinator.CoordinatorClient) error {
-	logger := logging.OperationLogger(s.logger, "heartbeat", slog.String("coordinator_address", client.Address()))
+	logger := logging.OperationLogger(s.logger, "heartbeat", slog.String("coordinator_address", client.Node.Endpoint()))
 
 	req := coordinator.HeartbeatRequest{
 		NodeID: s.Config.Info.ID,

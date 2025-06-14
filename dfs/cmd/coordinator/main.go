@@ -22,10 +22,11 @@ func main() {
 
 	// Coordinator dependencies
 
-	logger, err := logging.InitLogger(cfg.ID)
+	rootLogger, err := logging.InitLogger()
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
+	logger := logging.ExtendLogger(rootLogger, slog.String("node_id", cfg.ID))
 
 	metadataStore := metadata.NewMetadataLocalStorage()
 	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout, logger)

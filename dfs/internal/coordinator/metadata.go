@@ -77,6 +77,8 @@ func (m *metadataManager) commit(sessionID string, chunkInfos []common.ChunkInfo
 		return errors.New("session expired")
 	}
 
+	// Update the file info with the new chunk infos
+	// This is done as we do not know for sure where each chunk is stored by the time the session is created
 	fileInfo := session.fileInfo
 	fileInfo.Chunks = chunkInfos
 

@@ -58,7 +58,7 @@ func SetupLogger(nodeID string, logLevel slog.Level) *slog.Logger {
 }
 
 // TextLogger can be used during development for more readable logs
-func SetupTextLogger(nodeID string, logLevel slog.Level) *slog.Logger {
+func SetupTextLogger(logLevel slog.Level) *slog.Logger {
 	opts := &slog.HandlerOptions{
 		Level:     logLevel,
 		AddSource: true,
@@ -76,13 +76,11 @@ func SetupTextLogger(nodeID string, logLevel slog.Level) *slog.Logger {
 
 	handler := slog.NewTextHandler(os.Stdout, opts)
 
-	return slog.New(handler).With(
-		slog.String("node_id", nodeID),
-	)
+	return slog.New(handler)
 }
 
 // Initialize your service with configured logger
-func InitLogger(nodeID string) (*slog.Logger, error) {
+func InitLogger() (*slog.Logger, error) {
 	logLevel := slog.LevelInfo
 	var logger *slog.Logger
 
@@ -90,10 +88,10 @@ func InitLogger(nodeID string) (*slog.Logger, error) {
 	switch environment {
 	case "development":
 		logLevel = slog.LevelDebug
-		logger = SetupTextLogger(nodeID, logLevel)
+		logger = SetupTextLogger(logLevel)
 	case "production":
 		logLevel = slog.LevelInfo
-		logger = SetupTextLogger(nodeID, logLevel)
+		logger = SetupTextLogger(logLevel)
 	default:
 		return nil, errors.New("invalid environment")
 	}

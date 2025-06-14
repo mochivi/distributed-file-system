@@ -23,29 +23,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-func initServer(nodeConfig datanode.DataNodeConfig, logger *slog.Logger) (*datanode.DataNodeServer, error) {
-	// ChunkStore implementation is chosen here
-	baseDir := utils.GetEnvString("DISK_STORAGE_BASE_DIR", "/app")
-	rootDir := filepath.Join(baseDir, "data")
-	chunkStore, err := chunk.NewChunkDiskStorage(chunk.DiskStorageConfig{
-		Enabled: true,
-		Kind:    "block",
-		RootDir: rootDir,
-	}, logger)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	// Datanode dependencies
-
-	nodeSelector := common.NewNodeSelector()
-	nodeManager := common.NewNodeManager(nodeSelector)
-	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, logger)
-	sessionManager := datanode.NewSessionManager()
-
-	return datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeConfig, logger), nil
-}
-
 // COORDINATED SHUTDOWN PROCESS:
 // This section implements a graceful shutdown pattern for multiple goroutines
 // with both context-aware and non-context-aware services.
@@ -93,10 +70,11 @@ func main() {
 	nodeConfig := datanode.DefaultDatanodeConfig()
 
 	// Setup structured logging
-	logger, err := logging.InitLogger(nodeConfig.Info.ID)
+	rootLogger, err := logging.InitLogger()
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+	logger := logging.ExtendLogger(rootLogger, slog.String("node_id", nodeConfig.Info.ID))
 
 	// Datanode server
 	server, err := initServer(nodeConfig, logger)
@@ -139,10 +117,15 @@ func main() {
 	// Register datanode with coordinator - if fails, should crash
 	coordinatorHost := utils.GetEnvString("COORDINATOR_HOST", "coordinator")
 	coordinatorPort := utils.GetEnvInt("COORDINATOR_PORT", 8080)
-	coordinatorAddress := fmt.Sprintf("%s:%d", coordinatorHost, coordinatorPort)
+	coordinatorNode := &common.DataNodeInfo{
+		ID:     "coordinator", // TODO: change to coordinator ID when implemented, should be received from some service discovery/config storage system
+		Host:   coordinatorHost,
+		Port:   coordinatorPort,
+		Status: common.NodeHealthy,
+	}
 
 	// Register datanode with coordinator
-	if err := server.RegisterWithCoordinator(ctx, coordinatorAddress); err != nil {
+	if err := server.RegisterWithCoordinator(ctx, coordinatorNode); err != nil {
 		logger.Error("Failed to register with coordinator", slog.String("error", err.Error()))
 	}
 
@@ -161,7 +144,7 @@ func main() {
 		defer heartbeatCancel()
 
 		logger.Info("Starting heartbeat loop...")
-		if err := server.HeartbeatLoop(heartbeatCtx, coordinatorAddress); err != nil {
+		if err := server.HeartbeatLoop(heartbeatCtx, coordinatorNode); err != nil {
 			// Only send error if it's not due to context cancellation
 			select {
 			case <-ctx.Done():
@@ -219,4 +202,26 @@ func main() {
 	}
 
 	log.Println("Server stopped, exiting...")
+}
+
+func initServer(nodeConfig datanode.DataNodeConfig, logger *slog.Logger) (*datanode.DataNodeServer, error) {
+	// ChunkStore implementation is chosen here
+	baseDir := utils.GetEnvString("DISK_STORAGE_BASE_DIR", "/app")
+	rootDir := filepath.Join(baseDir, "data")
+	chunkStore, err := chunk.NewChunkDiskStorage(chunk.DiskStorageConfig{
+		Enabled: true,
+		Kind:    "block",
+		RootDir: rootDir,
+	}, logger)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	// Datanode dependencies
+	nodeSelector := common.NewNodeSelector()
+	nodeManager := common.NewNodeManager(nodeSelector)
+	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, logger)
+	sessionManager := datanode.NewSessionManager()
+
+	return datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeConfig, logger), nil
 }

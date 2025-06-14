@@ -26,6 +26,9 @@ func NewMetadataLocalStorage() *MetadataDiskStorage {
 }
 
 func (m *MetadataDiskStorage) PutFile(path string, info *common.FileInfo) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	return nil
 }
 func (m *MetadataDiskStorage) GetFile(path string) (*common.FileInfo, error) {

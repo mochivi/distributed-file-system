@@ -6,6 +6,7 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -40,9 +41,9 @@ type DataNodeServer struct {
 
 // Wrapper over the proto.DataNodeServiceClient interface
 type DataNodeClient struct {
-	client  proto.DataNodeServiceClient
-	conn    *grpc.ClientConn
-	address string
+	client proto.DataNodeServiceClient
+	conn   *grpc.ClientConn
+	Node   *common.DataNodeInfo
 }
 
 type IReplicationManager interface {
@@ -59,19 +60,20 @@ type ISessionManager interface {
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
 	nodeManager *common.NodeManager, config DataNodeConfig, logger *slog.Logger) *DataNodeServer {
+	datanodeLogger := logging.ExtendLogger(logger, slog.String("component", "datanode_server"))
 	return &DataNodeServer{
 		store:              store,
 		replicationManager: replicationManager,
 		sessionManager:     sessionManager,
 		nodeManager:        nodeManager,
 		Config:             config,
-		logger:             logger,
+		logger:             datanodeLogger,
 	}
 }
 
-func NewDataNodeClient(serverAddress string) (*DataNodeClient, error) {
+func NewDataNodeClient(node *common.DataNodeInfo) (*DataNodeClient, error) {
 	conn, err := grpc.NewClient(
-		serverAddress,
+		node.Endpoint(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()), // Update to TLS in prod
 	)
 	if err != nil {
@@ -81,8 +83,8 @@ func NewDataNodeClient(serverAddress string) (*DataNodeClient, error) {
 	client := proto.NewDataNodeServiceClient(conn)
 
 	return &DataNodeClient{
-		client:  client,
-		conn:    conn,
-		address: serverAddress,
+		client: client,
+		conn:   conn,
+		Node:   node,
 	}, nil
 }

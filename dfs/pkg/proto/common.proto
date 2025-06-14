@@ -19,7 +19,7 @@ message FileInfo {
 message ChunkInfo {
   string id = 1;
   int64 size = 2;
-  repeated string replicas = 3;  // DataNode IDs storing this chunk
+  repeated DataNodeInfo replicas = 3;  // DataNodes storing this chunk
   string checksum = 4;
 }
 

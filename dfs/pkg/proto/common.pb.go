@@ -160,7 +160,7 @@ type ChunkInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Size          int64                  `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`
-	Replicas      []string               `protobuf:"bytes,3,rep,name=replicas,proto3" json:"replicas,omitempty"` // DataNode IDs storing this chunk
+	Replicas      []*DataNodeInfo        `protobuf:"bytes,3,rep,name=replicas,proto3" json:"replicas,omitempty"` // DataNodes storing this chunk
 	Checksum      string                 `protobuf:"bytes,4,opt,name=checksum,proto3" json:"checksum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -210,7 +210,7 @@ func (x *ChunkInfo) GetSize() int64 {
 	return 0
 }
 
-func (x *ChunkInfo) GetReplicas() []string {
+func (x *ChunkInfo) GetReplicas() []*DataNodeInfo {
 	if x != nil {
 		return x.Replicas
 	}
@@ -381,11 +381,11 @@ const file_common_proto_rawDesc = "" +
 	"\x06chunks\x18\x04 \x03(\v2\x0e.dfs.ChunkInfoR\x06chunks\x129\n" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1a\n" +
-	"\bchecksum\x18\x06 \x01(\tR\bchecksum\"g\n" +
+	"\bchecksum\x18\x06 \x01(\tR\bchecksum\"z\n" +
 	"\tChunkInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x1a\n" +
-	"\breplicas\x18\x03 \x03(\tR\breplicas\x12\x1a\n" +
+	"\x04size\x18\x02 \x01(\x03R\x04size\x12-\n" +
+	"\breplicas\x18\x03 \x03(\v2\x11.dfs.DataNodeInfoR\breplicas\x12\x1a\n" +
 	"\bchecksum\x18\x04 \x01(\tR\bchecksum\"\xe3\x01\n" +
 	"\fDataNodeInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
@@ -430,15 +430,16 @@ var file_common_proto_goTypes = []any{
 var file_common_proto_depIdxs = []int32{
 	2, // 0: dfs.FileInfo.chunks:type_name -> dfs.ChunkInfo
 	5, // 1: dfs.FileInfo.created_at:type_name -> google.protobuf.Timestamp
-	0, // 2: dfs.DataNodeInfo.status:type_name -> dfs.NodeStatus
-	5, // 3: dfs.DataNodeInfo.last_seen:type_name -> google.protobuf.Timestamp
-	0, // 4: dfs.HealthStatus.status:type_name -> dfs.NodeStatus
-	5, // 5: dfs.HealthStatus.last_seen:type_name -> google.protobuf.Timestamp
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	3, // 2: dfs.ChunkInfo.replicas:type_name -> dfs.DataNodeInfo
+	0, // 3: dfs.DataNodeInfo.status:type_name -> dfs.NodeStatus
+	5, // 4: dfs.DataNodeInfo.last_seen:type_name -> google.protobuf.Timestamp
+	0, // 5: dfs.HealthStatus.status:type_name -> dfs.NodeStatus
+	5, // 6: dfs.HealthStatus.last_seen:type_name -> google.protobuf.Timestamp
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_common_proto_init() }

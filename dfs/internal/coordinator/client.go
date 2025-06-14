@@ -2,8 +2,8 @@ package coordinator
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -11,14 +11,14 @@ import (
 
 // Wrapper over the proto.CoordinatorServiceClient interface
 type CoordinatorClient struct {
-	client  proto.CoordinatorServiceClient
-	conn    *grpc.ClientConn
-	address string
+	client proto.CoordinatorServiceClient
+	conn   *grpc.ClientConn
+	Node   *common.DataNodeInfo
 }
 
-func NewCoordinatorClient(serverAddress string) (*CoordinatorClient, error) {
+func NewCoordinatorClient(node *common.DataNodeInfo) (*CoordinatorClient, error) {
 	conn, err := grpc.NewClient(
-		serverAddress,
+		node.Endpoint(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()), // Update to TLS in prod
 	)
 	if err != nil {
@@ -28,9 +28,9 @@ func NewCoordinatorClient(serverAddress string) (*CoordinatorClient, error) {
 	client := proto.NewCoordinatorServiceClient(conn)
 
 	return &CoordinatorClient{
-		client:  client,
-		conn:    conn,
-		address: serverAddress,
+		client: client,
+		conn:   conn,
+		Node:   node,
 	}, nil
 }
 
@@ -42,7 +42,7 @@ func (c *CoordinatorClient) Close() error {
 func (c *CoordinatorClient) UploadFile(ctx context.Context, req UploadRequest, opts ...grpc.CallOption) (UploadResponse, error) {
 	resp, err := c.client.UploadFile(ctx, req.ToProto(), opts...)
 	if err != nil {
-		return UploadResponse{}, fmt.Errorf("failed to upload file: %w", err)
+		return UploadResponse{}, err
 	}
 	return UploadResponseFromProto(resp), nil
 }
@@ -50,7 +50,7 @@ func (c *CoordinatorClient) UploadFile(ctx context.Context, req UploadRequest, o
 func (c *CoordinatorClient) DownloadFile(ctx context.Context, req DownloadRequest, opts ...grpc.CallOption) (DownloadResponse, error) {
 	resp, err := c.client.DownloadFile(ctx, req.ToProto(), opts...)
 	if err != nil {
-		return DownloadResponse{}, fmt.Errorf("failed to upload file: %w", err)
+		return DownloadResponse{}, err
 	}
 	return DownloadResponseFromProto(resp), nil
 }
@@ -58,15 +58,23 @@ func (c *CoordinatorClient) DownloadFile(ctx context.Context, req DownloadReques
 func (c *CoordinatorClient) DeleteFile(ctx context.Context, req DeleteRequest, opts ...grpc.CallOption) (DeleteResponse, error) {
 	resp, err := c.client.DeleteFile(ctx, req.ToProto(), opts...)
 	if err != nil {
-		return DeleteResponse{}, fmt.Errorf("failed to upload file: %w", err)
+		return DeleteResponse{}, err
 	}
 	return DeleteResponseFromProto(resp), nil
+}
+
+func (c *CoordinatorClient) ConfirmUpload(ctx context.Context, req ConfirmUploadRequest, opts ...grpc.CallOption) (ConfirmUploadResponse, error) {
+	resp, err := c.client.ConfirmUpload(ctx, req.ToProto(), opts...)
+	if err != nil {
+		return ConfirmUploadResponse{}, err
+	}
+	return ConfirmUploadResponseFromProto(resp), nil
 }
 
 func (c *CoordinatorClient) ListFiles(ctx context.Context, req ListRequest, opts ...grpc.CallOption) (ListResponse, error) {
 	resp, err := c.client.ListFiles(ctx, req.ToProto(), opts...)
 	if err != nil {
-		return ListResponse{}, fmt.Errorf("failed to upload file: %w", err)
+		return ListResponse{}, err
 	}
 	return ListResponseFromProto(resp), nil
 }
@@ -74,7 +82,7 @@ func (c *CoordinatorClient) ListFiles(ctx context.Context, req ListRequest, opts
 func (c *CoordinatorClient) RegisterDataNode(ctx context.Context, req RegisterDataNodeRequest, opts ...grpc.CallOption) (RegisterDataNodeResponse, error) {
 	resp, err := c.client.RegisterDataNode(ctx, req.ToProto(), opts...)
 	if err != nil {
-		return RegisterDataNodeResponse{}, fmt.Errorf("failed to upload file: %w", err)
+		return RegisterDataNodeResponse{}, err
 	}
 	return RegisterDataNodeResponseFromProto(resp), nil
 }
@@ -82,7 +90,7 @@ func (c *CoordinatorClient) RegisterDataNode(ctx context.Context, req RegisterDa
 func (c *CoordinatorClient) DataNodeHeartbeat(ctx context.Context, req HeartbeatRequest, opts ...grpc.CallOption) (HeartbeatResponse, error) {
 	resp, err := c.client.DataNodeHeartbeat(ctx, req.ToProto(), opts...)
 	if err != nil {
-		return HeartbeatResponse{}, fmt.Errorf("failed to upload file: %w", err)
+		return HeartbeatResponse{}, err
 	}
 	return HeartbeatResponseFromProto(resp), nil
 }
@@ -90,11 +98,7 @@ func (c *CoordinatorClient) DataNodeHeartbeat(ctx context.Context, req Heartbeat
 func (c *CoordinatorClient) ListNodes(ctx context.Context, rqe ListNodesRequest, opts ...grpc.CallOption) (ListNodesResponse, error) {
 	resp, err := c.client.ListNodes(context.Background(), &proto.ListNodesRequest{}, opts...)
 	if err != nil {
-		return ListNodesResponse{}, fmt.Errorf("failed to list nodes: %w", err)
+		return ListNodesResponse{}, err
 	}
 	return ListNodesResponseFromProto(resp), nil
-}
-
-func (c *CoordinatorClient) Address() string {
-	return c.address
 }

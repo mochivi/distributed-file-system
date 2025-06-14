@@ -1,6 +1,8 @@
 package common
 
-import "github.com/mochivi/distributed-file-system/pkg/proto"
+import (
+	"github.com/mochivi/distributed-file-system/pkg/proto"
+)
 
 type StoreChunkRequest struct {
 	ChunkID  string

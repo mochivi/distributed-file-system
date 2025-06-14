@@ -68,7 +68,7 @@ func (x NodeUpdate_UpdateType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use NodeUpdate_UpdateType.Descriptor instead.
 func (NodeUpdate_UpdateType) EnumDescriptor() ([]byte, []int) {
-	return file_coordinator_proto_rawDescGZIP(), []int{15, 0}
+	return file_coordinator_proto_rawDescGZIP(), []int{17, 0}
 }
 
 // Upload file request/response
@@ -143,6 +143,7 @@ func (x *UploadRequest) GetChecksum() string {
 type UploadResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ChunkLocations []*ChunkLocation       `protobuf:"bytes,1,rep,name=chunk_locations,json=chunkLocations,proto3" json:"chunk_locations,omitempty"`
+	SessionId      string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -184,11 +185,17 @@ func (x *UploadResponse) GetChunkLocations() []*ChunkLocation {
 	return nil
 }
 
+func (x *UploadResponse) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
 type ChunkLocation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ChunkId       string                 `protobuf:"bytes,1,opt,name=chunk_id,json=chunkId,proto3" json:"chunk_id,omitempty"`
-	NodeId        string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	Endpoint      string                 `protobuf:"bytes,3,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	Node          *DataNodeInfo          `protobuf:"bytes,2,opt,name=node,proto3" json:"node,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -230,18 +237,11 @@ func (x *ChunkLocation) GetChunkId() string {
 	return ""
 }
 
-func (x *ChunkLocation) GetNodeId() string {
+func (x *ChunkLocation) GetNode() *DataNodeInfo {
 	if x != nil {
-		return x.NodeId
+		return x.Node
 	}
-	return ""
-}
-
-func (x *ChunkLocation) GetEndpoint() string {
-	if x != nil {
-		return x.Endpoint
-	}
-	return ""
+	return nil
 }
 
 // Download file request/response
@@ -438,6 +438,111 @@ func (x *DeleteResponse) GetMessage() string {
 	return ""
 }
 
+// ConfirmUpload request/response
+type ConfirmUploadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ChunkInfos    []*ChunkInfo           `protobuf:"bytes,2,rep,name=chunk_infos,json=chunkInfos,proto3" json:"chunk_infos,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmUploadRequest) Reset() {
+	*x = ConfirmUploadRequest{}
+	mi := &file_coordinator_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmUploadRequest) ProtoMessage() {}
+
+func (x *ConfirmUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_coordinator_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmUploadRequest.ProtoReflect.Descriptor instead.
+func (*ConfirmUploadRequest) Descriptor() ([]byte, []int) {
+	return file_coordinator_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ConfirmUploadRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ConfirmUploadRequest) GetChunkInfos() []*ChunkInfo {
+	if x != nil {
+		return x.ChunkInfos
+	}
+	return nil
+}
+
+type ConfirmUploadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmUploadResponse) Reset() {
+	*x = ConfirmUploadResponse{}
+	mi := &file_coordinator_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmUploadResponse) ProtoMessage() {}
+
+func (x *ConfirmUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_coordinator_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmUploadResponse.ProtoReflect.Descriptor instead.
+func (*ConfirmUploadResponse) Descriptor() ([]byte, []int) {
+	return file_coordinator_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ConfirmUploadResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ConfirmUploadResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 // List files request/response
 type ListRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -448,7 +553,7 @@ type ListRequest struct {
 
 func (x *ListRequest) Reset() {
 	*x = ListRequest{}
-	mi := &file_coordinator_proto_msgTypes[7]
+	mi := &file_coordinator_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -460,7 +565,7 @@ func (x *ListRequest) String() string {
 func (*ListRequest) ProtoMessage() {}
 
 func (x *ListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_coordinator_proto_msgTypes[7]
+	mi := &file_coordinator_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -473,7 +578,7 @@ func (x *ListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRequest.ProtoReflect.Descriptor instead.
 func (*ListRequest) Descriptor() ([]byte, []int) {
-	return file_coordinator_proto_rawDescGZIP(), []int{7}
+	return file_coordinator_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListRequest) GetDirectory() string {
@@ -492,7 +597,7 @@ type ListResponse struct {
 
 func (x *ListResponse) Reset() {
 	*x = ListResponse{}
-	mi := &file_coordinator_proto_msgTypes[8]
+	mi := &file_coordinator_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -504,7 +609,7 @@ func (x *ListResponse) String() string {
 func (*ListResponse) ProtoMessage() {}
 
 func (x *ListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_coordinator_proto_msgTypes[8]
+	mi := &file_coordinator_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -517,7 +622,7 @@ func (x *ListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListResponse.ProtoReflect.Descriptor instead.
 func (*ListResponse) Descriptor() ([]byte, []int) {
-	return file_coordinator_proto_rawDescGZIP(), []int{8}
+	return file_coordinator_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListResponse) GetFiles() []*FileInfo {
@@ -537,7 +642,7 @@ type RegisterDataNodeRequest struct {
 
 func (x *RegisterDataNodeRequest) Reset() {
 	*x = RegisterDataNodeRequest{}
-	mi := &file_coordinator_proto_msgTypes[9]
+	mi := &file_coordinator_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -549,7 +654,7 @@ func (x *RegisterDataNodeRequest) String() string {
 func (*RegisterDataNodeRequest) ProtoMessage() {}
 
 func (x *RegisterDataNodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_coordinator_proto_msgTypes[9]
+	mi := &file_coordinator_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -562,7 +667,7 @@ func (x *RegisterDataNodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterDataNodeRequest.ProtoReflect.Descriptor instead.
 func (*RegisterDataNodeRequest) Descriptor() ([]byte, []int) {
-	return file_coordinator_proto_rawDescGZIP(), []int{9}
+	return file_coordinator_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RegisterDataNodeRequest) GetNodeInfo() *DataNodeInfo {
@@ -586,7 +691,7 @@ type RegisterDataNodeResponse struct {
 
 func (x *RegisterDataNodeResponse) Reset() {
 	*x = RegisterDataNodeResponse{}
-	mi := &file_coordinator_proto_msgTypes[10]
+	mi := &file_coordinator_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -598,7 +703,7 @@ func (x *RegisterDataNodeResponse) String() string {
 func (*RegisterDataNodeResponse) ProtoMessage() {}
 
 func (x *RegisterDataNodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_coordinator_proto_msgTypes[10]
+	mi := &file_coordinator_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -611,7 +716,7 @@ func (x *RegisterDataNodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterDataNodeResponse.ProtoReflect.Descriptor instead.
 func (*RegisterDataNodeResponse) Descriptor() ([]byte, []int) {
-	return file_coordinator_proto_rawDescGZIP(), []int{10}
+	return file_coordinator_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RegisterDataNodeResponse) GetSuccess() bool {
@@ -654,7 +759,7 @@ type HeartbeatRequest struct {
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_coordinator_proto_msgTypes[11]
+	mi := &file_coordinator_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -666,7 +771,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_coordinator_proto_msgTypes[11]
+	mi := &file_coordinator_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -679,7 +784,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_coordinator_proto_rawDescGZIP(), []int{11}
+	return file_coordinator_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *HeartbeatRequest) GetNodeId() string {
@@ -720,7 +825,7 @@ type HeartbeatResponse struct {
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_coordinator_proto_msgTypes[12]
+	mi := &file_coordinator_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -732,7 +837,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_coordinator_proto_msgTypes[12]
+	mi := &file_coordinator_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -745,7 +850,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_coordinator_proto_rawDescGZIP(), []int{12}
+	return file_coordinator_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *HeartbeatResponse) GetSuccess() bool {
@@ -798,7 +903,7 @@ type ListNodesRequest struct {
 
 func (x *ListNodesRequest) Reset() {
 	*x = ListNodesRequest{}
-	mi := &file_coordinator_proto_msgTypes[13]
+	mi := &file_coordinator_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -810,7 +915,7 @@ func (x *ListNodesRequest) String() string {
 func (*ListNodesRequest) ProtoMessage() {}
 
 func (x *ListNodesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_coordinator_proto_msgTypes[13]
+	mi := &file_coordinator_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -823,7 +928,7 @@ func (x *ListNodesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListNodesRequest.ProtoReflect.Descriptor instead.
 func (*ListNodesRequest) Descriptor() ([]byte, []int) {
-	return file_coordinator_proto_rawDescGZIP(), []int{13}
+	return file_coordinator_proto_rawDescGZIP(), []int{15}
 }
 
 type ListNodesResponse struct {
@@ -836,7 +941,7 @@ type ListNodesResponse struct {
 
 func (x *ListNodesResponse) Reset() {
 	*x = ListNodesResponse{}
-	mi := &file_coordinator_proto_msgTypes[14]
+	mi := &file_coordinator_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -848,7 +953,7 @@ func (x *ListNodesResponse) String() string {
 func (*ListNodesResponse) ProtoMessage() {}
 
 func (x *ListNodesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_coordinator_proto_msgTypes[14]
+	mi := &file_coordinator_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -861,7 +966,7 @@ func (x *ListNodesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListNodesResponse.ProtoReflect.Descriptor instead.
 func (*ListNodesResponse) Descriptor() ([]byte, []int) {
-	return file_coordinator_proto_rawDescGZIP(), []int{14}
+	return file_coordinator_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListNodesResponse) GetNodes() []*DataNodeInfo {
@@ -892,7 +997,7 @@ type NodeUpdate struct {
 
 func (x *NodeUpdate) Reset() {
 	*x = NodeUpdate{}
-	mi := &file_coordinator_proto_msgTypes[15]
+	mi := &file_coordinator_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -904,7 +1009,7 @@ func (x *NodeUpdate) String() string {
 func (*NodeUpdate) ProtoMessage() {}
 
 func (x *NodeUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_coordinator_proto_msgTypes[15]
+	mi := &file_coordinator_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -917,7 +1022,7 @@ func (x *NodeUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeUpdate.ProtoReflect.Descriptor instead.
 func (*NodeUpdate) Descriptor() ([]byte, []int) {
-	return file_coordinator_proto_rawDescGZIP(), []int{15}
+	return file_coordinator_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *NodeUpdate) GetVersion() int64 {
@@ -958,13 +1063,14 @@ const file_coordinator_proto_rawDesc = "" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x1d\n" +
 	"\n" +
 	"chunk_size\x18\x03 \x01(\x03R\tchunkSize\x12\x1a\n" +
-	"\bchecksum\x18\x04 \x01(\tR\bchecksum\"M\n" +
+	"\bchecksum\x18\x04 \x01(\tR\bchecksum\"l\n" +
 	"\x0eUploadResponse\x12;\n" +
-	"\x0fchunk_locations\x18\x01 \x03(\v2\x12.dfs.ChunkLocationR\x0echunkLocations\"_\n" +
+	"\x0fchunk_locations\x18\x01 \x03(\v2\x12.dfs.ChunkLocationR\x0echunkLocations\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\"Q\n" +
 	"\rChunkLocation\x12\x19\n" +
-	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12\x17\n" +
-	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1a\n" +
-	"\bendpoint\x18\x03 \x01(\tR\bendpoint\"%\n" +
+	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12%\n" +
+	"\x04node\x18\x02 \x01(\v2\x11.dfs.DataNodeInfoR\x04node\"%\n" +
 	"\x0fDownloadRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"{\n" +
 	"\x10DownloadResponse\x12*\n" +
@@ -973,6 +1079,14 @@ const file_coordinator_proto_rawDesc = "" +
 	"\rDeleteRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"D\n" +
 	"\x0eDeleteResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"f\n" +
+	"\x14ConfirmUploadRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12/\n" +
+	"\vchunk_infos\x18\x02 \x03(\v2\x0e.dfs.ChunkInfoR\n" +
+	"chunkInfos\"K\n" +
+	"\x15ConfirmUploadResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"+\n" +
 	"\vListRequest\x12\x1c\n" +
@@ -1013,14 +1127,15 @@ const file_coordinator_proto_rawDesc = "" +
 	"\n" +
 	"NODE_ADDED\x10\x00\x12\x10\n" +
 	"\fNODE_REMOVED\x10\x01\x12\x10\n" +
-	"\fNODE_UPDATED\x10\x022\xc2\x03\n" +
+	"\fNODE_UPDATED\x10\x022\x8a\x04\n" +
 	"\x12CoordinatorService\x125\n" +
 	"\n" +
 	"UploadFile\x12\x12.dfs.UploadRequest\x1a\x13.dfs.UploadResponse\x12;\n" +
 	"\fDownloadFile\x12\x14.dfs.DownloadRequest\x1a\x15.dfs.DownloadResponse\x125\n" +
 	"\n" +
 	"DeleteFile\x12\x12.dfs.DeleteRequest\x1a\x13.dfs.DeleteResponse\x120\n" +
-	"\tListFiles\x12\x10.dfs.ListRequest\x1a\x11.dfs.ListResponse\x12O\n" +
+	"\tListFiles\x12\x10.dfs.ListRequest\x1a\x11.dfs.ListResponse\x12F\n" +
+	"\rConfirmUpload\x12\x19.dfs.ConfirmUploadRequest\x1a\x1a.dfs.ConfirmUploadResponse\x12O\n" +
 	"\x10RegisterDataNode\x12\x1c.dfs.RegisterDataNodeRequest\x1a\x1d.dfs.RegisterDataNodeResponse\x12B\n" +
 	"\x11DataNodeHeartbeat\x12\x15.dfs.HeartbeatRequest\x1a\x16.dfs.HeartbeatResponse\x12:\n" +
 	"\tListNodes\x12\x15.dfs.ListNodesRequest\x1a\x16.dfs.ListNodesResponseB\vZ\tpkg/protob\x06proto3"
@@ -1038,7 +1153,7 @@ func file_coordinator_proto_rawDescGZIP() []byte {
 }
 
 var file_coordinator_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_coordinator_proto_goTypes = []any{
 	(NodeUpdate_UpdateType)(0),       // 0: dfs.NodeUpdate.UpdateType
 	(*UploadRequest)(nil),            // 1: dfs.UploadRequest
@@ -1048,52 +1163,59 @@ var file_coordinator_proto_goTypes = []any{
 	(*DownloadResponse)(nil),         // 5: dfs.DownloadResponse
 	(*DeleteRequest)(nil),            // 6: dfs.DeleteRequest
 	(*DeleteResponse)(nil),           // 7: dfs.DeleteResponse
-	(*ListRequest)(nil),              // 8: dfs.ListRequest
-	(*ListResponse)(nil),             // 9: dfs.ListResponse
-	(*RegisterDataNodeRequest)(nil),  // 10: dfs.RegisterDataNodeRequest
-	(*RegisterDataNodeResponse)(nil), // 11: dfs.RegisterDataNodeResponse
-	(*HeartbeatRequest)(nil),         // 12: dfs.HeartbeatRequest
-	(*HeartbeatResponse)(nil),        // 13: dfs.HeartbeatResponse
-	(*ListNodesRequest)(nil),         // 14: dfs.ListNodesRequest
-	(*ListNodesResponse)(nil),        // 15: dfs.ListNodesResponse
-	(*NodeUpdate)(nil),               // 16: dfs.NodeUpdate
-	(*FileInfo)(nil),                 // 17: dfs.FileInfo
-	(*DataNodeInfo)(nil),             // 18: dfs.DataNodeInfo
-	(*HealthStatus)(nil),             // 19: dfs.HealthStatus
-	(*timestamppb.Timestamp)(nil),    // 20: google.protobuf.Timestamp
+	(*ConfirmUploadRequest)(nil),     // 8: dfs.ConfirmUploadRequest
+	(*ConfirmUploadResponse)(nil),    // 9: dfs.ConfirmUploadResponse
+	(*ListRequest)(nil),              // 10: dfs.ListRequest
+	(*ListResponse)(nil),             // 11: dfs.ListResponse
+	(*RegisterDataNodeRequest)(nil),  // 12: dfs.RegisterDataNodeRequest
+	(*RegisterDataNodeResponse)(nil), // 13: dfs.RegisterDataNodeResponse
+	(*HeartbeatRequest)(nil),         // 14: dfs.HeartbeatRequest
+	(*HeartbeatResponse)(nil),        // 15: dfs.HeartbeatResponse
+	(*ListNodesRequest)(nil),         // 16: dfs.ListNodesRequest
+	(*ListNodesResponse)(nil),        // 17: dfs.ListNodesResponse
+	(*NodeUpdate)(nil),               // 18: dfs.NodeUpdate
+	(*DataNodeInfo)(nil),             // 19: dfs.DataNodeInfo
+	(*FileInfo)(nil),                 // 20: dfs.FileInfo
+	(*ChunkInfo)(nil),                // 21: dfs.ChunkInfo
+	(*HealthStatus)(nil),             // 22: dfs.HealthStatus
+	(*timestamppb.Timestamp)(nil),    // 23: google.protobuf.Timestamp
 }
 var file_coordinator_proto_depIdxs = []int32{
 	3,  // 0: dfs.UploadResponse.chunk_locations:type_name -> dfs.ChunkLocation
-	17, // 1: dfs.DownloadResponse.file_info:type_name -> dfs.FileInfo
-	3,  // 2: dfs.DownloadResponse.chunk_locations:type_name -> dfs.ChunkLocation
-	17, // 3: dfs.ListResponse.files:type_name -> dfs.FileInfo
-	18, // 4: dfs.RegisterDataNodeRequest.node_info:type_name -> dfs.DataNodeInfo
-	18, // 5: dfs.RegisterDataNodeResponse.full_node_list:type_name -> dfs.DataNodeInfo
-	19, // 6: dfs.HeartbeatRequest.status:type_name -> dfs.HealthStatus
-	16, // 7: dfs.HeartbeatResponse.updates:type_name -> dfs.NodeUpdate
-	18, // 8: dfs.ListNodesResponse.nodes:type_name -> dfs.DataNodeInfo
-	0,  // 9: dfs.NodeUpdate.type:type_name -> dfs.NodeUpdate.UpdateType
-	18, // 10: dfs.NodeUpdate.node:type_name -> dfs.DataNodeInfo
-	20, // 11: dfs.NodeUpdate.timestamp:type_name -> google.protobuf.Timestamp
-	1,  // 12: dfs.CoordinatorService.UploadFile:input_type -> dfs.UploadRequest
-	4,  // 13: dfs.CoordinatorService.DownloadFile:input_type -> dfs.DownloadRequest
-	6,  // 14: dfs.CoordinatorService.DeleteFile:input_type -> dfs.DeleteRequest
-	8,  // 15: dfs.CoordinatorService.ListFiles:input_type -> dfs.ListRequest
-	10, // 16: dfs.CoordinatorService.RegisterDataNode:input_type -> dfs.RegisterDataNodeRequest
-	12, // 17: dfs.CoordinatorService.DataNodeHeartbeat:input_type -> dfs.HeartbeatRequest
-	14, // 18: dfs.CoordinatorService.ListNodes:input_type -> dfs.ListNodesRequest
-	2,  // 19: dfs.CoordinatorService.UploadFile:output_type -> dfs.UploadResponse
-	5,  // 20: dfs.CoordinatorService.DownloadFile:output_type -> dfs.DownloadResponse
-	7,  // 21: dfs.CoordinatorService.DeleteFile:output_type -> dfs.DeleteResponse
-	9,  // 22: dfs.CoordinatorService.ListFiles:output_type -> dfs.ListResponse
-	11, // 23: dfs.CoordinatorService.RegisterDataNode:output_type -> dfs.RegisterDataNodeResponse
-	13, // 24: dfs.CoordinatorService.DataNodeHeartbeat:output_type -> dfs.HeartbeatResponse
-	15, // 25: dfs.CoordinatorService.ListNodes:output_type -> dfs.ListNodesResponse
-	19, // [19:26] is the sub-list for method output_type
-	12, // [12:19] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	19, // 1: dfs.ChunkLocation.node:type_name -> dfs.DataNodeInfo
+	20, // 2: dfs.DownloadResponse.file_info:type_name -> dfs.FileInfo
+	3,  // 3: dfs.DownloadResponse.chunk_locations:type_name -> dfs.ChunkLocation
+	21, // 4: dfs.ConfirmUploadRequest.chunk_infos:type_name -> dfs.ChunkInfo
+	20, // 5: dfs.ListResponse.files:type_name -> dfs.FileInfo
+	19, // 6: dfs.RegisterDataNodeRequest.node_info:type_name -> dfs.DataNodeInfo
+	19, // 7: dfs.RegisterDataNodeResponse.full_node_list:type_name -> dfs.DataNodeInfo
+	22, // 8: dfs.HeartbeatRequest.status:type_name -> dfs.HealthStatus
+	18, // 9: dfs.HeartbeatResponse.updates:type_name -> dfs.NodeUpdate
+	19, // 10: dfs.ListNodesResponse.nodes:type_name -> dfs.DataNodeInfo
+	0,  // 11: dfs.NodeUpdate.type:type_name -> dfs.NodeUpdate.UpdateType
+	19, // 12: dfs.NodeUpdate.node:type_name -> dfs.DataNodeInfo
+	23, // 13: dfs.NodeUpdate.timestamp:type_name -> google.protobuf.Timestamp
+	1,  // 14: dfs.CoordinatorService.UploadFile:input_type -> dfs.UploadRequest
+	4,  // 15: dfs.CoordinatorService.DownloadFile:input_type -> dfs.DownloadRequest
+	6,  // 16: dfs.CoordinatorService.DeleteFile:input_type -> dfs.DeleteRequest
+	10, // 17: dfs.CoordinatorService.ListFiles:input_type -> dfs.ListRequest
+	8,  // 18: dfs.CoordinatorService.ConfirmUpload:input_type -> dfs.ConfirmUploadRequest
+	12, // 19: dfs.CoordinatorService.RegisterDataNode:input_type -> dfs.RegisterDataNodeRequest
+	14, // 20: dfs.CoordinatorService.DataNodeHeartbeat:input_type -> dfs.HeartbeatRequest
+	16, // 21: dfs.CoordinatorService.ListNodes:input_type -> dfs.ListNodesRequest
+	2,  // 22: dfs.CoordinatorService.UploadFile:output_type -> dfs.UploadResponse
+	5,  // 23: dfs.CoordinatorService.DownloadFile:output_type -> dfs.DownloadResponse
+	7,  // 24: dfs.CoordinatorService.DeleteFile:output_type -> dfs.DeleteResponse
+	11, // 25: dfs.CoordinatorService.ListFiles:output_type -> dfs.ListResponse
+	9,  // 26: dfs.CoordinatorService.ConfirmUpload:output_type -> dfs.ConfirmUploadResponse
+	13, // 27: dfs.CoordinatorService.RegisterDataNode:output_type -> dfs.RegisterDataNodeResponse
+	15, // 28: dfs.CoordinatorService.DataNodeHeartbeat:output_type -> dfs.HeartbeatResponse
+	17, // 29: dfs.CoordinatorService.ListNodes:output_type -> dfs.ListNodesResponse
+	22, // [22:30] is the sub-list for method output_type
+	14, // [14:22] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_coordinator_proto_init() }
@@ -1108,7 +1230,7 @@ func file_coordinator_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_coordinator_proto_rawDesc), len(file_coordinator_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

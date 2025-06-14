@@ -30,13 +30,13 @@ func DefaultDatanodeConfig() DataNodeConfig {
 	datanodeHost := utils.GetEnvString("DATANODE_HOST", "0.0.0.0")
 	return DataNodeConfig{
 		Info: common.DataNodeInfo{
-			ID:        uuid.NewString(),
-			IPAddress: datanodeHost,
-			Port:      8081,
-			Capacity:  10 * 1024 * 1024 * 1024, // gB
-			Used:      0,
-			Status:    common.NodeHealthy,
-			LastSeen:  time.Now(),
+			ID:       uuid.NewString(),
+			Host:     datanodeHost,
+			Port:     8081,
+			Capacity: 10 * 1024 * 1024 * 1024, // gB
+			Used:     0,
+			Status:   common.NodeHealthy,
+			LastSeen: time.Now(),
 		},
 
 		Session: SessionManagerConfig{

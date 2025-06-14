@@ -35,6 +35,7 @@ func (ur UploadRequest) ToProto() *proto.UploadRequest {
 
 type UploadResponse struct {
 	ChunkLocations []ChunkLocation
+	SessionID      string
 }
 
 func UploadResponseFromProto(pb *proto.UploadResponse) UploadResponse {
@@ -42,7 +43,7 @@ func UploadResponseFromProto(pb *proto.UploadResponse) UploadResponse {
 	for _, chunkLocation := range pb.ChunkLocations {
 		chunkLocations = append(chunkLocations, ChunkLocationFromProto(chunkLocation))
 	}
-	return UploadResponse{ChunkLocations: chunkLocations}
+	return UploadResponse{ChunkLocations: chunkLocations, SessionID: pb.SessionId}
 }
 
 func (ur UploadResponse) ToProto() *proto.UploadResponse {
@@ -52,6 +53,7 @@ func (ur UploadResponse) ToProto() *proto.UploadResponse {
 	}
 	return &proto.UploadResponse{
 		ChunkLocations: chunkLocations,
+		SessionId:      ur.SessionID,
 	}
 }
 
@@ -125,6 +127,40 @@ func (dr DeleteResponse) ToProto() *proto.DeleteResponse {
 		Success: dr.Success,
 		Message: dr.Message,
 	}
+}
+
+type ConfirmUploadRequest struct {
+	SessionID  string
+	ChunkInfos []common.ChunkInfo
+}
+
+func ConfirmUploadRequestFromProto(pb *proto.ConfirmUploadRequest) ConfirmUploadRequest {
+	chunkInfos := make([]common.ChunkInfo, 0, len(pb.ChunkInfos))
+	for _, chunkInfo := range pb.ChunkInfos {
+		chunkInfos = append(chunkInfos, common.ChunkInfoFromProto(chunkInfo))
+	}
+	return ConfirmUploadRequest{SessionID: pb.SessionId, ChunkInfos: chunkInfos}
+}
+
+func (cur ConfirmUploadRequest) ToProto() *proto.ConfirmUploadRequest {
+	chunkInfos := make([]*proto.ChunkInfo, 0, len(cur.ChunkInfos))
+	for _, chunkInfo := range cur.ChunkInfos {
+		chunkInfos = append(chunkInfos, chunkInfo.ToProto())
+	}
+	return &proto.ConfirmUploadRequest{SessionId: cur.SessionID, ChunkInfos: chunkInfos}
+}
+
+type ConfirmUploadResponse struct {
+	Success bool
+	Message string
+}
+
+func ConfirmUploadResponseFromProto(pb *proto.ConfirmUploadResponse) ConfirmUploadResponse {
+	return ConfirmUploadResponse{Success: pb.Success, Message: pb.Message}
+}
+
+func (cur ConfirmUploadResponse) ToProto() *proto.ConfirmUploadResponse {
+	return &proto.ConfirmUploadResponse{Success: cur.Success, Message: cur.Message}
 }
 
 // List

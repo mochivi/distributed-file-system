@@ -2,26 +2,37 @@ package integration
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/client"
+	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
 
 func TestClientUpload(t *testing.T) {
 	coordinatorHost := utils.GetEnvString("COORDINATOR_HOST", "coordinator")
 	coordinatorPort := utils.GetEnvInt("COORDINATOR_PORT", 8080)
-	coordinatorClient, err := coordinator.NewCoordinatorClient(fmt.Sprintf("%s:%d", coordinatorHost, coordinatorPort))
+	coordinatorNode := &common.DataNodeInfo{
+		ID:     "coordinator",
+		Host:   coordinatorHost,
+		Port:   coordinatorPort,
+		Status: common.NodeHealthy,
+	}
+	coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorNode)
 	if err != nil {
 		t.Fatalf("failed to create coordinator client: %v", err)
 	}
 
-	client := client.NewClient(coordinatorClient)
+	logger, err := logging.InitLogger()
+	if err != nil {
+		t.Fatalf("failed to create logger: %v", err)
+	}
+	client := client.NewClient(coordinatorClient, logger)
 
 	testFilesDir := utils.GetEnvString("TEST_FILES_DIR", "/app/test-files")
 	file, err := os.Open(filepath.Join(testFilesDir, "test.txt"))

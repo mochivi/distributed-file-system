@@ -37,13 +37,12 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, re
 	// Create clients
 	var clients []*DataNodeClient
 	for _, node := range nodes {
-		endpoint := fmt.Sprintf("%s:%d", node.IPAddress, node.Port)
-		client, err := NewDataNodeClient(endpoint)
+		client, err := NewDataNodeClient(node)
 		if err != nil {
-			return fmt.Errorf("failed to create client for %s: %v", endpoint, err)
+			return fmt.Errorf("failed to create client for %s - [%s]  %v", node.ID, node.Endpoint(), err)
 		}
 		if client == nil {
-			return fmt.Errorf("client for %s is nil", endpoint)
+			return fmt.Errorf("client for %v is nil", node)
 		}
 		clients = append(clients, client)
 	}
@@ -64,7 +63,7 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, re
 	errChan := make(chan error, len(clients))
 
 	for i, client := range clients {
-		clientLogger := logging.ExtendLogger(logger, slog.String("client_address", client.address))
+		clientLogger := logging.ExtendLogger(logger, slog.String("client_id", client.Node.ID), slog.String("client_address", client.Node.Endpoint()))
 		// Stop starting new goroutines if we already have enough replicas
 		if int(acceptedCount.Load()) >= requiredReplicas {
 			break

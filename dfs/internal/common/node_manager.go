@@ -160,12 +160,12 @@ func (m *NodeManager) SelectBestNodes(n int, self ...string) ([]*DataNodeInfo, e
 }
 
 // Retrieves which nodes have some chunk
-func (m *NodeManager) GetAvailableNodeForChunk(replicaIDs []string) (*DataNodeInfo, bool) {
+func (m *NodeManager) GetAvailableNodeForChunk(replicaIDs []*DataNodeInfo) (*DataNodeInfo, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	for _, replicaID := range replicaIDs {
-		if node, exists := m.nodes[replicaID]; exists && node.Status == NodeHealthy {
+	for _, replica := range replicaIDs {
+		if node, exists := m.nodes[replica.ID]; exists && node.Status == NodeHealthy {
 			return node, true
 		}
 	}

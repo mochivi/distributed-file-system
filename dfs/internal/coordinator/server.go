@@ -2,7 +2,6 @@ package coordinator
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"math/rand"
 
@@ -49,9 +48,8 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 
 		// Add chunk location to assignment
 		assignments[i] = ChunkLocation{
-			ChunkID:  chunkID,
-			NodeID:   node.ID,
-			Endpoint: fmt.Sprintf("%s:%d", node.IPAddress, node.Port),
+			ChunkID: chunkID,
+			Node:    node,
 		}
 	}
 
@@ -61,6 +59,7 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 
 	return UploadResponse{
 		ChunkLocations: assignments,
+		SessionID:      sessionID,
 	}.ToProto(), nil
 }
 
@@ -85,9 +84,8 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 		}
 
 		chunkLocations[i] = ChunkLocation{
-			ChunkID:  chunk.ID,
-			NodeID:   node.ID,
-			Endpoint: fmt.Sprintf("%s:%d", node.IPAddress, node.Port),
+			ChunkID: chunk.ID,
+			Node:    node,
 		}
 	}
 
@@ -107,6 +105,23 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 // func (c *Coordinator) DeleteFile(ctx context.Context, pb *proto.DeleteRequest) (*proto.DeleteResponse, error) {
 // 	return nil, nil
 // }
+
+func (c *Coordinator) ConfirmUpload(ctx context.Context, pb *proto.ConfirmUploadRequest) (*proto.ConfirmUploadResponse, error) {
+	req := ConfirmUploadRequestFromProto(pb)
+	c.logger.Debug("Received ConfirmUploadRequest from client", slog.String("session_id", req.SessionID))
+
+	if err := c.metadataManager.commit(req.SessionID, req.ChunkInfos, c.metaStore); err != nil {
+		c.logger.Error("Failed to commit metadata", slog.String("error", err.Error()))
+		return ConfirmUploadResponse{
+			Success: false,
+			Message: "Failed to commit metadata",
+		}.ToProto(), nil
+	}
+
+	return ConfirmUploadResponse{
+		Success: true,
+	}.ToProto(), nil
+}
 
 // node -> coordinator requests below
 

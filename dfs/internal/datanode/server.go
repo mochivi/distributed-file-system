@@ -280,11 +280,11 @@ func (s *DataNodeServer) HealthCheck(ctx context.Context, pb *proto.HealthCheckR
 	return nil, nil
 }
 
-func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context, coordinatorAddress string) error {
-	logger := logging.OperationLogger(s.logger, "register", slog.String("coordinator_address", coordinatorAddress))
+func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context, coordinatorNode *common.DataNodeInfo) error {
+	logger := logging.OperationLogger(s.logger, "register", slog.String("coordinator_address", coordinatorNode.Endpoint()))
 	logger.Info("Registering with coordinator")
 
-	coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorAddress)
+	coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorNode)
 	if err != nil {
 		logger.Error("Failed to create coordinator client", slog.String("error", err.Error()))
 		return fmt.Errorf("failed to create coordinator client: %v", err)

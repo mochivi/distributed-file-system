@@ -13,6 +13,9 @@ service CoordinatorService {
   rpc DownloadFile(DownloadRequest) returns (DownloadResponse);
   rpc DeleteFile(DeleteRequest) returns (DeleteResponse);
   rpc ListFiles(ListRequest) returns (ListResponse);
+
+  // Metadata commit, sent by the client once all chunks have been uploaded to datanodes
+  rpc ConfirmUpload(ConfirmUploadRequest) returns (ConfirmUploadResponse);
   
   // Node management
   rpc RegisterDataNode(RegisterDataNodeRequest) returns (RegisterDataNodeResponse);
@@ -29,12 +32,12 @@ message UploadRequest {
 }
 message UploadResponse {
   repeated ChunkLocation chunk_locations = 1;
+  string session_id = 2;
 }
 
 message ChunkLocation {
   string chunk_id = 1;
-  string node_id = 2;
-  string endpoint = 3;
+  DataNodeInfo node = 2;
 }
 
 // Download file request/response
@@ -51,6 +54,16 @@ message DeleteRequest {
   string path = 1;
 }
 message DeleteResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ConfirmUpload request/response
+message ConfirmUploadRequest {
+  string session_id = 1;
+  repeated ChunkInfo chunk_infos = 2;
+}
+message ConfirmUploadResponse {
   bool success = 1;
   string message = 2;
 }
