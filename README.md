@@ -17,43 +17,29 @@ flowchart LR
     end
 
     subgraph "Coordinator"
-        C1["gRPC API<br/>Metadata manager"]
+        C1["Metadata & API"]
     end
 
     subgraph "Storage cluster"
-        DN1["DataNode 1 (primary for chunk)"]
-        DN2["DataNode 2 (replica)"]
-        DN3["DataNode 3 (replica)"]
+        DN1["DataNode – primary"]
+        DN2["DataNode – replica"]
     end
 
     A -- "Upload / Download" --> C1
     C1 -- "Chunk plan" --> A
 
-    %% Client uploads chunks to primary
+    %% Client writes chunk to primary
     A -- "StoreChunk" --> DN1
 
-    %% Primary negotiates replication session (request / accept)
-    DN1 -- "ReplicateChunk<br/>(session req)" --> DN2
-    DN2 -- "Accept / SessionID" --> DN1
+    %% Primary replicates chunk via streaming gRPC
+    DN1 -- "ReplicateChunk (stream)" --> DN2
 
-    DN1 -- "ReplicateChunk<br/>(session req)" --> DN3
-    DN3 -- "Accept / SessionID" --> DN1
-
-    %% Streaming data with flow-control
-    DN1 -- "ChunkDataStream ▶" --> DN2
-    DN2 -- "ChunkDataAck ◀ (back-pressure)" --> DN1
-
-    DN1 -- "ChunkDataStream ▶" --> DN3
-    DN3 -- "ChunkDataAck ◀ (back-pressure)" --> DN1
-
-    %% Any node can serve reads
+    %% Reads can hit any replica
     A -- "RetrieveChunk" --> DN2
-    A -- "RetrieveChunk" --> DN3
 
     %% Health-checks
     DN1 -- "Heartbeat" --> C1
     DN2 -- "Heartbeat" --> C1
-    DN3 -- "Heartbeat" --> C1
 ```
 
 * **Coordinator** – stateless service that holds _metadata only_ (paths, chunk maps). It never stores file bytes.  
