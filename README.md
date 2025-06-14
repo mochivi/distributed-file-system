@@ -12,26 +12,28 @@ It was built as a learning project to sharpen my skills around systems design, g
 
 ```mermaid
 flowchart LR
-    subgraph Client
-        A[CLI / SDK]
+    subgraph "Client"
+        A["CLI / SDK"]
     end
 
-    subgraph Coordinator
-        C1[gRPC API]<br/>Metadata manager
+    subgraph "Coordinator"
+        C1["gRPC API<br/>Metadata manager"]
     end
 
-    subgraph DataNodes[Storage cluster]
-        DN1[Node 1]
-        DN2[Node 2]
-        DN3[Node 3]
+    subgraph "Storage cluster"
+        DN1["Node 1"]
+        DN2["Node 2"]
+        DN3["Node 3"]
     end
 
-    A --Upload / Download--> C1
-    C1 --Chunk plan--> A
-    A --Store / Fetch--> DN1 & DN2 & DN3
-    DN1 --Heartbeat--> C1
-    DN2 --Heartbeat--> C1
-    DN3 --Heartbeat--> C1
+    A -- "Upload / Download" --> C1
+    C1 -- "Chunk plan" --> A
+    A -- "Store / Fetch" --> DN1
+    A -- "Store / Fetch" --> DN2
+    A -- "Store / Fetch" --> DN3
+    DN1 -- "Heartbeat" --> C1
+    DN2 -- "Heartbeat" --> C1
+    DN3 -- "Heartbeat" --> C1
 ```
 
 * **Coordinator** – stateless service that holds _metadata only_ (paths, chunk maps). It never stores file bytes.  
