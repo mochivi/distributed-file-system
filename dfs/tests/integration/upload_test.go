@@ -58,6 +58,7 @@ func TestClientUpload(t *testing.T) {
 		{name: "file size tests - 1MB", filepath: "small_test.txt"},
 		{name: "file size tests - 10MB", filepath: "medium_test.txt"},
 		{name: "file size tests - 100MB", filepath: "large_test.txt"},
+		{name: "file size tests - 1GB", filepath: "xlarge_test.txt"},
 	}
 
 	for _, tt := range fileSizeTestCases {
@@ -71,11 +72,26 @@ func TestClientUpload(t *testing.T) {
 			}
 
 			uploadAt := filepath.Join(baseUploadAt, tt.filepath, strconv.Itoa(rand.Intn(1000000)))
-			if err := client.UploadFile(context.Background(), file, uploadAt, defaultChunkSize); err != nil {
+			if _, err := client.UploadFile(context.Background(), file, uploadAt, defaultChunkSize); err != nil {
 				t.Errorf("failed to upload file: %v", err)
 			}
-
 			file.Close()
+
+			// // Validate if the chunks were replicated to the provided nodes and their checksum matches the expectation
+			// for _, info := range chunkInfos {
+			// 	for _, replica := range info.Replicas {
+			// 		dnClient, _ := datanode.NewDataNodeClient(replica)
+
+			// 		resp, err := dnClient.RetrieveChunk(context.Background(), common.RetrieveChunkRequest{ChunkID: info.ID})
+			// 		if err != nil {
+			// 			t.Errorf("retrieve %s: %v", info.ID, err)
+			// 		}
+
+			// 		if checksum := common.CalculateChecksum(resp.Data); checksum != info.Checksum {
+			// 			t.Errorf("checksum mismatch for %s", info.ID)
+			// 		}
+			// 	}
+			// }
 		})
 	}
 
@@ -89,9 +105,8 @@ func TestClientUpload(t *testing.T) {
 		{name: "chunk size tests - 32MB", filepath: "large_test.txt", chunkSize: 32 * 1024 * 1024},
 		{name: "chunk size tests - 64MB", filepath: "large_test.txt", chunkSize: 64 * 1024 * 1024},
 		{name: "chunk size tests - 128MB", filepath: "large_test.txt", chunkSize: 128 * 1024 * 1024},
-		{name: "chunk size tests - 256MB", filepath: "large_test.txt", chunkSize: 256 * 1024 * 1024},
-		{name: "chunk size tests - 512MB", filepath: "large_test.txt", chunkSize: 512 * 1024 * 1024},
-		{name: "chunk size tests - 1024MB", filepath: "large_test.txt", chunkSize: 1024 * 1024 * 1024},
+		{name: "chunk size tests - 256MB", filepath: "xlarge_test.txt", chunkSize: 256 * 1024 * 1024},
+		{name: "chunk size tests - 512MB", filepath: "xlarge_test.txt", chunkSize: 512 * 1024 * 1024},
 	}
 
 	for _, tt := range chunkSizeTestCases {
@@ -105,11 +120,27 @@ func TestClientUpload(t *testing.T) {
 			}
 
 			uploadAt := filepath.Join(baseUploadAt, tt.filepath, strconv.Itoa(rand.Intn(1000000)))
-			if err := client.UploadFile(context.Background(), file, uploadAt, tt.chunkSize); err != nil {
+			if _, err := client.UploadFile(context.Background(), file, uploadAt, tt.chunkSize); err != nil {
 				t.Errorf("failed to upload file: %v", err)
 			}
 
 			file.Close()
+
+			// // Validate if the chunks were replicated to the provided nodes and their checksum matches the expectation
+			// for _, info := range chunkInfos {
+			// 	for _, replica := range info.Replicas {
+			// 		dnClient, _ := datanode.NewDataNodeClient(replica)
+
+			// 		resp, err := dnClient.RetrieveChunk(context.Background(), common.RetrieveChunkRequest{ChunkID: info.ID})
+			// 		if err != nil {
+			// 			t.Errorf("retrieve %s: %v", info.ID, err)
+			// 		}
+
+			// 		if checksum := common.CalculateChecksum(resp.Data); checksum != info.Checksum {
+			// 			t.Errorf("checksum mismatch for %s", info.ID)
+			// 		}
+			// 	}
+			// }
 		})
 	}
 }

@@ -33,7 +33,7 @@ func DefaultCoordinatorConfig() CoordinatorConfig {
 			Factor: 3,
 		},
 		Metadata: MetadataConfig{
-			CommitTimeout: 15 * time.Second,
+			CommitTimeout: 15 * time.Minute,
 		},
 	}
 }
