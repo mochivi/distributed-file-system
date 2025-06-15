@@ -24,24 +24,28 @@ flowchart LR
 
     subgraph "Storage cluster"
         DN1["DataNode – primary"]
-        DN2["DataNode – replica"]
+        DN2["DataNode – replica 1"]
+        DN3["DataNode – replica 2"]
     end
 
     A -- "Upload / Download" --> C1
     C1 -- "Chunk plan" --> A
 
     %% Client writes chunk to primary
-    A -- "StoreChunk" --> DN1
+    A -- "StoreChunk (stream)" --> DN1
 
     %% Primary replicates chunk via streaming gRPC
     DN1 -- "ReplicateChunk (stream)" --> DN2
+    DN1 -- "ReplicateChunk (stream)" --> DN3
 
     %% Reads can hit any replica
     A -- "RetrieveChunk" --> DN2
+    A -- "RetrieveChunk" --> DN3
 
     %% Health-checks
     DN1 -- "Heartbeat" --> C1
     DN2 -- "Heartbeat" --> C1
+    DN3 -- "Heartbeat" --> C1
 ```
 
 * **Coordinator** – stateless service that holds _metadata only_ (paths, chunk maps). It never stores file bytes.  
@@ -125,9 +129,10 @@ Key mechanics:
 Primary write path:
 1. Client asks coordinator for an upload plan.  
 2. Coordinator fragments the file, chooses a primary + replica set per chunk, and returns `ChunkLocation{ChunkID, Node}` entries.
-3. Client streams `StoreChunk` to the primary.  
-4. Primary verifies checksum, persists chunk, then issues `ReplicateChunk` RPCs to its peers.  
-5. Peers stream back `ChunkDataAck`; once enough replicas succeed, the primary reports success.
+3. Client sends **PrepareChunkUpload** with `ChunkMeta` to the primary. The node replies `ChunkUploadReady{sessionID}` if it has capacity.  
+4. Client opens a **ChunkDataStream** (bidirectional streaming RPC) identified by that session ID and pushes the chunk using `common.Streamer`.  
+5. Primary verifies checksum, persists chunk, then performs the same two-phase handshake with each replica (Prepare → Stream) via `ReplicateChunk`.  
+6. Replicas ACK; once the required number succeed the primary reports success.
 
 This design keeps metadata centralized while letting data flow peer-to-peer for better throughput.
 
