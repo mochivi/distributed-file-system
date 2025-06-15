@@ -19,25 +19,25 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DataNodeService_StoreChunk_FullMethodName      = "/dfs.DataNodeService/StoreChunk"
-	DataNodeService_RetrieveChunk_FullMethodName   = "/dfs.DataNodeService/RetrieveChunk"
-	DataNodeService_DeleteChunk_FullMethodName     = "/dfs.DataNodeService/DeleteChunk"
-	DataNodeService_ReplicateChunk_FullMethodName  = "/dfs.DataNodeService/ReplicateChunk"
-	DataNodeService_StreamChunkData_FullMethodName = "/dfs.DataNodeService/StreamChunkData"
-	DataNodeService_HealthCheck_FullMethodName     = "/dfs.DataNodeService/HealthCheck"
+	DataNodeService_PrepareChunkUpload_FullMethodName = "/dfs.DataNodeService/PrepareChunkUpload"
+	DataNodeService_RetrieveChunk_FullMethodName      = "/dfs.DataNodeService/RetrieveChunk"
+	DataNodeService_DeleteChunk_FullMethodName        = "/dfs.DataNodeService/DeleteChunk"
+	DataNodeService_StreamChunk_FullMethodName        = "/dfs.DataNodeService/StreamChunk"
+	DataNodeService_HealthCheck_FullMethodName        = "/dfs.DataNodeService/HealthCheck"
 )
 
 // DataNodeServiceClient is the client API for DataNodeService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DataNodeServiceClient interface {
+	// Hand-shake definitions from uploader (client or other DataNode)
+	// All operations follow a 2 step protocol -> first prepare -> stream data
+	PrepareChunkUpload(ctx context.Context, in *ChunkMeta, opts ...grpc.CallOption) (*ChunkUploadReady, error)
 	// Chunk operations
-	StoreChunk(ctx context.Context, in *StoreChunkRequest, opts ...grpc.CallOption) (*StoreChunkResponse, error)
 	RetrieveChunk(ctx context.Context, in *RetrieveChunkRequest, opts ...grpc.CallOption) (*RetrieveChunkResponse, error)
 	DeleteChunk(ctx context.Context, in *DeleteChunkRequest, opts ...grpc.CallOption) (*DeleteChunkResponse, error)
-	// Replication
-	ReplicateChunk(ctx context.Context, in *ReplicateChunkRequest, opts ...grpc.CallOption) (*ReplicateChunkResponse, error)
-	StreamChunkData(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChunkDataStream, ChunkDataAck], error)
+	// Receiving chunk data from stream
+	StreamChunk(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChunkDataStream, ChunkDataAck], error)
 	// Health check
 	HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 }
@@ -50,10 +50,10 @@ func NewDataNodeServiceClient(cc grpc.ClientConnInterface) DataNodeServiceClient
 	return &dataNodeServiceClient{cc}
 }
 
-func (c *dataNodeServiceClient) StoreChunk(ctx context.Context, in *StoreChunkRequest, opts ...grpc.CallOption) (*StoreChunkResponse, error) {
+func (c *dataNodeServiceClient) PrepareChunkUpload(ctx context.Context, in *ChunkMeta, opts ...grpc.CallOption) (*ChunkUploadReady, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StoreChunkResponse)
-	err := c.cc.Invoke(ctx, DataNodeService_StoreChunk_FullMethodName, in, out, cOpts...)
+	out := new(ChunkUploadReady)
+	err := c.cc.Invoke(ctx, DataNodeService_PrepareChunkUpload_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -80,19 +80,9 @@ func (c *dataNodeServiceClient) DeleteChunk(ctx context.Context, in *DeleteChunk
 	return out, nil
 }
 
-func (c *dataNodeServiceClient) ReplicateChunk(ctx context.Context, in *ReplicateChunkRequest, opts ...grpc.CallOption) (*ReplicateChunkResponse, error) {
+func (c *dataNodeServiceClient) StreamChunk(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChunkDataStream, ChunkDataAck], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ReplicateChunkResponse)
-	err := c.cc.Invoke(ctx, DataNodeService_ReplicateChunk_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *dataNodeServiceClient) StreamChunkData(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChunkDataStream, ChunkDataAck], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &DataNodeService_ServiceDesc.Streams[0], DataNodeService_StreamChunkData_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &DataNodeService_ServiceDesc.Streams[0], DataNodeService_StreamChunk_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +91,7 @@ func (c *dataNodeServiceClient) StreamChunkData(ctx context.Context, opts ...grp
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataNodeService_StreamChunkDataClient = grpc.BidiStreamingClient[ChunkDataStream, ChunkDataAck]
+type DataNodeService_StreamChunkClient = grpc.BidiStreamingClient[ChunkDataStream, ChunkDataAck]
 
 func (c *dataNodeServiceClient) HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -117,13 +107,14 @@ func (c *dataNodeServiceClient) HealthCheck(ctx context.Context, in *HealthCheck
 // All implementations must embed UnimplementedDataNodeServiceServer
 // for forward compatibility.
 type DataNodeServiceServer interface {
+	// Hand-shake definitions from uploader (client or other DataNode)
+	// All operations follow a 2 step protocol -> first prepare -> stream data
+	PrepareChunkUpload(context.Context, *ChunkMeta) (*ChunkUploadReady, error)
 	// Chunk operations
-	StoreChunk(context.Context, *StoreChunkRequest) (*StoreChunkResponse, error)
 	RetrieveChunk(context.Context, *RetrieveChunkRequest) (*RetrieveChunkResponse, error)
 	DeleteChunk(context.Context, *DeleteChunkRequest) (*DeleteChunkResponse, error)
-	// Replication
-	ReplicateChunk(context.Context, *ReplicateChunkRequest) (*ReplicateChunkResponse, error)
-	StreamChunkData(grpc.BidiStreamingServer[ChunkDataStream, ChunkDataAck]) error
+	// Receiving chunk data from stream
+	StreamChunk(grpc.BidiStreamingServer[ChunkDataStream, ChunkDataAck]) error
 	// Health check
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	mustEmbedUnimplementedDataNodeServiceServer()
@@ -136,8 +127,8 @@ type DataNodeServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedDataNodeServiceServer struct{}
 
-func (UnimplementedDataNodeServiceServer) StoreChunk(context.Context, *StoreChunkRequest) (*StoreChunkResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StoreChunk not implemented")
+func (UnimplementedDataNodeServiceServer) PrepareChunkUpload(context.Context, *ChunkMeta) (*ChunkUploadReady, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PrepareChunkUpload not implemented")
 }
 func (UnimplementedDataNodeServiceServer) RetrieveChunk(context.Context, *RetrieveChunkRequest) (*RetrieveChunkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RetrieveChunk not implemented")
@@ -145,11 +136,8 @@ func (UnimplementedDataNodeServiceServer) RetrieveChunk(context.Context, *Retrie
 func (UnimplementedDataNodeServiceServer) DeleteChunk(context.Context, *DeleteChunkRequest) (*DeleteChunkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteChunk not implemented")
 }
-func (UnimplementedDataNodeServiceServer) ReplicateChunk(context.Context, *ReplicateChunkRequest) (*ReplicateChunkResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ReplicateChunk not implemented")
-}
-func (UnimplementedDataNodeServiceServer) StreamChunkData(grpc.BidiStreamingServer[ChunkDataStream, ChunkDataAck]) error {
-	return status.Errorf(codes.Unimplemented, "method StreamChunkData not implemented")
+func (UnimplementedDataNodeServiceServer) StreamChunk(grpc.BidiStreamingServer[ChunkDataStream, ChunkDataAck]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamChunk not implemented")
 }
 func (UnimplementedDataNodeServiceServer) HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
@@ -175,20 +163,20 @@ func RegisterDataNodeServiceServer(s grpc.ServiceRegistrar, srv DataNodeServiceS
 	s.RegisterService(&DataNodeService_ServiceDesc, srv)
 }
 
-func _DataNodeService_StoreChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StoreChunkRequest)
+func _DataNodeService_PrepareChunkUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChunkMeta)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DataNodeServiceServer).StoreChunk(ctx, in)
+		return srv.(DataNodeServiceServer).PrepareChunkUpload(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: DataNodeService_StoreChunk_FullMethodName,
+		FullMethod: DataNodeService_PrepareChunkUpload_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DataNodeServiceServer).StoreChunk(ctx, req.(*StoreChunkRequest))
+		return srv.(DataNodeServiceServer).PrepareChunkUpload(ctx, req.(*ChunkMeta))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -229,30 +217,12 @@ func _DataNodeService_DeleteChunk_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DataNodeService_ReplicateChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReplicateChunkRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DataNodeServiceServer).ReplicateChunk(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DataNodeService_ReplicateChunk_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DataNodeServiceServer).ReplicateChunk(ctx, req.(*ReplicateChunkRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DataNodeService_StreamChunkData_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(DataNodeServiceServer).StreamChunkData(&grpc.GenericServerStream[ChunkDataStream, ChunkDataAck]{ServerStream: stream})
+func _DataNodeService_StreamChunk_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(DataNodeServiceServer).StreamChunk(&grpc.GenericServerStream[ChunkDataStream, ChunkDataAck]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataNodeService_StreamChunkDataServer = grpc.BidiStreamingServer[ChunkDataStream, ChunkDataAck]
+type DataNodeService_StreamChunkServer = grpc.BidiStreamingServer[ChunkDataStream, ChunkDataAck]
 
 func _DataNodeService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HealthCheckRequest)
@@ -280,8 +250,8 @@ var DataNodeService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*DataNodeServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "StoreChunk",
-			Handler:    _DataNodeService_StoreChunk_Handler,
+			MethodName: "PrepareChunkUpload",
+			Handler:    _DataNodeService_PrepareChunkUpload_Handler,
 		},
 		{
 			MethodName: "RetrieveChunk",
@@ -292,18 +262,14 @@ var DataNodeService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DataNodeService_DeleteChunk_Handler,
 		},
 		{
-			MethodName: "ReplicateChunk",
-			Handler:    _DataNodeService_ReplicateChunk_Handler,
-		},
-		{
 			MethodName: "HealthCheck",
 			Handler:    _DataNodeService_HealthCheck_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "StreamChunkData",
-			Handler:       _DataNodeService_StreamChunkData_Handler,
+			StreamName:    "StreamChunk",
+			Handler:       _DataNodeService_StreamChunk_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

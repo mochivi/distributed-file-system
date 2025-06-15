@@ -115,6 +115,7 @@ services:
       - TEST_FILES_DIR=/app/test-files
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
+      - ENVIRONMENT=production # TODO: reduces logging verbosity, add log level as env var
     depends_on:
       - coordinator
       - datanode1

@@ -47,15 +47,15 @@ type DataNodeClient struct {
 }
 
 type IReplicationManager interface {
-	paralellReplicate(nodes []*common.DataNodeInfo, req common.ReplicateChunkRequest, data []byte, requiredReplicas int) error
-	replicate(ctx context.Context, client *DataNodeClient, req common.ReplicateChunkRequest, data []byte, clientLogger *slog.Logger) error
-	streamChunkData(ctx context.Context, client *DataNodeClient, sessionID string, req common.ReplicateChunkRequest, data []byte, streamLogger *slog.Logger) error
+	paralellReplicate(nodes []*common.DataNodeInfo, chunkMeta common.ChunkMeta, data []byte, requiredReplicas int) error
+	replicate(ctx context.Context, client *DataNodeClient, req common.ChunkMeta, data []byte, clientLogger *slog.Logger) error
 }
 
 type ISessionManager interface {
-	Store(sessionID string, session *StreamingSession)
+	Store(sessionID string, session *StreamingSession) error
 	Load(sessionID string) (*StreamingSession, bool)
 	Delete(sessionID string)
+	ExistsForChunk(chunkID string) bool
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,

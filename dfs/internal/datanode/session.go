@@ -3,6 +3,7 @@ package datanode
 import (
 	"bytes"
 	"crypto/sha256"
+	"fmt"
 	"hash"
 	"log/slog"
 	"sync"
@@ -20,17 +21,17 @@ type SessionManager struct {
 
 // StreamingSession controls the data flow during a chunk streaming session
 type StreamingSession struct {
-	SessionID    string
-	ChunkID      string
-	ExpectedSize int
-	ExpectedHash string
-	CreatedAt    time.Time
-	ExpiresAt    time.Time
+	SessionID string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+
+	// Chunk metadata
+	common.ChunkMeta
 
 	// Runtime state
-	BytesReceived int64
-	Buffer        *bytes.Buffer
-	Checksum      hash.Hash // Running checksum calculation
+	BytesReceived   int64
+	Buffer          *bytes.Buffer
+	RunningChecksum hash.Hash // Running checksum calculation
 
 	// Concurrency control
 	mutex  sync.RWMutex
@@ -44,10 +45,16 @@ func NewSessionManager() *SessionManager {
 	return &SessionManager{sessions: make(map[string]*StreamingSession)}
 }
 
-func (sm *SessionManager) Store(sessionID string, session *StreamingSession) {
+func (sm *SessionManager) Store(sessionID string, session *StreamingSession) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
+
+	if sm.ExistsForChunk(session.ChunkID) {
+		return fmt.Errorf("session for chunk %s already exists", session.ChunkID)
+	}
+
 	sm.sessions[sessionID] = session
+	return nil
 }
 
 func (sm *SessionManager) Load(sessionID string) (*StreamingSession, bool) {
@@ -66,22 +73,33 @@ func (sm *SessionManager) Delete(sessionID string) {
 	delete(sm.sessions, sessionID)
 }
 
+// Temporary solution to check if a chunk is already being streamed, stops duplicate requests
+func (sm *SessionManager) ExistsForChunk(chunkID string) bool {
+	for _, session := range sm.sessions {
+		if session.ChunkID == chunkID {
+			return true
+		}
+	}
+	return false
+}
+
 // DataNode creates and stores a session
-func (s *DataNodeServer) createStreamingSession(sessionId string, req common.ReplicateChunkRequest, logger *slog.Logger) {
+func (s *DataNodeServer) createStreamingSession(sessionId string, chunkMeta common.ChunkMeta, logger *slog.Logger) error {
 	streamLogger := logging.OperationLogger(logger, "create_streaming_session", slog.String("session_id", sessionId))
 	session := &StreamingSession{
-		SessionID:    sessionId,
-		ChunkID:      req.ChunkID,
-		ExpectedSize: req.ChunkSize,
-		ExpectedHash: req.Checksum,
-		CreatedAt:    time.Now(),
-		ExpiresAt:    time.Now().Add(s.Config.Session.SessionTimeout),
-		Status:       SessionActive,
-		Checksum:     sha256.New(),
-		logger:       streamLogger,
+		SessionID:       sessionId,
+		ChunkMeta:       chunkMeta,
+		CreatedAt:       time.Now(),
+		ExpiresAt:       time.Now().Add(s.Config.Session.SessionTimeout),
+		Status:          SessionActive,
+		RunningChecksum: sha256.New(),
+		logger:          streamLogger,
 	}
-	s.sessionManager.Store(sessionId, session)
+	if err := s.sessionManager.Store(sessionId, session); err != nil {
+		return err
+	}
 	streamLogger.Info("Streaming session created")
+	return nil
 }
 
 // DataNode retrieves the streaming session

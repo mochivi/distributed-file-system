@@ -53,6 +53,7 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		}
 	}
 
+	// Create metadata commit session for the upload
 	sessionID := uuid.NewString()
 	go c.metadataManager.trackUpload(sessionID, req, numChunks)
 	c.logger.Debug("Created upload session", slog.String("session_id", sessionID), slog.String("file_path", req.Path))
