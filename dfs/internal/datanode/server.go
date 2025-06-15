@@ -25,53 +25,40 @@ const (
 	N_NODES    int = (N_REPLICAS-1)*2 + 1
 )
 
-// StoreChunk is received only if the node is a primary receiver
-// 1. Verify chunk checksum is the same as expected
-// 2. Store chunk, given storage method
-// 3. Kickoff replication
-func (s *DataNodeServer) StoreChunk(ctx context.Context, pb *proto.StoreChunkRequest) (*proto.StoreChunkResponse, error) {
-	req := common.StoreChunkRequestFromProto(pb)
+// PrepareChunkUpload is received only if the node is a primary receiver, should reply to accept the chunk
+// and create a streaming session for the chunk data stream
+func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.ChunkMeta) (*proto.ChunkUploadReady, error) {
+	req := common.ChunkMetaFromProto(pb)
 
-	logger := logging.OperationLogger(s.logger, "store_chunk", slog.String("chunk_id", req.ChunkID))
-	logger.Info("Received StoreChunk request")
+	logger := logging.OperationLogger(s.logger, "prepare_chunk_upload", slog.String("chunk_id", req.ChunkID))
+	logger.Info("Received PrepareChunkUpload request")
 
-	calculatedChecksum := common.CalculateChecksum(req.Data)
-	if calculatedChecksum != req.Checksum {
-		logger.Error("Checksum mismatch", slog.String("expected", req.Checksum), slog.String("calculated", calculatedChecksum))
-		return common.StoreChunkResponse{
-			Success: false,
-			Message: "checksum does not match",
+	// Validate request
+	if req.ChunkID == "" || req.ChunkSize <= 0 {
+		logger.Error("Invalid chunk metadata")
+		return common.ChunkUploadReady{
+			Accept:  false,
+			Message: "Invalid chunk metadata",
+		}.ToProto(), nil
+	}
+	if !s.hasCapacity(req.ChunkSize) {
+		logger.Error("Insufficient storage capacity")
+		return common.ChunkUploadReady{
+			Accept:  false,
+			Message: "Insufficient storage capacity",
 		}.ToProto(), nil
 	}
 
-	if err := s.store.Store(req.ChunkID, req.Data); err != nil {
-		logger.Error("Failed to store chunk", slog.String("error", err.Error()))
-		return nil, status.Errorf(codes.Internal, "failed to store chunk: %v", err)
+	sessionID := uuid.NewString()
+	if err := s.createStreamingSession(sessionID, req, logger); err != nil {
+		logger.Error("Failed to create streaming session", slog.String("error", err.Error()))
+		return nil, status.Errorf(codes.AlreadyExists, "failed to create streaming session: %v", err)
 	}
 
-	replicateReq := common.ReplicateChunkRequest{
-		ChunkID:   req.ChunkID,
-		ChunkSize: 4 * 1024 * 1024,
-		Checksum:  req.Checksum,
-	}
-
-	// Select N_NODES possible nodes to replicate to
-	nodes, err := s.nodeManager.SelectBestNodes(N_NODES)
-	if err != nil {
-		logger.Error("Failed to select nodes", slog.String("error", err.Error()))
-		return nil, status.Errorf(codes.Internal, "failed to select nodes: %v", err)
-	}
-
-	// Replicate to N_REPLICAS nodes
-	if err := s.replicationManager.paralellReplicate(nodes, replicateReq, req.Data, N_REPLICAS-1); err != nil {
-		logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
-		return nil, status.Errorf(codes.Internal, "failed to replicate chunk: %v", err)
-	}
-	logger.Info("Chunk replicated successfully")
-
-	return common.StoreChunkResponse{
-		Success: true,
-		Message: "chunk stored",
+	return common.ChunkUploadReady{
+		Accept:    true,
+		Message:   "Ready to receive chunk data",
+		SessionID: sessionID,
 	}.ToProto(), nil
 }
 
@@ -129,45 +116,8 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 	}.ToProto(), nil
 }
 
-// ReplicateChunk means node is currenly acting as a replica for some chunk
-// The replication implementation here is paralell, which means this node does not need to care about forwarding
-// the replication request to some new node, just replying with the status is enough
-// 1. Check if node has enough capacity to handle storing the chunk
-// 2. Send accept response to innitiate data stream for chunk
-func (s *DataNodeServer) ReplicateChunk(ctx context.Context, pb *proto.ReplicateChunkRequest) (*proto.ReplicateChunkResponse, error) {
-	req := common.ReplicateChunkRequestFromProto(pb)
-	logger := logging.OperationLogger(s.logger, "receive_replicate_chunk", slog.String("chunk_id", req.ChunkID))
-
-	logger.Info("Received ReplicateChunk request")
-
-	if req.ChunkID == "" || req.ChunkSize <= 0 {
-		logger.Error("Invalid chunk metadata")
-		return common.ReplicateChunkResponse{
-			Accept:  false,
-			Message: "Invalid chunk metadata",
-		}.ToProto(), nil
-	}
-
-	if !s.hasCapacity(req.ChunkSize) {
-		logger.Error("Insufficient storage capacity")
-		return &proto.ReplicateChunkResponse{
-			Accept:  false,
-			Message: "Insufficient storage capacity",
-		}, nil
-	}
-
-	sessionID := uuid.NewString()
-	s.createStreamingSession(sessionID, req, logger)
-
-	return common.ReplicateChunkResponse{
-		Accept:    true,
-		Message:   "Ready to receive chunk data",
-		SessionID: sessionID,
-	}.ToProto(), nil
-}
-
-// This is the side that is responsible for receiving the chunk data from the client
-func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
+// This is the side that is responsible for receiving the chunk data from some peer (client or another node)
+func (s *DataNodeServer) StreamChunk(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
 	var session *StreamingSession
 	var buffer *bytes.Buffer
 	var totalReceived int
@@ -198,7 +148,7 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 			}
 
 			// Create buffer with pre-defined capacity for performance
-			buf := make([]byte, 0, session.ExpectedSize)
+			buf := make([]byte, 0, session.ChunkSize)
 			buffer = bytes.NewBuffer(buf)
 		}
 
@@ -209,9 +159,9 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 		}
 
 		// Write to buffer/temp file, update checksum
-		session.logger.Debug("Writing chunk data to buffer", slog.Int("offset", chunk.Offset), slog.Int("chunk_size", len(chunk.Data)))
+		// session.logger.Debug("Writing chunk data to buffer", slog.Int("offset", chunk.Offset), slog.Int("chunk_size", len(chunk.Data)))
 		buffer.Write(chunk.Data)
-		session.Checksum.Write(chunk.Data)
+		session.RunningChecksum.Write(chunk.Data)
 		totalReceived += len(chunk.Data)
 
 		// TODO: implement flushing buffer to disk whenever it hits the threshold
@@ -235,7 +185,7 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 			ReadyForNext:  true, // Requires flushing to be setup to work
 		}
 
-		session.logger.Debug("Sending acknowledgment", slog.Int("bytes_received", totalReceived))
+		// session.logger.Debug("Sending acknowledgment", slog.Int("bytes_received", totalReceived))
 		if err := stream.Send(ack.ToProto()); err != nil {
 			session.logger.Error("Failed to send acknowledgment", slog.String("error", err.Error()))
 			return err
@@ -244,11 +194,11 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 		// Handle final chunk
 		if chunk.IsFinal {
 			// Verify checksum immediately
-			computedHash := session.Checksum.Sum(nil)
-			expectedHash, _ := hex.DecodeString(session.ExpectedHash)
+			computedHash := session.RunningChecksum.Sum(nil)
+			expectedHash, _ := hex.DecodeString(session.Checksum)
 
 			if !bytes.Equal(computedHash, expectedHash) {
-				session.logger.Error("Checksum mismatch", slog.String("expected", session.ExpectedHash), slog.String("computed", hex.EncodeToString(computedHash)))
+				session.logger.Error("Checksum mismatch", slog.String("expected", session.Checksum), slog.String("computed", hex.EncodeToString(computedHash)))
 				return errors.New("checksum mismatch")
 			}
 
@@ -271,6 +221,16 @@ func (s *DataNodeServer) StreamChunkData(stream grpc.BidiStreamingServer[proto.C
 	}
 
 	session.logger.Debug("Received chunk data stream successfully")
+	s.sessionManager.Delete(session.SessionID) // Delete session after successful stream
+
+	// Propagate the chunk to other nodes if the flag is set
+	if session.Propagate {
+		if err := s.replicate(session.ChunkMeta, buffer.Bytes()); err != nil {
+			session.logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -306,5 +266,26 @@ func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context, coordinato
 	s.nodeManager.InitializeNodes(resp.FullNodeList, resp.CurrentVersion)
 
 	logger.Info("Datanode registered with coordinator successfully")
+	return nil
+}
+
+// Actually replicates the chunk to the given nodes in parallel
+func (s *DataNodeServer) replicate(chunkMeta common.ChunkMeta, data []byte) error {
+	logger := logging.OperationLogger(s.logger, "replicate_chunk", slog.String("chunk_id", chunkMeta.ChunkID))
+
+	// Select N_NODES possible nodes to replicate to
+	nodes, err := s.nodeManager.SelectBestNodes(N_NODES)
+	if err != nil {
+		logger.Error("Failed to select nodes", slog.String("error", err.Error()))
+		return fmt.Errorf("failed to select nodes: %v", err)
+	}
+
+	// Replicate to N_REPLICAS nodes
+	if err := s.replicationManager.paralellReplicate(nodes, chunkMeta, data, N_REPLICAS-1); err != nil {
+		logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
+		return fmt.Errorf("failed to replicate chunk: %v", err)
+	}
+	logger.Info("Chunk replicated successfully")
+
 	return nil
 }

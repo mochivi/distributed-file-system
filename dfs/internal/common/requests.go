@@ -1,40 +1,53 @@
 package common
 
-import (
-	"github.com/mochivi/distributed-file-system/pkg/proto"
-)
+import "github.com/mochivi/distributed-file-system/pkg/proto"
 
-type StoreChunkRequest struct {
-	ChunkID  string
-	Data     []byte
-	Checksum string
+// Coordinates the chunk upload process, if propagate is true, the peer must replicate the chunk to other nodes
+type ChunkMeta struct {
+	ChunkID   string
+	ChunkSize int
+	Checksum  string
+	Propagate bool
 }
 
-func StoreChunkRequestFromProto(pb *proto.StoreChunkRequest) StoreChunkRequest {
-	return StoreChunkRequest{
-		ChunkID:  pb.ChunkId,
-		Data:     pb.Data,
-		Checksum: pb.Checksum,
+func ChunkMetaFromProto(pb *proto.ChunkMeta) ChunkMeta {
+	return ChunkMeta{
+		ChunkID:   pb.ChunkId,
+		ChunkSize: int(pb.ChunkSize),
+		Checksum:  pb.Checksum,
+		Propagate: pb.Propagate,
 	}
 }
 
-func (str StoreChunkRequest) ToProto() *proto.StoreChunkRequest {
-	return &proto.StoreChunkRequest{
-		ChunkId:  str.ChunkID,
-		Data:     str.Data,
-		Checksum: str.Checksum,
+func (cm ChunkMeta) ToProto() *proto.ChunkMeta {
+	return &proto.ChunkMeta{
+		ChunkId:   cm.ChunkID,
+		ChunkSize: int64(cm.ChunkSize),
+		Checksum:  cm.Checksum,
+		Propagate: cm.Propagate,
 	}
 }
 
-type StoreChunkResponse struct {
-	Success bool
-	Message string
+// Coordinates the chunk upload process, if accept is true, the peer can start streaming the chunk data
+type ChunkUploadReady struct {
+	Accept    bool
+	Message   string
+	SessionID string
 }
 
-func (scr StoreChunkResponse) ToProto() *proto.StoreChunkResponse {
-	return &proto.StoreChunkResponse{
-		Success: scr.Success,
-		Message: scr.Message,
+func ChunkUploadReadyFromProto(pb *proto.ChunkUploadReady) ChunkUploadReady {
+	return ChunkUploadReady{
+		Accept:    pb.Accept,
+		Message:   pb.Message,
+		SessionID: pb.SessionId,
+	}
+}
+
+func (cuu ChunkUploadReady) ToProto() *proto.ChunkUploadReady {
+	return &proto.ChunkUploadReady{
+		Accept:    cuu.Accept,
+		Message:   cuu.Message,
+		SessionId: cuu.SessionID,
 	}
 }
 
@@ -96,50 +109,6 @@ func (dcr DeleteChunkResponse) ToProto() *proto.DeleteChunkResponse {
 	return &proto.DeleteChunkResponse{
 		Success: dcr.Success,
 		Message: dcr.Message,
-	}
-}
-
-type ReplicateChunkRequest struct {
-	ChunkID   string
-	ChunkSize int
-	Checksum  string
-}
-
-func ReplicateChunkRequestFromProto(pb *proto.ReplicateChunkRequest) ReplicateChunkRequest {
-	return ReplicateChunkRequest{
-		ChunkID:   pb.ChunkId,
-		ChunkSize: int(pb.ChunkSize),
-		Checksum:  pb.Checksum,
-	}
-}
-
-func (rpr ReplicateChunkRequest) ToProto() *proto.ReplicateChunkRequest {
-	return &proto.ReplicateChunkRequest{
-		ChunkId:   rpr.ChunkID,
-		ChunkSize: int64(rpr.ChunkSize),
-		Checksum:  rpr.Checksum,
-	}
-}
-
-type ReplicateChunkResponse struct {
-	Accept    bool
-	Message   string
-	SessionID string
-}
-
-func ReplicateChunkResponseFromProto(pb *proto.ReplicateChunkResponse) ReplicateChunkResponse {
-	return ReplicateChunkResponse{
-		Accept:    pb.Accept,
-		Message:   pb.Message,
-		SessionID: pb.SessionId,
-	}
-}
-
-func (rcr ReplicateChunkResponse) ToProto() *proto.ReplicateChunkResponse {
-	return &proto.ReplicateChunkResponse{
-		Accept:    rcr.Accept,
-		Message:   rcr.Message,
-		SessionId: rcr.SessionID,
 	}
 }
 

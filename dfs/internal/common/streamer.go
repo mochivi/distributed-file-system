@@ -12,15 +12,25 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	DEFAULT_CHUNK_STREAM_SIZE = 256 * 1024 // Default 256KB chunks
-)
-
-type Streamer struct {
+type StreamerConfig struct {
+	MaxChunkRetries  int
+	ChunkStreamSize  int
+	BackpressureTime time.Duration
 }
 
-func NewStreamer(logger *slog.Logger) *Streamer {
-	return &Streamer{}
+func DefaultStreamerConfig() StreamerConfig {
+	return StreamerConfig{
+		MaxChunkRetries: 3,
+		ChunkStreamSize: 256 * 1024,
+	}
+}
+
+type Streamer struct {
+	Config StreamerConfig
+}
+
+func NewStreamer(config StreamerConfig) *Streamer {
+	return &Streamer{Config: config}
 }
 
 type StreamChunkParams struct {
@@ -28,13 +38,8 @@ type StreamChunkParams struct {
 	SessionID string
 
 	// Chunk data
-	ChunkID  string
-	Checksum string
-	Data     []byte
-
-	// Streamer configuration
-	MaxChunkRetries int
-	ChunkStreamSize int
+	ChunkMeta ChunkMeta
+	Data      []byte
 }
 
 // Initiate a stream to send a chunk to a datanode
@@ -45,11 +50,7 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 	logger.Debug("Initializing chunk data stream")
 
 	// Stream data in chunks
-	chunkStreamSize := params.ChunkStreamSize
-	if chunkStreamSize == 0 {
-		chunkStreamSize = DEFAULT_CHUNK_STREAM_SIZE
-	}
-	logger.Debug("Chunk data stream created", slog.Int("chunk_size_KB", chunkStreamSize/1024))
+	logger.Debug("Chunk data stream created", slog.Int("chunk_size_KB", s.Config.ChunkStreamSize/1024))
 
 	totalSize := len(params.Data)
 	offset := 0
@@ -59,7 +60,7 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 	for offset < totalSize {
 		// Calculate chunk size for this iteration
 		remainingBytes := totalSize - offset
-		currentChunkStreamSize := chunkStreamSize
+		currentChunkStreamSize := s.Config.ChunkStreamSize
 		if remainingBytes < currentChunkStreamSize {
 			currentChunkStreamSize = remainingBytes
 		}
@@ -77,12 +78,12 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 		retryCount := 0
 
 		// Retry the same chunk piece if it fails
-		logger.Debug("Sending chunk data", slog.Int("iteration", iteration), slog.Int("offset", offset), slog.Int("chunk_size", currentChunkStreamSize))
-		for retryCount < params.MaxChunkRetries {
+		// logger.Debug("Sending chunk data", slog.Int("iteration", iteration), slog.Int("offset", offset), slog.Int("chunk_size", currentChunkStreamSize))
+		for retryCount < s.Config.MaxChunkRetries {
 			// Create stream message
 			streamMsg := &ChunkDataStream{
 				SessionID:       params.SessionID,
-				ChunkID:         params.ChunkID,
+				ChunkID:         params.ChunkMeta.ChunkID,
 				Data:            chunkData,
 				Offset:          offset,
 				IsFinal:         isFinal,
@@ -99,8 +100,8 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 			if err != nil {
 				logger.Debug("Failed to receive stream response", slog.Int("retry_count", retryCount), slog.String("error", err.Error()))
 				retryCount++
-				if retryCount >= params.MaxChunkRetries {
-					return fmt.Errorf("failed to receive stream response after %d retries: %w", params.MaxChunkRetries, err)
+				if retryCount >= s.Config.MaxChunkRetries {
+					return fmt.Errorf("failed to receive stream response after %d retries: %w", s.Config.MaxChunkRetries, err)
 				}
 				time.Sleep(time.Duration(retryCount) * time.Second) // Exponential backoff
 				continue
@@ -111,8 +112,8 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 			if !ack.Success {
 				logger.Debug("Chunk data failed", slog.Int("retry_count", retryCount), slog.String("error", ack.Message))
 				retryCount++
-				if retryCount >= params.MaxChunkRetries {
-					return fmt.Errorf("chunk failed after %d retries: %s", params.MaxChunkRetries, ack.Message)
+				if retryCount >= s.Config.MaxChunkRetries {
+					return fmt.Errorf("chunk failed after %d retries: %s", s.Config.MaxChunkRetries, ack.Message)
 				}
 				time.Sleep(time.Duration(retryCount) * time.Second)
 				continue
@@ -123,9 +124,9 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 			if ack.BytesReceived != expectedBytes {
 				logger.Debug("Byte count mismatch", slog.Int("expected", expectedBytes), slog.Int("got", ack.BytesReceived))
 				retryCount++
-				if retryCount >= params.MaxChunkRetries {
+				if retryCount >= s.Config.MaxChunkRetries {
 					return fmt.Errorf("byte count mismatch after %d retries: expected %d, got %d",
-						params.MaxChunkRetries, expectedBytes, ack.BytesReceived)
+						s.Config.MaxChunkRetries, expectedBytes, ack.BytesReceived)
 				}
 				time.Sleep(time.Duration(retryCount) * time.Second)
 				continue
@@ -138,7 +139,7 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 		// Handle backpressure - server needs time to flush to disk
 		if !ack.ReadyForNext && !isFinal {
 			select {
-			case <-time.After(time.Duration(500) * time.Millisecond):
+			case <-time.After(s.Config.BackpressureTime):
 			case <-ctx.Done():
 				return ctx.Err()
 			}
@@ -171,9 +172,9 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 
 	// Validate if checksum after all partial sections are added up still matches the original
 	calculatedChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
-	if calculatedChecksum != params.Checksum {
+	if calculatedChecksum != params.ChunkMeta.Checksum {
 		return fmt.Errorf("request checksum mismatch: expected %s, calculated %s",
-			params.Checksum, calculatedChecksum)
+			params.ChunkMeta.Checksum, calculatedChecksum)
 	}
 
 	if !finalAck.Success {

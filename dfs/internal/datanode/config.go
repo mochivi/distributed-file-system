@@ -22,8 +22,6 @@ type SessionManagerConfig struct {
 
 type ReplicateManagerConfig struct {
 	ReplicateTimeout time.Duration // timeout until replication to another node is considered failed
-	ChunkStreamSize  int
-	MaxChunkRetries  int
 }
 
 func DefaultDatanodeConfig() DataNodeConfig {
@@ -45,8 +43,6 @@ func DefaultDatanodeConfig() DataNodeConfig {
 
 		Replication: ReplicateManagerConfig{
 			ReplicateTimeout: 2 * time.Minute,
-			ChunkStreamSize:  256 * 1024,
-			MaxChunkRetries:  3,
 		},
 	}
 }

@@ -2,8 +2,6 @@ package datanode
 
 import (
 	"context"
-	"fmt"
-	"log"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -11,18 +9,14 @@ import (
 )
 
 // client -> node
-func (c *DataNodeClient) StoreChunk(ctx context.Context, req common.StoreChunkRequest, opts ...grpc.CallOption) error {
-	resp, err := c.client.StoreChunk(ctx, req.ToProto(), opts...)
+// This is the primary node that is receiving the chunk
+func (c *DataNodeClient) StoreChunk(ctx context.Context, req common.ChunkMeta, opts ...grpc.CallOption) (common.ChunkUploadReady, error) {
+	resp, err := c.client.PrepareChunkUpload(ctx, req.ToProto(), opts...)
 	if err != nil {
-		return handlegRPCError(err, req.ChunkID)
+		err = handlegRPCError(err, req.ChunkID)
+		return common.ChunkUploadReady{}, err
 	}
-
-	if !resp.Success {
-		return fmt.Errorf("failed to store chunk: %s", resp.Message)
-	}
-
-	log.Printf("Successfully stored chunk %s", req.ChunkID)
-	return nil
+	return common.ChunkUploadReadyFromProto(resp), nil
 }
 
 // client -> node
@@ -46,19 +40,20 @@ func (c *DataNodeClient) DeleteChunk(ctx context.Context, req common.DeleteChunk
 }
 
 // node -> node
-// add context cancellation support
-func (c *DataNodeClient) ReplicateChunk(ctx context.Context, req common.ReplicateChunkRequest, opts ...grpc.CallOption) (common.ReplicateChunkResponse, error) {
-	resp, err := c.client.ReplicateChunk(ctx, req.ToProto(), opts...)
+// This is a replica node that is receiving the chunk
+// This is a copy of StoreChunk, but with a different method name
+func (c *DataNodeClient) ReplicateChunk(ctx context.Context, req common.ChunkMeta, opts ...grpc.CallOption) (common.ChunkUploadReady, error) {
+	resp, err := c.client.PrepareChunkUpload(ctx, req.ToProto(), opts...)
 	if err != nil {
 		err = handlegRPCError(err, req.ChunkID)
-		return common.ReplicateChunkResponse{}, err
+		return common.ChunkUploadReady{}, err
 	}
-	return common.ReplicateChunkResponseFromProto(resp), nil
+	return common.ChunkUploadReadyFromProto(resp), nil
 }
 
 // node -> node
-func (c *DataNodeClient) StreamChunkData(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck], error) {
-	return c.client.StreamChunkData(ctx, opts...)
+func (c *DataNodeClient) StreamChunk(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck], error) {
+	return c.client.StreamChunk(ctx, opts...)
 }
 
 // node -> node

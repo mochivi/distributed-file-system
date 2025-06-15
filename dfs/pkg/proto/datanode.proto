@@ -7,28 +7,36 @@ option go_package = "pkg/proto";
 import "common.proto";
 
 service DataNodeService {
+  // Hand-shake definitions from uploader (client or other DataNode)
+  // All operations follow a 2 step protocol -> first prepare -> stream data
+  rpc PrepareChunkUpload(ChunkMeta) returns (ChunkUploadReady);
+
   // Chunk operations
-  rpc StoreChunk(StoreChunkRequest) returns (StoreChunkResponse);
   rpc RetrieveChunk(RetrieveChunkRequest) returns (RetrieveChunkResponse);
   rpc DeleteChunk(DeleteChunkRequest) returns (DeleteChunkResponse);
-  
-  // Replication
-  rpc ReplicateChunk(ReplicateChunkRequest) returns (ReplicateChunkResponse);
-  rpc StreamChunkData(stream ChunkDataStream) returns (stream ChunkDataAck);
+
+  // Receiving chunk data from stream
+  rpc StreamChunk(stream ChunkDataStream) returns (stream ChunkDataAck);
   
   // Health check
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
-// Store chunk request/response
-message StoreChunkRequest {
-  string chunk_id = 1;
-  bytes data = 2;
-  string checksum = 3;
+// Hand-shake from uploader (client or other DataNode)
+message ChunkMeta {
+  string chunk_id   = 1;
+  int64  chunk_size = 2;
+  string checksum   = 3;
+
+  // true  => receiver must replicate further (uploader is a client -> primary)
+  // false => receiver just stores the chunk (uploader is another DataNode)
+  bool    propagate = 4;
 }
-message StoreChunkResponse {
-  bool success = 1;
-  string message = 2;
+
+message ChunkUploadReady {
+  bool   accept     = 1;
+  string message    = 2;
+  string session_id = 3;
 }
 
 // Retrieve chunk request/response
@@ -49,17 +57,6 @@ message DeleteChunkResponse {
   string message = 2;
 }
 
-// Replicate chunk request/response
-message ReplicateChunkRequest {
-  string chunk_id = 1;
-  int64 chunk_size = 2;           // Size for capacity check
-  string checksum = 3;            // Expected hash for verification
-}
-message ReplicateChunkResponse {
-  bool accept = 1;                // Accept to receive chunk or not
-  string message = 2;             // Message to deliver with accept
-  string session_id = 3;          // Unique ID for the streaming session
-}
 
 message ChunkDataStream {
   string session_id = 1;
