@@ -48,7 +48,7 @@ flowchart LR
 * **DataNode** – stores chunks on local disk, streams data via gRPC, and replicates to peers.  
 * **Client** – CLI / SDK. Splits files, uploads chunks in parallel, confirms upload.
 
-Replication is currently **N = 1 primary + 1 replica** but is configurable.
+Replication default is **factor 3 → 1 primary + 2 replicas** (constant `N_REPLICAS` in `datanode/server.go`) but it is fully configurable via environment or config file.
 
 ## Feature set (implemented)
 
@@ -58,6 +58,8 @@ Replication is currently **N = 1 primary + 1 replica** but is configurable.
 • Heart-beat & node health tracking  
 • Automatic re-replication on write  
 • Integration test-bed with `docker-compose` spinning up 1 × Coordinator + 6 × DataNodes
+• Shared `common.Streamer` abstraction – single implementation used by client uploads *and* DataNode-to-DataNode replication
+• Extended integration-test matrix exercising multiple file sizes (1 MB → 1 GB) and chunk sizes (16 MB → 512 MB)
 
 ## Roadmap
 

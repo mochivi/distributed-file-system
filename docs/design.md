@@ -38,7 +38,10 @@ flowchart LR
 
 * **Coordinator** – Stateless service that maintains metadata only: file paths, chunk-to-node mapping and cluster membership / health.  It never stores file bytes.
 * **DataNode** – Stores chunk bytes on local disk, streams them via gRPC and replicates to sibling nodes.
-* **Client SDK / CLI** – Splits files into chunks, orchestrates uploads/downloads in parallel, and confirms uploads.
+* **Client SDK / CLI** – Splits files into chunks, orchestrates uploads/downloads in parallel, and confirms uploads.  
+  All streaming logic (chunk framing, back-pressure, retries) is implemented once in a reusable component **`common.Streamer`** and reused by both the client and DataNode replication paths.
+
+*Default replication factor today is 3 (1 primary + 2 replicas) but it is configurable via node and coordinator config.*
 
 ---
 
@@ -68,8 +71,8 @@ Steps in detail:
 
 1. **UploadRequest** – Client sends path, size & optional chunk size to `Coordinator.UploadFile`.
 2. **Chunk plan** – Coordinator shards the file logically and picks a *primary* and *n-1 replicas* for each chunk using the pluggable `NodeSelector`.
-3. **StoreChunk (stream)** – Client streams the chunk to the primary DataNode (`StoreChunk`). The node validates checksum and persists to disk.
-4. **ReplicateChunk (stream)** – Primary opens parallel bidirectional streams to peer DataNodes. Each frame carries offset, checksum & `isFinal`. Peers ACK incrementally enabling back-pressure.
+3. **StoreChunk (stream)** – Client streams the chunk to the primary DataNode (`StoreChunk`) using `common.Streamer`. The node validates checksum and persists to disk.
+4. **ReplicateChunk (stream)** – Primary opens parallel bidirectional streams to peer DataNodes using the **same `common.Streamer` implementation**. Each frame carries offset, checksum & `isFinal`. Peers ACK incrementally enabling back-pressure.
 5. **ConfirmUpload** – Once all chunks are replicated, the client finalises the session so the coordinator can commit the metadata atomically.
 
 ---
