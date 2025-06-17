@@ -293,6 +293,7 @@ type DownloadResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	FileInfo       *FileInfo              `protobuf:"bytes,1,opt,name=file_info,json=fileInfo,proto3" json:"file_info,omitempty"`
 	ChunkLocations []*ChunkLocation       `protobuf:"bytes,2,rep,name=chunk_locations,json=chunkLocations,proto3" json:"chunk_locations,omitempty"`
+	SessionId      string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -339,6 +340,13 @@ func (x *DownloadResponse) GetChunkLocations() []*ChunkLocation {
 		return x.ChunkLocations
 	}
 	return nil
+}
+
+func (x *DownloadResponse) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
 }
 
 // Delete file request/response
@@ -1072,10 +1080,12 @@ const file_coordinator_proto_rawDesc = "" +
 	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12%\n" +
 	"\x04node\x18\x02 \x01(\v2\x11.dfs.DataNodeInfoR\x04node\"%\n" +
 	"\x0fDownloadRequest\x12\x12\n" +
-	"\x04path\x18\x01 \x01(\tR\x04path\"{\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\"\x9a\x01\n" +
 	"\x10DownloadResponse\x12*\n" +
 	"\tfile_info\x18\x01 \x01(\v2\r.dfs.FileInfoR\bfileInfo\x12;\n" +
-	"\x0fchunk_locations\x18\x02 \x03(\v2\x12.dfs.ChunkLocationR\x0echunkLocations\"#\n" +
+	"\x0fchunk_locations\x18\x02 \x03(\v2\x12.dfs.ChunkLocationR\x0echunkLocations\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\"#\n" +
 	"\rDeleteRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"D\n" +
 	"\x0eDeleteResponse\x12\x18\n" +

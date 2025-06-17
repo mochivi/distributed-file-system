@@ -92,8 +92,9 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 
 	c.logger.Debug("Replying to client with chunk locations", slog.Int("num_chunks", len(chunkLocations)))
 	return DownloadResponse{
-		fileInfo:       *fileInfo,
-		chunkLocations: chunkLocations,
+		FileInfo:       *fileInfo,
+		ChunkLocations: chunkLocations,
+		SessionID:      uuid.NewString(), // TODO: this should be a session id that is used to track the download
 	}.ToProto(), nil
 }
 

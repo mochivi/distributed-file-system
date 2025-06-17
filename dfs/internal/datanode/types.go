@@ -12,19 +12,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const (
-	DEFAULT_REPLICAS = 3
-)
-
-type SessionStatus int
-
-const (
-	SessionActive SessionStatus = iota
-	SessionCompleted
-	SessionFailed
-	SessionExpired
-)
-
 // Implements the proto.DataNodeServiceServer interface
 type DataNodeServer struct {
 	proto.UnimplementedDataNodeServiceServer

@@ -13,6 +13,15 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
+type SessionStatus int
+
+const (
+	SessionActive SessionStatus = iota
+	SessionCompleted
+	SessionFailed
+	SessionExpired
+)
+
 // SessionManager handles currently open chunk streaming sessions with clients
 type SessionManager struct {
 	sessions map[string]*StreamingSession
@@ -34,7 +43,7 @@ type StreamingSession struct {
 	RunningChecksum hash.Hash // Running checksum calculation
 
 	// Concurrency control
-	mutex  sync.RWMutex
+	// mutex  sync.RWMutex
 	Status SessionStatus
 
 	// scoped logger for this session
@@ -85,7 +94,7 @@ func (sm *SessionManager) ExistsForChunk(chunkID string) bool {
 
 // DataNode creates and stores a session
 func (s *DataNodeServer) createStreamingSession(sessionId string, chunkMeta common.ChunkMeta, logger *slog.Logger) error {
-	streamLogger := logging.OperationLogger(logger, "create_streaming_session", slog.String("session_id", sessionId))
+	streamLogger := logging.OperationLogger(logger, "chunk_streaming_session", slog.String("session_id", sessionId))
 	session := &StreamingSession{
 		SessionID:       sessionId,
 		ChunkMeta:       chunkMeta,
@@ -103,19 +112,19 @@ func (s *DataNodeServer) createStreamingSession(sessionId string, chunkMeta comm
 }
 
 // DataNode retrieves the streaming session
-func (s *DataNodeServer) getStreamingSession(sessionId string) *StreamingSession {
+func (s *DataNodeServer) getStreamingSession(sessionId string) (*StreamingSession, bool) {
 	session, exists := s.sessionManager.Load(sessionId)
 	if !exists {
-		return nil
+		return nil, false
 	}
 
 	// Check if expired
 	if time.Now().After(session.ExpiresAt) {
 		s.sessionManager.Delete(sessionId)
-		return nil
+		return nil, false
 	}
 
 	session.logger.Debug("Streaming session retrieved")
 
-	return session
+	return session, true
 }

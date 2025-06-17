@@ -7,22 +7,27 @@ option go_package = "pkg/proto";
 import "common.proto";
 
 service DataNodeService {
-  // Hand-shake definitions from uploader (client or other DataNode)
-  // All operations follow a 2 step protocol -> first prepare -> stream data
-  rpc PrepareChunkUpload(ChunkMeta) returns (ChunkUploadReady);
+  // Hand-shake definitions from peer (upload and download, client or other DataNode) 
+  // Both operations follow a 2 step protocol: prepare -> stream data
+  rpc PrepareChunkUpload(ChunkMeta) returns (NodeReady);
+  rpc PrepareChunkDownload(DownloadChunkRequest) returns (NodeReady);
 
-  // Chunk operations
-  rpc RetrieveChunk(RetrieveChunkRequest) returns (RetrieveChunkResponse);
+  // Bidirectional stream for uploading chunk data to a node.
+  // The client streams data, the server streams back acknowledgements.
+  rpc UploadChunkStream(stream ChunkDataStream) returns (stream ChunkDataAck);
+  
+  // Server-side stream for downloading chunk data from a node.
+  // The client sends a single request, the server streams back data.
+  rpc DownloadChunkStream(DownloadStreamRequest) returns (stream ChunkDataStream);
+
+  // Unary operation to delete a chunk
   rpc DeleteChunk(DeleteChunkRequest) returns (DeleteChunkResponse);
 
-  // Receiving chunk data from stream
-  rpc StreamChunk(stream ChunkDataStream) returns (stream ChunkDataAck);
-  
   // Health check
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
-// Hand-shake from uploader (client or other DataNode)
+// Hand-shake from uploader peer (client or other DataNode)
 message ChunkMeta {
   string chunk_id   = 1;
   int64  chunk_size = 2;
@@ -33,19 +38,18 @@ message ChunkMeta {
   bool    propagate = 4;
 }
 
-message ChunkUploadReady {
+message NodeReady {
   bool   accept     = 1;
   string message    = 2;
   string session_id = 3;
 }
 
-// Retrieve chunk request/response
-message RetrieveChunkRequest {
+// PrepareChunkDownload request/response
+message DownloadChunkRequest {
   string chunk_id = 1;
 }
-message RetrieveChunkResponse {
-  bytes data = 1;
-  string checksum = 2;
+message DownloadStreamRequest {
+  string session_id = 1;
 }
 
 // Delete chunk request/response
@@ -56,7 +60,6 @@ message DeleteChunkResponse {
   bool success = 1;
   string message = 2;
 }
-
 
 message ChunkDataStream {
   string session_id = 1;

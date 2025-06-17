@@ -72,7 +72,7 @@ func TestClientUpload(t *testing.T) {
 			}
 
 			uploadAt := filepath.Join(baseUploadAt, tt.filepath, strconv.Itoa(rand.Intn(1000000)))
-			if _, err := client.UploadFile(context.Background(), file, uploadAt, defaultChunkSize); err != nil {
+			if err := client.UploadFile(context.Background(), file, uploadAt, defaultChunkSize); err != nil {
 				t.Errorf("failed to upload file: %v", err)
 			}
 			file.Close()
@@ -120,7 +120,7 @@ func TestClientUpload(t *testing.T) {
 			}
 
 			uploadAt := filepath.Join(baseUploadAt, tt.filepath, strconv.Itoa(rand.Intn(1000000)))
-			if _, err := client.UploadFile(context.Background(), file, uploadAt, tt.chunkSize); err != nil {
+			if err := client.UploadFile(context.Background(), file, uploadAt, tt.chunkSize); err != nil {
 				t.Errorf("failed to upload file: %v", err)
 			}
 

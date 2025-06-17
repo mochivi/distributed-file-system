@@ -29,56 +29,49 @@ func (cm ChunkMeta) ToProto() *proto.ChunkMeta {
 }
 
 // Coordinates the chunk upload process, if accept is true, the peer can start streaming the chunk data
-type ChunkUploadReady struct {
+type NodeReady struct {
 	Accept    bool
 	Message   string
 	SessionID string
 }
 
-func ChunkUploadReadyFromProto(pb *proto.ChunkUploadReady) ChunkUploadReady {
-	return ChunkUploadReady{
+func NodeReadyFromProto(pb *proto.NodeReady) NodeReady {
+	return NodeReady{
 		Accept:    pb.Accept,
 		Message:   pb.Message,
 		SessionID: pb.SessionId,
 	}
 }
 
-func (cuu ChunkUploadReady) ToProto() *proto.ChunkUploadReady {
-	return &proto.ChunkUploadReady{
+func (cuu NodeReady) ToProto() *proto.NodeReady {
+	return &proto.NodeReady{
 		Accept:    cuu.Accept,
 		Message:   cuu.Message,
 		SessionId: cuu.SessionID,
 	}
 }
 
-type RetrieveChunkRequest struct {
+type DownloadChunkRequest struct {
 	ChunkID string
 }
 
-func RetrieveChunkRequestFromProto(pb *proto.RetrieveChunkRequest) RetrieveChunkRequest {
-	return RetrieveChunkRequest{ChunkID: pb.ChunkId}
+func DownloadChunkRequestFromProto(pb *proto.DownloadChunkRequest) DownloadChunkRequest {
+	return DownloadChunkRequest{ChunkID: pb.ChunkId}
 }
-func (rtr RetrieveChunkRequest) ToProto() *proto.RetrieveChunkRequest {
-	return &proto.RetrieveChunkRequest{ChunkId: rtr.ChunkID}
-}
-
-type RetrieveChunkResponse struct {
-	Data     []byte
-	Checksum string
+func (r DownloadChunkRequest) ToProto() *proto.DownloadChunkRequest {
+	return &proto.DownloadChunkRequest{ChunkId: r.ChunkID}
 }
 
-func RetrieveChunkResponseFromProto(pb *proto.RetrieveChunkResponse) RetrieveChunkResponse {
-	return RetrieveChunkResponse{
-		Data:     pb.Data,
-		Checksum: pb.Checksum,
-	}
+type DownloadStreamRequest struct {
+	SessionID string
 }
 
-func (rcr RetrieveChunkResponse) ToProto() *proto.RetrieveChunkResponse {
-	return &proto.RetrieveChunkResponse{
-		Data:     rcr.Data,
-		Checksum: rcr.Checksum,
-	}
+func DownloadStreamRequestFromProto(pb *proto.DownloadStreamRequest) DownloadStreamRequest {
+	return DownloadStreamRequest{SessionID: pb.SessionId}
+}
+
+func (r DownloadStreamRequest) ToProto() *proto.DownloadStreamRequest {
+	return &proto.DownloadStreamRequest{SessionId: r.SessionID}
 }
 
 type DeleteChunkRequest struct {

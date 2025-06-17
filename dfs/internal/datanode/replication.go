@@ -123,7 +123,7 @@ func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeCli
 	clientLogger.Debug("Replication request accepted")
 
 	// Create stream to send the chunk data
-	stream, err := client.StreamChunk(ctx)
+	stream, err := client.UploadChunkStream(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create stream for chunk %s: %v", chunkMeta.ChunkID, err)
 	}

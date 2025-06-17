@@ -47,6 +47,7 @@ message DownloadRequest {
 message DownloadResponse {
   FileInfo file_info = 1;
   repeated ChunkLocation chunk_locations = 2;
+  string session_id = 3;
 }
 
 // Delete file request/response

@@ -10,23 +10,23 @@ import (
 
 // client -> node
 // This is the primary node that is receiving the chunk
-func (c *DataNodeClient) StoreChunk(ctx context.Context, req common.ChunkMeta, opts ...grpc.CallOption) (common.ChunkUploadReady, error) {
+func (c *DataNodeClient) StoreChunk(ctx context.Context, req common.ChunkMeta, opts ...grpc.CallOption) (common.NodeReady, error) {
 	resp, err := c.client.PrepareChunkUpload(ctx, req.ToProto(), opts...)
 	if err != nil {
 		err = handlegRPCError(err, req.ChunkID)
-		return common.ChunkUploadReady{}, err
+		return common.NodeReady{}, err
 	}
-	return common.ChunkUploadReadyFromProto(resp), nil
+	return common.NodeReadyFromProto(resp), nil
 }
 
 // client -> node
-func (c *DataNodeClient) RetrieveChunk(ctx context.Context, req common.RetrieveChunkRequest, opts ...grpc.CallOption) (common.RetrieveChunkResponse, error) {
-	resp, err := c.client.RetrieveChunk(ctx, req.ToProto(), opts...)
+func (c *DataNodeClient) PrepareChunkDownload(ctx context.Context, req common.DownloadChunkRequest, opts ...grpc.CallOption) (common.NodeReady, error) {
+	resp, err := c.client.PrepareChunkDownload(ctx, req.ToProto(), opts...)
 	if err != nil {
 		err = handlegRPCError(err, req.ChunkID)
-		return common.RetrieveChunkResponse{}, err
+		return common.NodeReady{}, err
 	}
-	return common.RetrieveChunkResponseFromProto(resp), nil
+	return common.NodeReadyFromProto(resp), nil
 }
 
 // client -> node
@@ -42,18 +42,23 @@ func (c *DataNodeClient) DeleteChunk(ctx context.Context, req common.DeleteChunk
 // node -> node
 // This is a replica node that is receiving the chunk
 // This is a copy of StoreChunk, but with a different method name
-func (c *DataNodeClient) ReplicateChunk(ctx context.Context, req common.ChunkMeta, opts ...grpc.CallOption) (common.ChunkUploadReady, error) {
+func (c *DataNodeClient) ReplicateChunk(ctx context.Context, req common.ChunkMeta, opts ...grpc.CallOption) (common.NodeReady, error) {
 	resp, err := c.client.PrepareChunkUpload(ctx, req.ToProto(), opts...)
 	if err != nil {
 		err = handlegRPCError(err, req.ChunkID)
-		return common.ChunkUploadReady{}, err
+		return common.NodeReady{}, err
 	}
-	return common.ChunkUploadReadyFromProto(resp), nil
+	return common.NodeReadyFromProto(resp), nil
 }
 
 // node -> node
-func (c *DataNodeClient) StreamChunk(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck], error) {
-	return c.client.StreamChunk(ctx, opts...)
+func (c *DataNodeClient) UploadChunkStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck], error) {
+	return c.client.UploadChunkStream(ctx, opts...)
+}
+
+// node -> node
+func (c *DataNodeClient) DownloadChunkStream(ctx context.Context, req common.DownloadStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[proto.ChunkDataStream], error) {
+	return c.client.DownloadChunkStream(ctx, req.ToProto(), opts...)
 }
 
 // node -> node
