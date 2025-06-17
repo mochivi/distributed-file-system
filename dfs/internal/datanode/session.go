@@ -35,7 +35,8 @@ type StreamingSession struct {
 	ExpiresAt time.Time
 
 	// Chunk metadata
-	common.ChunkMeta
+	common.ChunkInfo
+	Propagate bool
 
 	// Runtime state
 	BytesReceived   int64
@@ -58,8 +59,8 @@ func (sm *SessionManager) Store(sessionID string, session *StreamingSession) err
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	if sm.ExistsForChunk(session.ChunkID) {
-		return fmt.Errorf("session for chunk %s already exists", session.ChunkID)
+	if sm.ExistsForChunk(session.ChunkInfo.ID) {
+		return fmt.Errorf("session for chunk %s already exists", session.ChunkInfo.ID)
 	}
 
 	sm.sessions[sessionID] = session
@@ -85,7 +86,7 @@ func (sm *SessionManager) Delete(sessionID string) {
 // Temporary solution to check if a chunk is already being streamed, stops duplicate requests
 func (sm *SessionManager) ExistsForChunk(chunkID string) bool {
 	for _, session := range sm.sessions {
-		if session.ChunkID == chunkID {
+		if session.ChunkInfo.ID == chunkID {
 			return true
 		}
 	}
@@ -93,13 +94,14 @@ func (sm *SessionManager) ExistsForChunk(chunkID string) bool {
 }
 
 // DataNode creates and stores a session
-func (s *DataNodeServer) createStreamingSession(sessionId string, chunkMeta common.ChunkMeta, logger *slog.Logger) error {
+func (s *DataNodeServer) createStreamingSession(sessionId string, chunkInfo common.ChunkInfo, propagate bool, logger *slog.Logger) error {
 	streamLogger := logging.OperationLogger(logger, "chunk_streaming_session", slog.String("session_id", sessionId))
 	session := &StreamingSession{
 		SessionID:       sessionId,
-		ChunkMeta:       chunkMeta,
+		ChunkInfo:       chunkInfo,
 		CreatedAt:       time.Now(),
 		ExpiresAt:       time.Now().Add(s.Config.Session.SessionTimeout),
+		Propagate:       propagate,
 		Status:          SessionActive,
 		RunningChecksum: sha256.New(),
 		logger:          streamLogger,

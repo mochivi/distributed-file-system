@@ -62,6 +62,7 @@ func (fi FileInfo) ToProto() *proto.FileInfo {
 // ChunkInfo + proto conversions
 type ChunkInfo struct {
 	ID       string
+	Index    int // Index of the chunk in the file
 	Size     int
 	Replicas []*DataNodeInfo // DataNode IDs storing this chunk
 	Checksum string

@@ -2,29 +2,22 @@ package common
 
 import "github.com/mochivi/distributed-file-system/pkg/proto"
 
-// Coordinates the chunk upload process, if propagate is true, the peer must replicate the chunk to other nodes
-type ChunkMeta struct {
-	ChunkID   string
-	ChunkSize int
-	Checksum  string
+type UploadChunkRequest struct {
+	ChunkInfo ChunkInfo
 	Propagate bool
 }
 
-func ChunkMetaFromProto(pb *proto.ChunkMeta) ChunkMeta {
-	return ChunkMeta{
-		ChunkID:   pb.ChunkId,
-		ChunkSize: int(pb.ChunkSize),
-		Checksum:  pb.Checksum,
+func UploadChunkRequestFromProto(pb *proto.UploadChunkRequest) UploadChunkRequest {
+	return UploadChunkRequest{
+		ChunkInfo: ChunkInfoFromProto(pb.ChunkInfo),
 		Propagate: pb.Propagate,
 	}
 }
 
-func (cm ChunkMeta) ToProto() *proto.ChunkMeta {
-	return &proto.ChunkMeta{
-		ChunkId:   cm.ChunkID,
-		ChunkSize: int64(cm.ChunkSize),
-		Checksum:  cm.Checksum,
-		Propagate: cm.Propagate,
+func (ucr UploadChunkRequest) ToProto() *proto.UploadChunkRequest {
+	return &proto.UploadChunkRequest{
+		ChunkInfo: ucr.ChunkInfo.ToProto(),
+		Propagate: ucr.Propagate,
 	}
 }
 

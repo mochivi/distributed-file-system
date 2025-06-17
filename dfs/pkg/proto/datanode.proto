@@ -9,7 +9,7 @@ import "common.proto";
 service DataNodeService {
   // Hand-shake definitions from peer (upload and download, client or other DataNode) 
   // Both operations follow a 2 step protocol: prepare -> stream data
-  rpc PrepareChunkUpload(ChunkMeta) returns (NodeReady);
+  rpc PrepareChunkUpload(UploadChunkRequest) returns (NodeReady);
   rpc PrepareChunkDownload(DownloadChunkRequest) returns (NodeReady);
 
   // Bidirectional stream for uploading chunk data to a node.
@@ -27,15 +27,12 @@ service DataNodeService {
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
-// Hand-shake from uploader peer (client or other DataNode)
-message ChunkMeta {
-  string chunk_id   = 1;
-  int64  chunk_size = 2;
-  string checksum   = 3;
-
+message UploadChunkRequest {
+  ChunkInfo chunk_info = 1;
+  
   // true  => receiver must replicate further (uploader is a client -> primary)
   // false => receiver just stores the chunk (uploader is another DataNode)
-  bool    propagate = 4;
+  bool propagate = 2;
 }
 
 message NodeReady {

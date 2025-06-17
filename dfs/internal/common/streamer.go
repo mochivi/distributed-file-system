@@ -38,7 +38,7 @@ type StreamChunkParams struct {
 	SessionID string
 
 	// Chunk data
-	ChunkMeta ChunkMeta
+	ChunkInfo ChunkInfo
 	Data      []byte
 }
 
@@ -83,7 +83,7 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 			// Create stream message
 			streamMsg := &ChunkDataStream{
 				SessionID:       params.SessionID,
-				ChunkID:         params.ChunkMeta.ChunkID,
+				ChunkID:         params.ChunkInfo.ID,
 				Data:            chunkData,
 				Offset:          offset,
 				IsFinal:         isFinal,
@@ -172,9 +172,9 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 
 	// Validate if checksum after all partial sections are added up still matches the original
 	calculatedChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
-	if calculatedChecksum != params.ChunkMeta.Checksum {
+	if calculatedChecksum != params.ChunkInfo.Checksum {
 		return fmt.Errorf("request checksum mismatch: expected %s, calculated %s",
-			params.ChunkMeta.Checksum, calculatedChecksum)
+			params.ChunkInfo.Checksum, calculatedChecksum)
 	}
 
 	if !finalAck.Success {

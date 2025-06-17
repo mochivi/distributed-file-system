@@ -21,33 +21,30 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Hand-shake from uploader peer (client or other DataNode)
-type ChunkMeta struct {
+type UploadChunkRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
-	ChunkId   string                 `protobuf:"bytes,1,opt,name=chunk_id,json=chunkId,proto3" json:"chunk_id,omitempty"`
-	ChunkSize int64                  `protobuf:"varint,2,opt,name=chunk_size,json=chunkSize,proto3" json:"chunk_size,omitempty"`
-	Checksum  string                 `protobuf:"bytes,3,opt,name=checksum,proto3" json:"checksum,omitempty"`
+	ChunkInfo *ChunkInfo             `protobuf:"bytes,1,opt,name=chunk_info,json=chunkInfo,proto3" json:"chunk_info,omitempty"`
 	// true  => receiver must replicate further (uploader is a client -> primary)
 	// false => receiver just stores the chunk (uploader is another DataNode)
-	Propagate     bool `protobuf:"varint,4,opt,name=propagate,proto3" json:"propagate,omitempty"`
+	Propagate     bool `protobuf:"varint,2,opt,name=propagate,proto3" json:"propagate,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ChunkMeta) Reset() {
-	*x = ChunkMeta{}
+func (x *UploadChunkRequest) Reset() {
+	*x = UploadChunkRequest{}
 	mi := &file_datanode_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ChunkMeta) String() string {
+func (x *UploadChunkRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ChunkMeta) ProtoMessage() {}
+func (*UploadChunkRequest) ProtoMessage() {}
 
-func (x *ChunkMeta) ProtoReflect() protoreflect.Message {
+func (x *UploadChunkRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_datanode_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -59,33 +56,19 @@ func (x *ChunkMeta) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ChunkMeta.ProtoReflect.Descriptor instead.
-func (*ChunkMeta) Descriptor() ([]byte, []int) {
+// Deprecated: Use UploadChunkRequest.ProtoReflect.Descriptor instead.
+func (*UploadChunkRequest) Descriptor() ([]byte, []int) {
 	return file_datanode_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ChunkMeta) GetChunkId() string {
+func (x *UploadChunkRequest) GetChunkInfo() *ChunkInfo {
 	if x != nil {
-		return x.ChunkId
+		return x.ChunkInfo
 	}
-	return ""
+	return nil
 }
 
-func (x *ChunkMeta) GetChunkSize() int64 {
-	if x != nil {
-		return x.ChunkSize
-	}
-	return 0
-}
-
-func (x *ChunkMeta) GetChecksum() string {
-	if x != nil {
-		return x.Checksum
-	}
-	return ""
-}
-
-func (x *ChunkMeta) GetPropagate() bool {
+func (x *UploadChunkRequest) GetPropagate() bool {
 	if x != nil {
 		return x.Propagate
 	}
@@ -583,13 +566,11 @@ var File_datanode_proto protoreflect.FileDescriptor
 
 const file_datanode_proto_rawDesc = "" +
 	"\n" +
-	"\x0edatanode.proto\x12\x03dfs\x1a\fcommon.proto\"\x7f\n" +
-	"\tChunkMeta\x12\x19\n" +
-	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12\x1d\n" +
+	"\x0edatanode.proto\x12\x03dfs\x1a\fcommon.proto\"a\n" +
+	"\x12UploadChunkRequest\x12-\n" +
 	"\n" +
-	"chunk_size\x18\x02 \x01(\x03R\tchunkSize\x12\x1a\n" +
-	"\bchecksum\x18\x03 \x01(\tR\bchecksum\x12\x1c\n" +
-	"\tpropagate\x18\x04 \x01(\bR\tpropagate\"\\\n" +
+	"chunk_info\x18\x01 \x01(\v2\x0e.dfs.ChunkInfoR\tchunkInfo\x12\x1c\n" +
+	"\tpropagate\x18\x02 \x01(\bR\tpropagate\"\\\n" +
 	"\tNodeReady\x12\x16\n" +
 	"\x06accept\x18\x01 \x01(\bR\x06accept\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1d\n" +
@@ -622,9 +603,9 @@ const file_datanode_proto_rawDesc = "" +
 	"\x0eready_for_next\x18\x05 \x01(\bR\freadyForNext\"\x14\n" +
 	"\x12HealthCheckRequest\"@\n" +
 	"\x13HealthCheckResponse\x12)\n" +
-	"\x06status\x18\x01 \x01(\v2\x11.dfs.HealthStatusR\x06status2\x9b\x03\n" +
-	"\x0fDataNodeService\x124\n" +
-	"\x12PrepareChunkUpload\x12\x0e.dfs.ChunkMeta\x1a\x0e.dfs.NodeReady\x12A\n" +
+	"\x06status\x18\x01 \x01(\v2\x11.dfs.HealthStatusR\x06status2\xa4\x03\n" +
+	"\x0fDataNodeService\x12=\n" +
+	"\x12PrepareChunkUpload\x12\x17.dfs.UploadChunkRequest\x1a\x0e.dfs.NodeReady\x12A\n" +
 	"\x14PrepareChunkDownload\x12\x19.dfs.DownloadChunkRequest\x1a\x0e.dfs.NodeReady\x12@\n" +
 	"\x11UploadChunkStream\x12\x14.dfs.ChunkDataStream\x1a\x11.dfs.ChunkDataAck(\x010\x01\x12I\n" +
 	"\x13DownloadChunkStream\x12\x1a.dfs.DownloadStreamRequest\x1a\x14.dfs.ChunkDataStream0\x01\x12@\n" +
@@ -645,7 +626,7 @@ func file_datanode_proto_rawDescGZIP() []byte {
 
 var file_datanode_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_datanode_proto_goTypes = []any{
-	(*ChunkMeta)(nil),             // 0: dfs.ChunkMeta
+	(*UploadChunkRequest)(nil),    // 0: dfs.UploadChunkRequest
 	(*NodeReady)(nil),             // 1: dfs.NodeReady
 	(*DownloadChunkRequest)(nil),  // 2: dfs.DownloadChunkRequest
 	(*DownloadStreamRequest)(nil), // 3: dfs.DownloadStreamRequest
@@ -655,27 +636,29 @@ var file_datanode_proto_goTypes = []any{
 	(*ChunkDataAck)(nil),          // 7: dfs.ChunkDataAck
 	(*HealthCheckRequest)(nil),    // 8: dfs.HealthCheckRequest
 	(*HealthCheckResponse)(nil),   // 9: dfs.HealthCheckResponse
-	(*HealthStatus)(nil),          // 10: dfs.HealthStatus
+	(*ChunkInfo)(nil),             // 10: dfs.ChunkInfo
+	(*HealthStatus)(nil),          // 11: dfs.HealthStatus
 }
 var file_datanode_proto_depIdxs = []int32{
-	10, // 0: dfs.HealthCheckResponse.status:type_name -> dfs.HealthStatus
-	0,  // 1: dfs.DataNodeService.PrepareChunkUpload:input_type -> dfs.ChunkMeta
-	2,  // 2: dfs.DataNodeService.PrepareChunkDownload:input_type -> dfs.DownloadChunkRequest
-	6,  // 3: dfs.DataNodeService.UploadChunkStream:input_type -> dfs.ChunkDataStream
-	3,  // 4: dfs.DataNodeService.DownloadChunkStream:input_type -> dfs.DownloadStreamRequest
-	4,  // 5: dfs.DataNodeService.DeleteChunk:input_type -> dfs.DeleteChunkRequest
-	8,  // 6: dfs.DataNodeService.HealthCheck:input_type -> dfs.HealthCheckRequest
-	1,  // 7: dfs.DataNodeService.PrepareChunkUpload:output_type -> dfs.NodeReady
-	1,  // 8: dfs.DataNodeService.PrepareChunkDownload:output_type -> dfs.NodeReady
-	7,  // 9: dfs.DataNodeService.UploadChunkStream:output_type -> dfs.ChunkDataAck
-	6,  // 10: dfs.DataNodeService.DownloadChunkStream:output_type -> dfs.ChunkDataStream
-	5,  // 11: dfs.DataNodeService.DeleteChunk:output_type -> dfs.DeleteChunkResponse
-	9,  // 12: dfs.DataNodeService.HealthCheck:output_type -> dfs.HealthCheckResponse
-	7,  // [7:13] is the sub-list for method output_type
-	1,  // [1:7] is the sub-list for method input_type
-	1,  // [1:1] is the sub-list for extension type_name
-	1,  // [1:1] is the sub-list for extension extendee
-	0,  // [0:1] is the sub-list for field type_name
+	10, // 0: dfs.UploadChunkRequest.chunk_info:type_name -> dfs.ChunkInfo
+	11, // 1: dfs.HealthCheckResponse.status:type_name -> dfs.HealthStatus
+	0,  // 2: dfs.DataNodeService.PrepareChunkUpload:input_type -> dfs.UploadChunkRequest
+	2,  // 3: dfs.DataNodeService.PrepareChunkDownload:input_type -> dfs.DownloadChunkRequest
+	6,  // 4: dfs.DataNodeService.UploadChunkStream:input_type -> dfs.ChunkDataStream
+	3,  // 5: dfs.DataNodeService.DownloadChunkStream:input_type -> dfs.DownloadStreamRequest
+	4,  // 6: dfs.DataNodeService.DeleteChunk:input_type -> dfs.DeleteChunkRequest
+	8,  // 7: dfs.DataNodeService.HealthCheck:input_type -> dfs.HealthCheckRequest
+	1,  // 8: dfs.DataNodeService.PrepareChunkUpload:output_type -> dfs.NodeReady
+	1,  // 9: dfs.DataNodeService.PrepareChunkDownload:output_type -> dfs.NodeReady
+	7,  // 10: dfs.DataNodeService.UploadChunkStream:output_type -> dfs.ChunkDataAck
+	6,  // 11: dfs.DataNodeService.DownloadChunkStream:output_type -> dfs.ChunkDataStream
+	5,  // 12: dfs.DataNodeService.DeleteChunk:output_type -> dfs.DeleteChunkResponse
+	9,  // 13: dfs.DataNodeService.HealthCheck:output_type -> dfs.HealthCheckResponse
+	8,  // [8:14] is the sub-list for method output_type
+	2,  // [2:8] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_datanode_proto_init() }

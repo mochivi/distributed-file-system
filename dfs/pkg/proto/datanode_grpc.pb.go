@@ -33,7 +33,7 @@ const (
 type DataNodeServiceClient interface {
 	// Hand-shake definitions from peer (upload and download, client or other DataNode)
 	// Both operations follow a 2 step protocol: prepare -> stream data
-	PrepareChunkUpload(ctx context.Context, in *ChunkMeta, opts ...grpc.CallOption) (*NodeReady, error)
+	PrepareChunkUpload(ctx context.Context, in *UploadChunkRequest, opts ...grpc.CallOption) (*NodeReady, error)
 	PrepareChunkDownload(ctx context.Context, in *DownloadChunkRequest, opts ...grpc.CallOption) (*NodeReady, error)
 	// Bidirectional stream for uploading chunk data to a node.
 	// The client streams data, the server streams back acknowledgements.
@@ -55,7 +55,7 @@ func NewDataNodeServiceClient(cc grpc.ClientConnInterface) DataNodeServiceClient
 	return &dataNodeServiceClient{cc}
 }
 
-func (c *dataNodeServiceClient) PrepareChunkUpload(ctx context.Context, in *ChunkMeta, opts ...grpc.CallOption) (*NodeReady, error) {
+func (c *dataNodeServiceClient) PrepareChunkUpload(ctx context.Context, in *UploadChunkRequest, opts ...grpc.CallOption) (*NodeReady, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(NodeReady)
 	err := c.cc.Invoke(ctx, DataNodeService_PrepareChunkUpload_FullMethodName, in, out, cOpts...)
@@ -133,7 +133,7 @@ func (c *dataNodeServiceClient) HealthCheck(ctx context.Context, in *HealthCheck
 type DataNodeServiceServer interface {
 	// Hand-shake definitions from peer (upload and download, client or other DataNode)
 	// Both operations follow a 2 step protocol: prepare -> stream data
-	PrepareChunkUpload(context.Context, *ChunkMeta) (*NodeReady, error)
+	PrepareChunkUpload(context.Context, *UploadChunkRequest) (*NodeReady, error)
 	PrepareChunkDownload(context.Context, *DownloadChunkRequest) (*NodeReady, error)
 	// Bidirectional stream for uploading chunk data to a node.
 	// The client streams data, the server streams back acknowledgements.
@@ -155,7 +155,7 @@ type DataNodeServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedDataNodeServiceServer struct{}
 
-func (UnimplementedDataNodeServiceServer) PrepareChunkUpload(context.Context, *ChunkMeta) (*NodeReady, error) {
+func (UnimplementedDataNodeServiceServer) PrepareChunkUpload(context.Context, *UploadChunkRequest) (*NodeReady, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PrepareChunkUpload not implemented")
 }
 func (UnimplementedDataNodeServiceServer) PrepareChunkDownload(context.Context, *DownloadChunkRequest) (*NodeReady, error) {
@@ -195,7 +195,7 @@ func RegisterDataNodeServiceServer(s grpc.ServiceRegistrar, srv DataNodeServiceS
 }
 
 func _DataNodeService_PrepareChunkUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ChunkMeta)
+	in := new(UploadChunkRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func _DataNodeService_PrepareChunkUpload_Handler(srv interface{}, ctx context.Co
 		FullMethod: DataNodeService_PrepareChunkUpload_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DataNodeServiceServer).PrepareChunkUpload(ctx, req.(*ChunkMeta))
+		return srv.(DataNodeServiceServer).PrepareChunkUpload(ctx, req.(*UploadChunkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
