@@ -12,20 +12,20 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
-func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chunksize int) error {
+func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chunksize int) ([]common.ChunkInfo, error) {
 	logger := logging.ExtendLogger(c.logger, slog.String("operation", "upload_file"), slog.String("path", path))
 
 	// Stat the file to get the file info
 	fileInfo, err := file.Stat()
 	if err != nil {
 		logger.Error("Failed to stat file", slog.String("error", err.Error()))
-		return fmt.Errorf("failed to stat file: %w", err)
+		return nil, fmt.Errorf("failed to stat file: %w", err)
 	}
 
 	checksum, err := common.CalculateFileChecksum(file)
 	if err != nil {
 		logger.Error("Failed to calculate checksum", slog.String("error", err.Error()))
-		return fmt.Errorf("failed to calculate checksum")
+		return nil, fmt.Errorf("failed to calculate checksum")
 	}
 
 	uploadRequest := coordinator.UploadRequest{
@@ -38,7 +38,7 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 
 	uploadResponse, err := c.coordinatorClient.UploadFile(ctx, uploadRequest)
 	if err != nil {
-		return fmt.Errorf("failed to submit upload request: %w", err)
+		return nil, fmt.Errorf("failed to submit upload request: %w", err)
 	}
 	metadataSessionLogger := logging.ExtendLogger(logger, slog.String("metadata_session_id", uploadResponse.SessionID), slog.String("coordinator_id", c.coordinatorClient.Node.ID))
 	metadataSessionLogger.Info("Received UploadResponse")
@@ -53,7 +53,7 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 	})
 	chunkInfos, err := uploader.UploadFile(uploadCtx, file, uploadResponse.ChunkLocations, uploadResponse.SessionID, metadataSessionLogger)
 	if err != nil {
-		return fmt.Errorf("failed to upload file: %w", err)
+		return nil, fmt.Errorf("failed to upload file: %w", err)
 	}
 
 	// Confirm upload to coordinator with chunk location information
@@ -64,15 +64,15 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 	confirmUploadResponse, err := c.coordinatorClient.ConfirmUpload(ctx, confirmUploadRequest)
 	if err != nil {
 		metadataSessionLogger.Error("Failed to confirm upload", slog.String("error", err.Error()))
-		return fmt.Errorf("failed to confirm upload: %w", err)
+		return nil, fmt.Errorf("failed to confirm upload: %w", err)
 	}
 
 	if !confirmUploadResponse.Success {
 		metadataSessionLogger.Error("Failed to confirm upload", slog.String("message", confirmUploadResponse.Message))
-		return fmt.Errorf("failed to confirm upload")
+		return nil, fmt.Errorf("failed to confirm upload")
 	}
 
-	return nil
+	return chunkInfos, nil
 }
 
 func (c *Client) DownloadFile(ctx context.Context, path string) (string, error) {

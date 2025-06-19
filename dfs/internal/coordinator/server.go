@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"math/rand"
 
@@ -28,7 +29,7 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		chunkSize = c.config.ChunkSize * 1024 * 1024
 	}
 	numChunks := (req.Size + chunkSize - 1) / chunkSize
-	c.logger.Debug("File will be split into chunks", slog.Int("num_chunks", numChunks), slog.Int("chunk_size", chunkSize/(1024*1024)))
+	c.logger.Debug(fmt.Sprintf("File will be split into %d chunks of %dMB", numChunks, chunkSize/(1024*1024)))
 
 	// Get a list of the best nodes to upload to
 	nodes, err := c.nodeManager.SelectBestNodes(numChunks)
