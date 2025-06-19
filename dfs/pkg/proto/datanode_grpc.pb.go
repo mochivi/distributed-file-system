@@ -34,7 +34,7 @@ type DataNodeServiceClient interface {
 	// Hand-shake definitions from peer (upload and download, client or other DataNode)
 	// Both operations follow a 2 step protocol: prepare -> stream data
 	PrepareChunkUpload(ctx context.Context, in *UploadChunkRequest, opts ...grpc.CallOption) (*NodeReady, error)
-	PrepareChunkDownload(ctx context.Context, in *DownloadChunkRequest, opts ...grpc.CallOption) (*NodeReady, error)
+	PrepareChunkDownload(ctx context.Context, in *DownloadChunkRequest, opts ...grpc.CallOption) (*DownloadReady, error)
 	// Bidirectional stream for uploading chunk data to a node.
 	// The client streams data, the server streams back acknowledgements.
 	UploadChunkStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChunkDataStream, ChunkDataAck], error)
@@ -65,9 +65,9 @@ func (c *dataNodeServiceClient) PrepareChunkUpload(ctx context.Context, in *Uplo
 	return out, nil
 }
 
-func (c *dataNodeServiceClient) PrepareChunkDownload(ctx context.Context, in *DownloadChunkRequest, opts ...grpc.CallOption) (*NodeReady, error) {
+func (c *dataNodeServiceClient) PrepareChunkDownload(ctx context.Context, in *DownloadChunkRequest, opts ...grpc.CallOption) (*DownloadReady, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(NodeReady)
+	out := new(DownloadReady)
 	err := c.cc.Invoke(ctx, DataNodeService_PrepareChunkDownload_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ type DataNodeServiceServer interface {
 	// Hand-shake definitions from peer (upload and download, client or other DataNode)
 	// Both operations follow a 2 step protocol: prepare -> stream data
 	PrepareChunkUpload(context.Context, *UploadChunkRequest) (*NodeReady, error)
-	PrepareChunkDownload(context.Context, *DownloadChunkRequest) (*NodeReady, error)
+	PrepareChunkDownload(context.Context, *DownloadChunkRequest) (*DownloadReady, error)
 	// Bidirectional stream for uploading chunk data to a node.
 	// The client streams data, the server streams back acknowledgements.
 	UploadChunkStream(grpc.BidiStreamingServer[ChunkDataStream, ChunkDataAck]) error
@@ -158,7 +158,7 @@ type UnimplementedDataNodeServiceServer struct{}
 func (UnimplementedDataNodeServiceServer) PrepareChunkUpload(context.Context, *UploadChunkRequest) (*NodeReady, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PrepareChunkUpload not implemented")
 }
-func (UnimplementedDataNodeServiceServer) PrepareChunkDownload(context.Context, *DownloadChunkRequest) (*NodeReady, error) {
+func (UnimplementedDataNodeServiceServer) PrepareChunkDownload(context.Context, *DownloadChunkRequest) (*DownloadReady, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PrepareChunkDownload not implemented")
 }
 func (UnimplementedDataNodeServiceServer) UploadChunkStream(grpc.BidiStreamingServer[ChunkDataStream, ChunkDataAck]) error {

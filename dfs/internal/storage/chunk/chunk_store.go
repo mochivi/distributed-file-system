@@ -10,23 +10,27 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
 type ChunkDiskStorage struct {
-	config DiskStorageConfig
-	logger *slog.Logger
+	config     DiskStorageConfig
+	logger     *slog.Logger
+	serializer encoding.ChunkSerializer
 }
 
-func NewChunkDiskStorage(config DiskStorageConfig, logger *slog.Logger) (*ChunkDiskStorage, error) {
+func NewChunkDiskStorage(config DiskStorageConfig, serializer encoding.ChunkSerializer, logger *slog.Logger) (*ChunkDiskStorage, error) {
 	storageLogger := logging.ExtendLogger(logger, slog.String("component", "chunk_storage"))
 	if err := os.MkdirAll(config.RootDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create rootDir for chunk disk storage: %w", err)
 	}
 	storageLogger.Info("Created chunk disk storage rootDir", slog.String("root_dir", config.RootDir))
 	return &ChunkDiskStorage{
-		config: config,
-		logger: storageLogger,
+		config:     config,
+		logger:     storageLogger,
+		serializer: serializer,
 	}, nil
 }
 
@@ -63,11 +67,18 @@ func (d *ChunkDiskStorage) getChunkPath(chunkID string) (string, error) {
 	return filepath.Join(d.config.RootDir, dir1, dir2, chunkID), nil
 }
 
-func (d *ChunkDiskStorage) Store(chunkID string, data []byte) error {
-	fullPath, err := d.getChunkPath(chunkID)
+func (d *ChunkDiskStorage) Store(chunkHeader common.ChunkHeader, data []byte) error {
+	fullPath, err := d.getChunkPath(chunkHeader.ID)
 	if err != nil {
 		return err
 	}
+
+	// Serialize chunkHeader
+	serializedHeader, err := d.serializer.SerializeHeader(chunkHeader)
+	if err != nil {
+		return fmt.Errorf("failed to serialize chunk: %w", err)
+	}
+	data = append(serializedHeader, data...) // TODO: performance can be better by reserving the space in the file for the header and data, then write separately
 
 	// Extract the directory path from the full file path
 	dirPath := filepath.Dir(fullPath)
@@ -82,11 +93,11 @@ func (d *ChunkDiskStorage) Store(chunkID string, data []byte) error {
 		return fmt.Errorf("failed to write chunk file %s: %w", fullPath, err)
 	}
 
-	d.logger.Info("Stored chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
+	d.logger.Info("Stored chunk", slog.String("chunk_id", chunkHeader.ID), slog.String("path", fullPath))
 	return nil
 }
 
-func (d *ChunkDiskStorage) Retrieve(chunkID string) ([]byte, error) {
+func (d *ChunkDiskStorage) GetChunk(chunkID string) ([]byte, error) {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return nil, err
@@ -99,6 +110,25 @@ func (d *ChunkDiskStorage) Retrieve(chunkID string) ([]byte, error) {
 
 	d.logger.Info("Retrieved chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
 	return data, nil
+}
+
+func (d *ChunkDiskStorage) GetChunkHeader(chunkID string) (common.ChunkHeader, error) {
+	fullPath, err := d.getChunkPath(chunkID)
+	if err != nil {
+		return common.ChunkHeader{}, err
+	}
+
+	file, err := os.Open(fullPath)
+	if err != nil {
+		return common.ChunkHeader{}, fmt.Errorf("failed to read chunk file %s: %w", fullPath, err)
+	}
+	defer file.Close()
+
+	header, err := d.serializer.DeserializeHeader(file)
+	if err != nil {
+		return common.ChunkHeader{}, fmt.Errorf("failed to deserialize chunk header: %w", err)
+	}
+	return header, nil
 }
 
 func (d *ChunkDiskStorage) Delete(chunkID string) error {

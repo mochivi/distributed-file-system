@@ -1,23 +1,27 @@
 package common
 
-import "github.com/mochivi/distributed-file-system/pkg/proto"
+import (
+	"fmt"
+
+	"github.com/mochivi/distributed-file-system/pkg/proto"
+)
 
 type UploadChunkRequest struct {
-	ChunkInfo ChunkInfo
-	Propagate bool
+	ChunkHeader ChunkHeader
+	Propagate   bool
 }
 
 func UploadChunkRequestFromProto(pb *proto.UploadChunkRequest) UploadChunkRequest {
 	return UploadChunkRequest{
-		ChunkInfo: ChunkInfoFromProto(pb.ChunkInfo),
-		Propagate: pb.Propagate,
+		ChunkHeader: ChunkHeaderFromProto(pb.ChunkHeader),
+		Propagate:   pb.Propagate,
 	}
 }
 
 func (ucr UploadChunkRequest) ToProto() *proto.UploadChunkRequest {
 	return &proto.UploadChunkRequest{
-		ChunkInfo: ucr.ChunkInfo.ToProto(),
-		Propagate: ucr.Propagate,
+		ChunkHeader: ucr.ChunkHeader.ToProto(),
+		Propagate:   ucr.Propagate,
 	}
 }
 
@@ -55,16 +59,45 @@ func (r DownloadChunkRequest) ToProto() *proto.DownloadChunkRequest {
 	return &proto.DownloadChunkRequest{ChunkId: r.ChunkID}
 }
 
-type DownloadStreamRequest struct {
-	SessionID string
+type DownloadReady struct {
+	NodeReady
+	ChunkHeader ChunkHeader
 }
 
-func DownloadStreamRequestFromProto(pb *proto.DownloadStreamRequest) DownloadStreamRequest {
-	return DownloadStreamRequest{SessionID: pb.SessionId}
+func DownloadReadyFromProto(pb *proto.DownloadReady) DownloadReady {
+	return DownloadReady{
+		NodeReady:   NodeReadyFromProto(pb.Ready),
+		ChunkHeader: ChunkHeaderFromProto(pb.ChunkHeader),
+	}
+}
+
+func (dr DownloadReady) ToProto() *proto.DownloadReady {
+	return &proto.DownloadReady{
+		Ready:       dr.NodeReady.ToProto(),
+		ChunkHeader: dr.ChunkHeader.ToProto(),
+	}
+}
+
+type DownloadStreamRequest struct {
+	SessionID       string
+	ChunkStreamSize int32
+}
+
+func DownloadStreamRequestFromProto(pb *proto.DownloadStreamRequest) (DownloadStreamRequest, error) {
+	req := DownloadStreamRequest{SessionID: pb.SessionId, ChunkStreamSize: pb.ChunkStreamSize}
+
+	if req.ChunkStreamSize > 1024*1024 {
+		return DownloadStreamRequest{}, fmt.Errorf("chunk stream size is too large")
+	}
+
+	if req.ChunkStreamSize <= 0 {
+		pb.ChunkStreamSize = int32(DefaultStreamerConfig().ChunkStreamSize)
+	}
+	return req, nil
 }
 
 func (r DownloadStreamRequest) ToProto() *proto.DownloadStreamRequest {
-	return &proto.DownloadStreamRequest{SessionId: r.SessionID}
+	return &proto.DownloadStreamRequest{SessionId: r.SessionID, ChunkStreamSize: r.ChunkStreamSize}
 }
 
 type DeleteChunkRequest struct {

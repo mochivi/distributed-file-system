@@ -156,19 +156,93 @@ func (x *FileInfo) GetChecksum() string {
 	return ""
 }
 
-type ChunkInfo struct {
+type ChunkHeader struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Size          int64                  `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`
+	Version       uint32                 `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	Index         int32                  `protobuf:"varint,3,opt,name=index,proto3" json:"index,omitempty"`
+	Size          int64                  `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
+	Checksum      string                 `protobuf:"bytes,5,opt,name=checksum,proto3" json:"checksum,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChunkHeader) Reset() {
+	*x = ChunkHeader{}
+	mi := &file_common_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChunkHeader) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChunkHeader) ProtoMessage() {}
+
+func (x *ChunkHeader) ProtoReflect() protoreflect.Message {
+	mi := &file_common_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChunkHeader.ProtoReflect.Descriptor instead.
+func (*ChunkHeader) Descriptor() ([]byte, []int) {
+	return file_common_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ChunkHeader) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ChunkHeader) GetVersion() uint32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *ChunkHeader) GetIndex() int32 {
+	if x != nil {
+		return x.Index
+	}
+	return 0
+}
+
+func (x *ChunkHeader) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *ChunkHeader) GetChecksum() string {
+	if x != nil {
+		return x.Checksum
+	}
+	return ""
+}
+
+type ChunkInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Header        *ChunkHeader           `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
 	Replicas      []*DataNodeInfo        `protobuf:"bytes,3,rep,name=replicas,proto3" json:"replicas,omitempty"` // DataNodes storing this chunk
-	Checksum      string                 `protobuf:"bytes,4,opt,name=checksum,proto3" json:"checksum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ChunkInfo) Reset() {
 	*x = ChunkInfo{}
-	mi := &file_common_proto_msgTypes[1]
+	mi := &file_common_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -180,7 +254,7 @@ func (x *ChunkInfo) String() string {
 func (*ChunkInfo) ProtoMessage() {}
 
 func (x *ChunkInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[1]
+	mi := &file_common_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -193,21 +267,14 @@ func (x *ChunkInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChunkInfo.ProtoReflect.Descriptor instead.
 func (*ChunkInfo) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{1}
+	return file_common_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *ChunkInfo) GetId() string {
+func (x *ChunkInfo) GetHeader() *ChunkHeader {
 	if x != nil {
-		return x.Id
+		return x.Header
 	}
-	return ""
-}
-
-func (x *ChunkInfo) GetSize() int64 {
-	if x != nil {
-		return x.Size
-	}
-	return 0
+	return nil
 }
 
 func (x *ChunkInfo) GetReplicas() []*DataNodeInfo {
@@ -215,13 +282,6 @@ func (x *ChunkInfo) GetReplicas() []*DataNodeInfo {
 		return x.Replicas
 	}
 	return nil
-}
-
-func (x *ChunkInfo) GetChecksum() string {
-	if x != nil {
-		return x.Checksum
-	}
-	return ""
 }
 
 type DataNodeInfo struct {
@@ -239,7 +299,7 @@ type DataNodeInfo struct {
 
 func (x *DataNodeInfo) Reset() {
 	*x = DataNodeInfo{}
-	mi := &file_common_proto_msgTypes[2]
+	mi := &file_common_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -251,7 +311,7 @@ func (x *DataNodeInfo) String() string {
 func (*DataNodeInfo) ProtoMessage() {}
 
 func (x *DataNodeInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[2]
+	mi := &file_common_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -264,7 +324,7 @@ func (x *DataNodeInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataNodeInfo.ProtoReflect.Descriptor instead.
 func (*DataNodeInfo) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{2}
+	return file_common_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *DataNodeInfo) GetId() string {
@@ -326,7 +386,7 @@ type HealthStatus struct {
 
 func (x *HealthStatus) Reset() {
 	*x = HealthStatus{}
-	mi := &file_common_proto_msgTypes[3]
+	mi := &file_common_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -338,7 +398,7 @@ func (x *HealthStatus) String() string {
 func (*HealthStatus) ProtoMessage() {}
 
 func (x *HealthStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[3]
+	mi := &file_common_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -351,7 +411,7 @@ func (x *HealthStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthStatus.ProtoReflect.Descriptor instead.
 func (*HealthStatus) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{3}
+	return file_common_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *HealthStatus) GetStatus() NodeStatus {
@@ -381,12 +441,16 @@ const file_common_proto_rawDesc = "" +
 	"\x06chunks\x18\x04 \x03(\v2\x0e.dfs.ChunkInfoR\x06chunks\x129\n" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1a\n" +
-	"\bchecksum\x18\x06 \x01(\tR\bchecksum\"z\n" +
-	"\tChunkInfo\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04size\x18\x02 \x01(\x03R\x04size\x12-\n" +
-	"\breplicas\x18\x03 \x03(\v2\x11.dfs.DataNodeInfoR\breplicas\x12\x1a\n" +
-	"\bchecksum\x18\x04 \x01(\tR\bchecksum\"\xe3\x01\n" +
+	"\bchecksum\x18\x06 \x01(\tR\bchecksum\"}\n" +
+	"\vChunkHeader\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\rR\aversion\x12\x14\n" +
+	"\x05index\x18\x03 \x01(\x05R\x05index\x12\x12\n" +
+	"\x04size\x18\x04 \x01(\x03R\x04size\x12\x1a\n" +
+	"\bchecksum\x18\x05 \x01(\tR\bchecksum\"d\n" +
+	"\tChunkInfo\x12(\n" +
+	"\x06header\x18\x01 \x01(\v2\x10.dfs.ChunkHeaderR\x06header\x12-\n" +
+	"\breplicas\x18\x03 \x03(\v2\x11.dfs.DataNodeInfoR\breplicas\"\xe3\x01\n" +
 	"\fDataNodeInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -418,28 +482,30 @@ func file_common_proto_rawDescGZIP() []byte {
 }
 
 var file_common_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_common_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_common_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_common_proto_goTypes = []any{
 	(NodeStatus)(0),               // 0: dfs.NodeStatus
 	(*FileInfo)(nil),              // 1: dfs.FileInfo
-	(*ChunkInfo)(nil),             // 2: dfs.ChunkInfo
-	(*DataNodeInfo)(nil),          // 3: dfs.DataNodeInfo
-	(*HealthStatus)(nil),          // 4: dfs.HealthStatus
-	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(*ChunkHeader)(nil),           // 2: dfs.ChunkHeader
+	(*ChunkInfo)(nil),             // 3: dfs.ChunkInfo
+	(*DataNodeInfo)(nil),          // 4: dfs.DataNodeInfo
+	(*HealthStatus)(nil),          // 5: dfs.HealthStatus
+	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
 }
 var file_common_proto_depIdxs = []int32{
-	2, // 0: dfs.FileInfo.chunks:type_name -> dfs.ChunkInfo
-	5, // 1: dfs.FileInfo.created_at:type_name -> google.protobuf.Timestamp
-	3, // 2: dfs.ChunkInfo.replicas:type_name -> dfs.DataNodeInfo
-	0, // 3: dfs.DataNodeInfo.status:type_name -> dfs.NodeStatus
-	5, // 4: dfs.DataNodeInfo.last_seen:type_name -> google.protobuf.Timestamp
-	0, // 5: dfs.HealthStatus.status:type_name -> dfs.NodeStatus
-	5, // 6: dfs.HealthStatus.last_seen:type_name -> google.protobuf.Timestamp
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	3, // 0: dfs.FileInfo.chunks:type_name -> dfs.ChunkInfo
+	6, // 1: dfs.FileInfo.created_at:type_name -> google.protobuf.Timestamp
+	2, // 2: dfs.ChunkInfo.header:type_name -> dfs.ChunkHeader
+	4, // 3: dfs.ChunkInfo.replicas:type_name -> dfs.DataNodeInfo
+	0, // 4: dfs.DataNodeInfo.status:type_name -> dfs.NodeStatus
+	6, // 5: dfs.DataNodeInfo.last_seen:type_name -> google.protobuf.Timestamp
+	0, // 6: dfs.HealthStatus.status:type_name -> dfs.NodeStatus
+	6, // 7: dfs.HealthStatus.last_seen:type_name -> google.protobuf.Timestamp
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_common_proto_init() }
@@ -453,7 +519,7 @@ func file_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_common_proto_rawDesc), len(file_common_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

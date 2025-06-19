@@ -33,7 +33,7 @@ func (c *chunkInfoMap) tryAddReplica(chunkID string, replica *common.DataNodeInf
 func (c *chunkInfoMap) addChunkInfo(chunkInfo *common.ChunkInfo) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.chunkInfos[chunkInfo.ID] = chunkInfo
+	c.chunkInfos[chunkInfo.Header.ID] = chunkInfo
 }
 
 func (c *chunkInfoMap) getChunkInfos() []common.ChunkInfo {
@@ -48,10 +48,10 @@ func (c *chunkInfoMap) getChunkInfos() []common.ChunkInfo {
 
 // Define the datatype that workers will receive
 type UploaderWork struct {
-	sessionID string
-	chunkInfo common.ChunkInfo
-	data      []byte
-	client    *datanode.DataNodeClient
+	sessionID   string
+	chunkHeader common.ChunkHeader
+	data        []byte
+	client      *datanode.DataNodeClient
 }
 
 type UploaderConfig struct {
@@ -148,7 +148,7 @@ func (u *Uploader) processWork(work UploaderWork, session *uploadSession) error 
 		if err := u.uploadChunk(work, session); err != nil {
 			retryCount++
 			if retryCount >= u.config.ChunkRetryCount {
-				return fmt.Errorf("failed to store chunk %s after %d retries", work.chunkInfo.ID, retryCount)
+				return fmt.Errorf("failed to store chunk %s after %d retries", work.chunkHeader.ID, retryCount)
 			}
 		} else {
 			break
@@ -157,8 +157,10 @@ func (u *Uploader) processWork(work UploaderWork, session *uploadSession) error 
 
 	// Update chunk infos - this information is sent to the coordinator to update the metadata about the chunk
 	// Try to add a replica, if that is unsucessful, we need to first add an entire chunkInfo
-	if ok := session.chunkInfos.tryAddReplica(work.chunkInfo.ID, work.client.Node); !ok {
-		session.chunkInfos.addChunkInfo(&work.chunkInfo)
+	if ok := session.chunkInfos.tryAddReplica(work.chunkHeader.ID, work.client.Node); !ok {
+		session.chunkInfos.addChunkInfo(&common.ChunkInfo{
+			Header: work.chunkHeader,
+		})
 	}
 
 	return nil
@@ -171,17 +173,17 @@ func (u *Uploader) uploadChunk(work UploaderWork, session *uploadSession) error 
 	stream, err := work.client.UploadChunkStream(session.ctx)
 	if err != nil {
 		session.logger.Error("Failed to create upload stream")
-		return fmt.Errorf("failed to create stream for chunk %s: %w", work.chunkInfo.ID, err)
+		return fmt.Errorf("failed to create stream for chunk %s: %w", work.chunkHeader.ID, err)
 	}
 
 	// Stream chunk to peer
-	if err := u.streamer.StreamChunk(session.ctx, stream, session.logger, common.StreamChunkParams{
-		SessionID: work.sessionID, // This sessionID is the streaming sessionID, NOT the metadata sessionID or uploadSessionID
-		ChunkInfo: work.chunkInfo,
-		Data:      work.data,
+	if err := u.streamer.SendChunkStream(session.ctx, stream, session.logger, common.UploadChunkStreamParams{
+		SessionID:   work.sessionID, // This sessionID is the streaming sessionID, NOT the metadata sessionID or uploadSessionID
+		ChunkHeader: work.chunkHeader,
+		Data:        work.data,
 	}); err != nil {
 		session.logger.Error("Failed to create upload stream")
-		return fmt.Errorf("failed to stream chunk %s: %w", work.chunkInfo.ID, err)
+		return fmt.Errorf("failed to stream chunk %s: %w", work.chunkHeader.ID, err)
 	}
 
 	session.logger.Info("Chunk streaming completed")
@@ -202,11 +204,10 @@ func (u *Uploader) QueueWork(ctx context.Context, session *uploadSession, file *
 		chunkData = chunkData[:n]
 
 		checksum := common.CalculateChecksum(chunkData)
-		chunkInfo := common.ChunkInfo{
+		chunkHeader := common.ChunkHeader{
 			ID:       chunkUploadLocation.ChunkID,
 			Index:    i,
-			Size:     len(chunkData),
-			Replicas: []*common.DataNodeInfo{chunkUploadLocation.Node},
+			Size:     int64(len(chunkData)),
 			Checksum: checksum,
 		}
 
@@ -217,23 +218,23 @@ func (u *Uploader) QueueWork(ctx context.Context, session *uploadSession, file *
 		}
 
 		// Check if client accepts to store the chunk
-		storeChunkResponse, err := client.StoreChunk(ctx, chunkInfo)
+		storeChunkResponse, err := client.StoreChunk(ctx, chunkHeader)
 		if err != nil {
-			session.logger.Error("Failed to prepare chunk %s for upload: %w", chunkInfo.ID, err)
-			return fmt.Errorf("failed to prepare chunk %s for upload: %w", chunkInfo.ID, err)
+			session.logger.Error("Failed to prepare chunk %s for upload: %w", chunkHeader.ID, err)
+			return fmt.Errorf("failed to prepare chunk %s for upload: %w", chunkHeader.ID, err)
 		}
 
 		if !storeChunkResponse.Accept {
-			session.logger.Error("Node did not accept chunk upload %s: %s", chunkInfo.ID, storeChunkResponse.Message)
-			return fmt.Errorf("node did not accept chunk upload %s: %s", chunkInfo.ID, storeChunkResponse.Message)
+			session.logger.Error("Node did not accept chunk upload %s: %s", chunkHeader.ID, storeChunkResponse.Message)
+			return fmt.Errorf("node did not accept chunk upload %s: %s", chunkHeader.ID, storeChunkResponse.Message)
 		}
-		session.logger.Info("Chunk accepted", slog.String("chunk_id", chunkInfo.ID))
+		session.logger.Info("Chunk accepted", slog.String("chunk_id", chunkHeader.ID))
 
 		session.workChan <- UploaderWork{
-			sessionID: storeChunkResponse.SessionID, // streaming sessionID, NOT metadata sessionID
-			chunkInfo: chunkInfo,
-			data:      chunkData,
-			client:    client,
+			sessionID:   storeChunkResponse.SessionID, // streaming sessionID, NOT metadata sessionID
+			chunkHeader: chunkHeader,
+			data:        chunkData,
+			client:      client,
 		}
 	}
 

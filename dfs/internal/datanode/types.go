@@ -34,8 +34,8 @@ type DataNodeClient struct {
 }
 
 type IReplicationManager interface {
-	paralellReplicate(nodes []*common.DataNodeInfo, chunkInfo common.ChunkInfo, data []byte, requiredReplicas int) error
-	replicate(ctx context.Context, client *DataNodeClient, req common.ChunkInfo, data []byte, clientLogger *slog.Logger) error
+	paralellReplicate(nodes []*common.DataNodeInfo, chunkInfo common.ChunkHeader, data []byte, requiredReplicas int) error
+	replicate(ctx context.Context, client *DataNodeClient, req common.ChunkHeader, data []byte, clientLogger *slog.Logger) error
 }
 
 type ISessionManager interface {

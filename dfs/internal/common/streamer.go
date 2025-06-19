@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -33,18 +34,23 @@ func NewStreamer(config StreamerConfig) *Streamer {
 	return &Streamer{Config: config}
 }
 
-type StreamChunkParams struct {
+type UploadChunkStreamParams struct {
 	// Retrieve session
 	SessionID string
 
 	// Chunk data
-	ChunkInfo ChunkInfo
-	Data      []byte
+	ChunkHeader ChunkHeader
+	Data        []byte
+}
+
+type DownloadChunkStreamParams struct {
+	SessionID   string
+	ChunkHeader ChunkHeader
 }
 
 // Initiate a stream to send a chunk to a datanode
-func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck],
-	logger *slog.Logger, params StreamChunkParams) error {
+func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck],
+	logger *slog.Logger, params UploadChunkStreamParams) error {
 
 	logger = logging.OperationLogger(logger, "stream_chunk", slog.String("session_id", params.SessionID))
 	logger.Debug("Initializing chunk data stream")
@@ -83,7 +89,7 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 			// Create stream message
 			streamMsg := &ChunkDataStream{
 				SessionID:       params.SessionID,
-				ChunkID:         params.ChunkInfo.ID,
+				ChunkID:         params.ChunkHeader.ID,
 				Data:            chunkData,
 				Offset:          offset,
 				IsFinal:         isFinal,
@@ -172,9 +178,9 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 
 	// Validate if checksum after all partial sections are added up still matches the original
 	calculatedChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
-	if calculatedChecksum != params.ChunkInfo.Checksum {
+	if calculatedChecksum != params.ChunkHeader.Checksum {
 		return fmt.Errorf("request checksum mismatch: expected %s, calculated %s",
-			params.ChunkInfo.Checksum, calculatedChecksum)
+			params.ChunkHeader.Checksum, calculatedChecksum)
 	}
 
 	if !finalAck.Success {
@@ -182,5 +188,30 @@ func (s *Streamer) StreamChunk(ctx context.Context, stream grpc.BidiStreamingCli
 	}
 
 	logger.Info("Chunk data stream completed successfully")
+	return nil
+}
+
+func (s *Streamer) ReceiveChunkStream(ctx context.Context, stream grpc.ServerStreamingClient[proto.ChunkDataStream],
+	buffer *bytes.Buffer, logger *slog.Logger, params DownloadChunkStreamParams) error {
+
+	logger = logging.OperationLogger(logger, "receive_chunk_stream", slog.String("session_id", params.SessionID))
+	logger.Debug("Initializing chunk data stream")
+
+	for {
+		protoChunkDataStream, err := stream.Recv()
+		if err != nil {
+			return fmt.Errorf("failed to receive chunk data: %w", err)
+		}
+		chunkStream := ChunkDataStreamFromProto(protoChunkDataStream)
+
+		if _, err := buffer.Write(chunkStream.Data); err != nil {
+			return fmt.Errorf("failed to write chunk data to buffer: %w", err)
+		}
+
+		if chunkStream.IsFinal {
+			break
+		}
+	}
+
 	return nil
 }

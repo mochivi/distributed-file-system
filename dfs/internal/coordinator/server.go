@@ -80,12 +80,12 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 	for i, chunk := range fileInfo.Chunks {
 		node, ok := c.nodeManager.GetAvailableNodeForChunk(chunk.Replicas)
 		if !ok {
-			c.logger.Error("Failed to get available node for chunk", slog.String("chunk_id", chunk.ID), slog.String("file_path", req.Path))
+			c.logger.Error("Failed to get available node for chunk", slog.String("chunk_id", chunk.Header.ID), slog.String("file_path", req.Path))
 			return nil, status.Error(codes.NotFound, "no available nodes")
 		}
 
 		chunkLocations[i] = ChunkLocation{
-			ChunkID: chunk.ID,
+			ChunkID: chunk.Header.ID,
 			Node:    node,
 		}
 	}

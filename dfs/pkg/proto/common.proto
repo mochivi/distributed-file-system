@@ -16,12 +16,18 @@ message FileInfo {
   string checksum = 6;
 }
 
-message ChunkInfo {
+message ChunkHeader {
   string id = 1;
-  int64 size = 2;
-  repeated DataNodeInfo replicas = 3;  // DataNodes storing this chunk
-  string checksum = 4;
+  uint32 version = 2;
+  int32 index = 3;
+  int64 size = 4;
+  string checksum = 5;
 }
+
+message ChunkInfo {
+  ChunkHeader header = 1;
+  repeated DataNodeInfo replicas = 3;  // DataNodes storing this chunk
+}  
 
 message DataNodeInfo {
   string id = 1;

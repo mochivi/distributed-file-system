@@ -10,11 +10,11 @@ import (
 
 // client -> node
 // This is the primary node that is receiving the chunk
-func (c *DataNodeClient) StoreChunk(ctx context.Context, req common.ChunkInfo, opts ...grpc.CallOption) (common.NodeReady, error) {
+func (c *DataNodeClient) StoreChunk(ctx context.Context, req common.ChunkHeader, opts ...grpc.CallOption) (common.NodeReady, error) {
 	// Convert to expected request type
 	uploadChunkRequest := common.UploadChunkRequest{
-		ChunkInfo: req,
-		Propagate: true, // StoreChunk is always propagated
+		ChunkHeader: req,
+		Propagate:   true, // StoreChunk is always propagated
 	}
 
 	resp, err := c.client.PrepareChunkUpload(ctx, uploadChunkRequest.ToProto(), opts...)
@@ -26,13 +26,13 @@ func (c *DataNodeClient) StoreChunk(ctx context.Context, req common.ChunkInfo, o
 }
 
 // client -> node
-func (c *DataNodeClient) PrepareChunkDownload(ctx context.Context, req common.DownloadChunkRequest, opts ...grpc.CallOption) (common.NodeReady, error) {
+func (c *DataNodeClient) PrepareChunkDownload(ctx context.Context, req common.DownloadChunkRequest, opts ...grpc.CallOption) (common.DownloadReady, error) {
 	resp, err := c.client.PrepareChunkDownload(ctx, req.ToProto(), opts...)
 	if err != nil {
 		err = handlegRPCError(err, req.ChunkID)
-		return common.NodeReady{}, err
+		return common.DownloadReady{}, err
 	}
-	return common.NodeReadyFromProto(resp), nil
+	return common.DownloadReadyFromProto(resp), nil
 }
 
 // client -> node
@@ -48,10 +48,10 @@ func (c *DataNodeClient) DeleteChunk(ctx context.Context, req common.DeleteChunk
 // node -> node
 // This is a replica node that is receiving the chunk
 // This is a copy of StoreChunk, but with a different method name
-func (c *DataNodeClient) ReplicateChunk(ctx context.Context, req common.ChunkInfo, opts ...grpc.CallOption) (common.NodeReady, error) {
+func (c *DataNodeClient) ReplicateChunk(ctx context.Context, req common.ChunkHeader, opts ...grpc.CallOption) (common.NodeReady, error) {
 	uploadChunkRequest := common.UploadChunkRequest{
-		ChunkInfo: req,
-		Propagate: false, // ReplicateChunk is not propagated, as it is already received by a replica node
+		ChunkHeader: req,
+		Propagate:   false, // ReplicateChunk is not propagated, as it is already received by a replica node
 	}
 
 	resp, err := c.client.PrepareChunkUpload(ctx, uploadChunkRequest.ToProto(), opts...)

@@ -27,8 +27,8 @@ func NewReplicationManager(config ReplicateManagerConfig, logger *slog.Logger) *
 }
 
 // paralellReplicate replicates the chunk to the given nodes in parallel
-func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, chunkInfo common.ChunkInfo, data []byte, requiredReplicas int) error {
-	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", chunkInfo.ID))
+func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) error {
+	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", chunkHeader.ID))
 
 	if len(nodes) == 0 {
 		return fmt.Errorf("no node endpoints provided")
@@ -83,7 +83,7 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, ch
 			ctx, cancel := context.WithTimeout(context.Background(), rm.Config.ReplicateTimeout)
 			defer cancel()
 
-			if err := rm.replicate(ctx, c, chunkInfo, data, clientLogger); err != nil {
+			if err := rm.replicate(ctx, c, chunkHeader, data, clientLogger); err != nil {
 				errChan <- fmt.Errorf("replication failed for client %d: %v", clientIndex, err)
 				return
 			}
@@ -110,9 +110,9 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, ch
 	return nil
 }
 
-func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeClient, chunkInfo common.ChunkInfo, data []byte, clientLogger *slog.Logger) error {
+func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeClient, chunkHeader common.ChunkHeader, data []byte, clientLogger *slog.Logger) error {
 	// Request replication session
-	resp, err := client.ReplicateChunk(ctx, chunkInfo)
+	resp, err := client.ReplicateChunk(ctx, chunkHeader)
 	if err != nil {
 		return fmt.Errorf("failed to request replication: %v", err)
 	}
@@ -125,13 +125,13 @@ func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeCli
 	// Create stream to send the chunk data
 	stream, err := client.UploadChunkStream(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create stream for chunk %s: %v", chunkInfo.ID, err)
+		return fmt.Errorf("failed to create stream for chunk %s: %v", chunkHeader.ID, err)
 	}
 
-	if err := rm.streamer.StreamChunk(ctx, stream, clientLogger, common.StreamChunkParams{
-		SessionID: resp.SessionID,
-		ChunkInfo: chunkInfo,
-		Data:      data,
+	if err := rm.streamer.SendChunkStream(ctx, stream, clientLogger, common.UploadChunkStreamParams{
+		SessionID:   resp.SessionID,
+		ChunkHeader: chunkHeader,
+		Data:        data,
 	}); err != nil {
 		return fmt.Errorf("failed to stream chunk data: %v", err)
 	}
