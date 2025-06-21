@@ -19,17 +19,6 @@ type chunkInfoMap struct {
 	mutex      sync.Mutex
 }
 
-func (c *chunkInfoMap) tryAddReplica(chunkID string, replica *common.DataNodeInfo) bool {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	chunkInfo, ok := c.chunkInfos[chunkID]
-	if !ok {
-		return false
-	}
-	chunkInfo.Replicas = append(chunkInfo.Replicas, replica)
-	return true
-}
-
 func (c *chunkInfoMap) addChunkInfo(chunkInfo *common.ChunkInfo) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -86,11 +75,13 @@ func NewUploader(streamer *common.Streamer, logger *slog.Logger, config Uploader
 	}
 }
 
-func (u *Uploader) UploadFile(ctx context.Context, file *os.File, chunkLocations []coordinator.ChunkLocation, sessionID string, logger *slog.Logger) ([]common.ChunkInfo, error) {
+func (u *Uploader) UploadFile(ctx context.Context, file *os.File, chunkLocations []coordinator.ChunkLocation, sessionID string, logger *slog.Logger, chunksize int) ([]common.ChunkInfo, error) {
 	session := &uploadSession{
-		ctx:      ctx,
-		workChan: make(chan UploaderWork, u.config.NumWorkers),
-		errChan:  make(chan error, len(chunkLocations)),
+		ctx:            ctx,
+		chunkLocations: chunkLocations,
+		chunksize:      chunksize,
+		workChan:       make(chan UploaderWork, u.config.NumWorkers),
+		errChan:        make(chan error, len(chunkLocations)),
 		chunkInfos: &chunkInfoMap{
 			chunkInfos: make(map[string]*common.ChunkInfo, len(chunkLocations)),
 			mutex:      sync.Mutex{},
@@ -144,51 +135,57 @@ func (u *Uploader) UploadFile(ctx context.Context, file *os.File, chunkLocations
 
 func (u *Uploader) processWork(work UploaderWork, session *uploadSession) error {
 	retryCount := 0
+	var replicatedNodes []*common.DataNodeInfo
 	for retryCount < u.config.ChunkRetryCount {
-		if err := u.uploadChunk(work, session); err != nil {
+		var err error
+		replicatedNodes, err = u.uploadChunk(work, session)
+		if err != nil {
 			retryCount++
 			if retryCount >= u.config.ChunkRetryCount {
 				return fmt.Errorf("failed to store chunk %s after %d retries", work.chunkHeader.ID, retryCount)
 			}
-		} else {
-			break
+			continue
 		}
+		break
 	}
 
 	// Update chunk infos - this information is sent to the coordinator to update the metadata about the chunk
-	// Try to add a replica, if that is unsucessful, we need to first add an entire chunkInfo
-	if ok := session.chunkInfos.tryAddReplica(work.chunkHeader.ID, work.client.Node); !ok {
-		session.chunkInfos.addChunkInfo(&common.ChunkInfo{
-			Header: work.chunkHeader,
-		})
-	}
+	session.chunkInfos.addChunkInfo(&common.ChunkInfo{
+		Header:   work.chunkHeader,
+		Replicas: replicatedNodes,
+	})
 
 	return nil
 }
 
-func (u *Uploader) uploadChunk(work UploaderWork, session *uploadSession) error {
+func (u *Uploader) uploadChunk(work UploaderWork, session *uploadSession) ([]*common.DataNodeInfo, error) {
 	session.logger.Info("Streaming chunk")
 
 	// Open stream to send chunk data to the datanode
 	stream, err := work.client.UploadChunkStream(session.ctx)
 	if err != nil {
 		session.logger.Error("Failed to create upload stream")
-		return fmt.Errorf("failed to create stream for chunk %s: %w", work.chunkHeader.ID, err)
+		return nil, fmt.Errorf("failed to create stream for chunk %s: %w", work.chunkHeader.ID, err)
 	}
 
 	// Stream chunk to peer
-	if err := u.streamer.SendChunkStream(session.ctx, stream, session.logger, common.UploadChunkStreamParams{
+	replicatedNodes, err := u.streamer.SendChunkStream(session.ctx, stream, session.logger, common.UploadChunkStreamParams{
 		SessionID:   work.sessionID, // This sessionID is the streaming sessionID, NOT the metadata sessionID or uploadSessionID
 		ChunkHeader: work.chunkHeader,
 		Data:        work.data,
-	}); err != nil {
-		session.logger.Error("Failed to create upload stream")
-		return fmt.Errorf("failed to stream chunk %s: %w", work.chunkHeader.ID, err)
+	})
+	if err != nil {
+		session.logger.Error("Failed to stream chunk", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("failed to stream chunk %s: %w", work.chunkHeader.ID, err)
+	}
+	if replicatedNodes == nil {
+		session.logger.Error("Datanode failed to replicate chunk", slog.String("chunk_id", work.chunkHeader.ID))
+		return nil, fmt.Errorf("datanode failed to replicate chunk %s", work.chunkHeader.ID)
 	}
 
 	session.logger.Info("Chunk streaming completed")
 
-	return nil
+	return replicatedNodes, nil
 }
 
 // Reads file and queue work

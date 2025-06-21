@@ -472,6 +472,7 @@ type ChunkDataAck struct {
 	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 	BytesReceived int64                  `protobuf:"varint,4,opt,name=bytes_received,json=bytesReceived,proto3" json:"bytes_received,omitempty"` // Total bytes received so far
 	ReadyForNext  bool                   `protobuf:"varint,5,opt,name=ready_for_next,json=readyForNext,proto3" json:"ready_for_next,omitempty"`  // Flow control: ready for next chunk
+	Replicas      []*DataNodeInfo        `protobuf:"bytes,6,rep,name=replicas,proto3" json:"replicas,omitempty"`                                 // The last request send out by the server confirms all replica nodes
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -539,6 +540,13 @@ func (x *ChunkDataAck) GetReadyForNext() bool {
 		return x.ReadyForNext
 	}
 	return false
+}
+
+func (x *ChunkDataAck) GetReplicas() []*DataNodeInfo {
+	if x != nil {
+		return x.Replicas
+	}
+	return nil
 }
 
 // Health check request/response
@@ -656,14 +664,15 @@ const file_datanode_proto_rawDesc = "" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12\x16\n" +
 	"\x06offset\x18\x04 \x01(\x03R\x06offset\x12\x19\n" +
 	"\bis_final\x18\x05 \x01(\bR\aisFinal\x12)\n" +
-	"\x10partial_checksum\x18\x06 \x01(\tR\x0fpartialChecksum\"\xae\x01\n" +
+	"\x10partial_checksum\x18\x06 \x01(\tR\x0fpartialChecksum\"\xdd\x01\n" +
 	"\fChunkDataAck\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x18\n" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\x12%\n" +
 	"\x0ebytes_received\x18\x04 \x01(\x03R\rbytesReceived\x12$\n" +
-	"\x0eready_for_next\x18\x05 \x01(\bR\freadyForNext\"\x14\n" +
+	"\x0eready_for_next\x18\x05 \x01(\bR\freadyForNext\x12-\n" +
+	"\breplicas\x18\x06 \x03(\v2\x11.dfs.DataNodeInfoR\breplicas\"\x14\n" +
 	"\x12HealthCheckRequest\"@\n" +
 	"\x13HealthCheckResponse\x12)\n" +
 	"\x06status\x18\x01 \x01(\v2\x11.dfs.HealthStatusR\x06status2\xa8\x03\n" +
@@ -701,30 +710,32 @@ var file_datanode_proto_goTypes = []any{
 	(*HealthCheckRequest)(nil),    // 9: dfs.HealthCheckRequest
 	(*HealthCheckResponse)(nil),   // 10: dfs.HealthCheckResponse
 	(*ChunkHeader)(nil),           // 11: dfs.ChunkHeader
-	(*HealthStatus)(nil),          // 12: dfs.HealthStatus
+	(*DataNodeInfo)(nil),          // 12: dfs.DataNodeInfo
+	(*HealthStatus)(nil),          // 13: dfs.HealthStatus
 }
 var file_datanode_proto_depIdxs = []int32{
 	11, // 0: dfs.UploadChunkRequest.chunk_header:type_name -> dfs.ChunkHeader
 	1,  // 1: dfs.DownloadReady.ready:type_name -> dfs.NodeReady
 	11, // 2: dfs.DownloadReady.chunk_header:type_name -> dfs.ChunkHeader
-	12, // 3: dfs.HealthCheckResponse.status:type_name -> dfs.HealthStatus
-	0,  // 4: dfs.DataNodeService.PrepareChunkUpload:input_type -> dfs.UploadChunkRequest
-	3,  // 5: dfs.DataNodeService.PrepareChunkDownload:input_type -> dfs.DownloadChunkRequest
-	7,  // 6: dfs.DataNodeService.UploadChunkStream:input_type -> dfs.ChunkDataStream
-	4,  // 7: dfs.DataNodeService.DownloadChunkStream:input_type -> dfs.DownloadStreamRequest
-	5,  // 8: dfs.DataNodeService.DeleteChunk:input_type -> dfs.DeleteChunkRequest
-	9,  // 9: dfs.DataNodeService.HealthCheck:input_type -> dfs.HealthCheckRequest
-	1,  // 10: dfs.DataNodeService.PrepareChunkUpload:output_type -> dfs.NodeReady
-	2,  // 11: dfs.DataNodeService.PrepareChunkDownload:output_type -> dfs.DownloadReady
-	8,  // 12: dfs.DataNodeService.UploadChunkStream:output_type -> dfs.ChunkDataAck
-	7,  // 13: dfs.DataNodeService.DownloadChunkStream:output_type -> dfs.ChunkDataStream
-	6,  // 14: dfs.DataNodeService.DeleteChunk:output_type -> dfs.DeleteChunkResponse
-	10, // 15: dfs.DataNodeService.HealthCheck:output_type -> dfs.HealthCheckResponse
-	10, // [10:16] is the sub-list for method output_type
-	4,  // [4:10] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	12, // 3: dfs.ChunkDataAck.replicas:type_name -> dfs.DataNodeInfo
+	13, // 4: dfs.HealthCheckResponse.status:type_name -> dfs.HealthStatus
+	0,  // 5: dfs.DataNodeService.PrepareChunkUpload:input_type -> dfs.UploadChunkRequest
+	3,  // 6: dfs.DataNodeService.PrepareChunkDownload:input_type -> dfs.DownloadChunkRequest
+	7,  // 7: dfs.DataNodeService.UploadChunkStream:input_type -> dfs.ChunkDataStream
+	4,  // 8: dfs.DataNodeService.DownloadChunkStream:input_type -> dfs.DownloadStreamRequest
+	5,  // 9: dfs.DataNodeService.DeleteChunk:input_type -> dfs.DeleteChunkRequest
+	9,  // 10: dfs.DataNodeService.HealthCheck:input_type -> dfs.HealthCheckRequest
+	1,  // 11: dfs.DataNodeService.PrepareChunkUpload:output_type -> dfs.NodeReady
+	2,  // 12: dfs.DataNodeService.PrepareChunkDownload:output_type -> dfs.DownloadReady
+	8,  // 13: dfs.DataNodeService.UploadChunkStream:output_type -> dfs.ChunkDataAck
+	7,  // 14: dfs.DataNodeService.DownloadChunkStream:output_type -> dfs.ChunkDataStream
+	6,  // 15: dfs.DataNodeService.DeleteChunk:output_type -> dfs.DeleteChunkResponse
+	10, // 16: dfs.DataNodeService.HealthCheck:output_type -> dfs.HealthCheckResponse
+	11, // [11:17] is the sub-list for method output_type
+	5,  // [5:11] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_datanode_proto_init() }

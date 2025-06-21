@@ -51,7 +51,7 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 		NumWorkers:      10,
 		ChunkRetryCount: 3,
 	})
-	chunkInfos, err := uploader.UploadFile(uploadCtx, file, uploadResponse.ChunkLocations, uploadResponse.SessionID, metadataSessionLogger)
+	chunkInfos, err := uploader.UploadFile(uploadCtx, file, uploadResponse.ChunkLocations, uploadResponse.SessionID, metadataSessionLogger, chunksize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload file: %w", err)
 	}

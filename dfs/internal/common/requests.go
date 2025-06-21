@@ -168,25 +168,37 @@ type ChunkDataAck struct {
 	Message       string
 	BytesReceived int
 	ReadyForNext  bool
+	Replicas      []*DataNodeInfo
 }
 
 func ChunkDataAckFromProto(pb *proto.ChunkDataAck) ChunkDataAck {
+	replicas := make([]*DataNodeInfo, len(pb.Replicas))
+	for i, replica := range pb.Replicas {
+		replicaInfo := DataNodeInfoFromProto(replica)
+		replicas[i] = &replicaInfo
+	}
 	return ChunkDataAck{
 		SessionID:     pb.SessionId,
 		Success:       pb.Success,
 		Message:       pb.Message,
 		BytesReceived: int(pb.BytesReceived),
 		ReadyForNext:  pb.ReadyForNext,
+		Replicas:      replicas,
 	}
 }
 
 func (cda ChunkDataAck) ToProto() *proto.ChunkDataAck {
+	replicas := make([]*proto.DataNodeInfo, len(cda.Replicas))
+	for i, replica := range cda.Replicas {
+		replicas[i] = replica.ToProto()
+	}
 	return &proto.ChunkDataAck{
 		SessionId:     cda.SessionID,
 		Success:       cda.Success,
 		Message:       cda.Message,
 		BytesReceived: int64(cda.BytesReceived),
 		ReadyForNext:  cda.ReadyForNext,
+		Replicas:      replicas,
 	}
 }
 

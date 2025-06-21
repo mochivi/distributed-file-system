@@ -28,6 +28,7 @@ type Chunk struct {
 type ChunkSerializer interface {
 	SerializeHeader(chunkHeader common.ChunkHeader) ([]byte, error)
 	DeserializeHeader(file *os.File) (common.ChunkHeader, error)
+	HeaderSize() int
 }
 
 type ProtoSerializer struct {
@@ -98,4 +99,8 @@ func (s *ProtoSerializer) DeserializeHeader(file *os.File) (common.ChunkHeader, 
 		return common.ChunkHeader{}, err
 	}
 	return common.ChunkHeaderFromProto(headerPB), nil
+}
+
+func (s *ProtoSerializer) HeaderSize() int {
+	return 13 // 4 B magic + 1 B version + 4 B length + 4 B header
 }

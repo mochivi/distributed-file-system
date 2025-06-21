@@ -11,6 +11,23 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
+type ReplicatedNodes struct {
+	nodes []*common.DataNodeInfo
+	mutex sync.Mutex
+}
+
+func (r *ReplicatedNodes) AddNode(node *common.DataNodeInfo) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.nodes = append(r.nodes, node)
+}
+
+func (r *ReplicatedNodes) GetNodes() []*common.DataNodeInfo {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	return r.nodes
+}
+
 type ReplicationManager struct {
 	Config   ReplicateManagerConfig
 	streamer *common.Streamer
@@ -27,22 +44,24 @@ func NewReplicationManager(config ReplicateManagerConfig, logger *slog.Logger) *
 }
 
 // paralellReplicate replicates the chunk to the given nodes in parallel
-func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) error {
+func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error) {
 	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", chunkHeader.ID))
 
 	if len(nodes) == 0 {
-		return fmt.Errorf("no node endpoints provided")
+		return nil, fmt.Errorf("no node endpoints provided")
 	}
+
+	replicatedNodes := ReplicatedNodes{}
 
 	// Create clients
 	var clients []*DataNodeClient
 	for _, node := range nodes {
 		client, err := NewDataNodeClient(node)
 		if err != nil {
-			return fmt.Errorf("failed to create client for %s - [%s]  %v", node.ID, node.Endpoint(), err)
+			return nil, fmt.Errorf("failed to create client for %s - [%s]  %v", node.ID, node.Endpoint(), err)
 		}
 		if client == nil {
-			return fmt.Errorf("client for %v is nil", node)
+			return nil, fmt.Errorf("client for %v is nil", node)
 		}
 		clients = append(clients, client)
 	}
@@ -87,6 +106,7 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, ch
 				errChan <- fmt.Errorf("replication failed for client %d: %v", clientIndex, err)
 				return
 			}
+			replicatedNodes.AddNode(c.Node)
 
 			clientLogger.Debug("Replication succeeded")
 		}(i, client)
@@ -103,11 +123,11 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, ch
 		for err := range errChan {
 			errors = append(errors, err)
 		}
-		return fmt.Errorf("insufficient replicas: got %d, required %d. Errors: %v",
+		return nil, fmt.Errorf("insufficient replicas: got %d, required %d. Errors: %v",
 			finalAccepted, requiredReplicas, errors)
 	}
 
-	return nil
+	return replicatedNodes.GetNodes(), nil
 }
 
 func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeClient, chunkHeader common.ChunkHeader, data []byte, clientLogger *slog.Logger) error {
@@ -128,11 +148,12 @@ func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeCli
 		return fmt.Errorf("failed to create stream for chunk %s: %v", chunkHeader.ID, err)
 	}
 
-	if err := rm.streamer.SendChunkStream(ctx, stream, clientLogger, common.UploadChunkStreamParams{
+	_, err = rm.streamer.SendChunkStream(ctx, stream, clientLogger, common.UploadChunkStreamParams{
 		SessionID:   resp.SessionID,
 		ChunkHeader: chunkHeader,
 		Data:        data,
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("failed to stream chunk data: %v", err)
 	}
 

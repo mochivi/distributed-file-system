@@ -17,12 +17,14 @@ type StreamerConfig struct {
 	MaxChunkRetries  int
 	ChunkStreamSize  int
 	BackpressureTime time.Duration
+	WaitReplicas     bool // Only used by client, waits for the final stream with the replicas information, default is false when used by datanodes
 }
 
 func DefaultStreamerConfig() StreamerConfig {
 	return StreamerConfig{
 		MaxChunkRetries: 3,
 		ChunkStreamSize: 256 * 1024,
+		WaitReplicas:    false,
 	}
 }
 
@@ -50,7 +52,7 @@ type DownloadChunkStreamParams struct {
 
 // Initiate a stream to send a chunk to a datanode
 func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck],
-	logger *slog.Logger, params UploadChunkStreamParams) error {
+	logger *slog.Logger, params UploadChunkStreamParams) ([]*DataNodeInfo, error) {
 
 	logger = logging.OperationLogger(logger, "stream_chunk", slog.String("session_id", params.SessionID))
 	logger.Debug("Initializing chunk data stream")
@@ -98,7 +100,7 @@ func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamin
 
 			// Send chunk piece
 			if err := stream.Send(streamMsg.ToProto()); err != nil {
-				return fmt.Errorf("failed to send chunk at offset %d: %w", offset, err)
+				return nil, fmt.Errorf("failed to send chunk at offset %d: %w", offset, err)
 			}
 
 			// Wait for acknowledgment
@@ -107,7 +109,7 @@ func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamin
 				logger.Debug("Failed to receive stream response", slog.Int("retry_count", retryCount), slog.String("error", err.Error()))
 				retryCount++
 				if retryCount >= s.Config.MaxChunkRetries {
-					return fmt.Errorf("failed to receive stream response after %d retries: %w", s.Config.MaxChunkRetries, err)
+					return nil, fmt.Errorf("failed to receive stream response after %d retries: %w", s.Config.MaxChunkRetries, err)
 				}
 				time.Sleep(time.Duration(retryCount) * time.Second) // Exponential backoff
 				continue
@@ -119,7 +121,7 @@ func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamin
 				logger.Debug("Chunk data failed", slog.Int("retry_count", retryCount), slog.String("error", ack.Message))
 				retryCount++
 				if retryCount >= s.Config.MaxChunkRetries {
-					return fmt.Errorf("chunk failed after %d retries: %s", s.Config.MaxChunkRetries, ack.Message)
+					return nil, fmt.Errorf("chunk failed after %d retries: %s", s.Config.MaxChunkRetries, ack.Message)
 				}
 				time.Sleep(time.Duration(retryCount) * time.Second)
 				continue
@@ -131,7 +133,7 @@ func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamin
 				logger.Debug("Byte count mismatch", slog.Int("expected", expectedBytes), slog.Int("got", ack.BytesReceived))
 				retryCount++
 				if retryCount >= s.Config.MaxChunkRetries {
-					return fmt.Errorf("byte count mismatch after %d retries: expected %d, got %d",
+					return nil, fmt.Errorf("byte count mismatch after %d retries: expected %d, got %d",
 						s.Config.MaxChunkRetries, expectedBytes, ack.BytesReceived)
 				}
 				time.Sleep(time.Duration(retryCount) * time.Second)
@@ -147,7 +149,7 @@ func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamin
 			select {
 			case <-time.After(s.Config.BackpressureTime):
 			case <-ctx.Done():
-				return ctx.Err()
+				return nil, ctx.Err()
 			}
 		}
 
@@ -157,7 +159,7 @@ func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamin
 		// Check for context cancellation
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
@@ -166,29 +168,45 @@ func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamin
 
 	// Close the stream and wait for response
 	if err := stream.CloseSend(); err != nil {
-		return fmt.Errorf("failed to close stream: %w", err)
+		return nil, fmt.Errorf("failed to close stream: %w", err)
 	}
 
 	// Wait for and receive the final response
-	finalResp, err := stream.Recv()
+	finalStreamResp, err := stream.Recv()
 	if err != nil {
-		return fmt.Errorf("failed to receive stream response: %w", err)
+		return nil, fmt.Errorf("failed to receive stream response: %w", err)
 	}
-	finalAck := ChunkDataAckFromProto(finalResp)
+	finalStreamAck := ChunkDataAckFromProto(finalStreamResp)
 
 	// Validate if checksum after all partial sections are added up still matches the original
 	calculatedChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
 	if calculatedChecksum != params.ChunkHeader.Checksum {
-		return fmt.Errorf("request checksum mismatch: expected %s, calculated %s",
+		return nil, fmt.Errorf("request checksum mismatch: expected %s, calculated %s",
 			params.ChunkHeader.Checksum, calculatedChecksum)
 	}
 
-	if !finalAck.Success {
-		return fmt.Errorf("stream failed: %s", finalAck.Message)
+	if !finalStreamAck.Success {
+		return nil, fmt.Errorf("stream failed: %s", finalStreamAck.Message)
+	}
+
+	// If streamer is being used by a client, must wait for another final stream with the replicas information
+	if s.Config.WaitReplicas {
+		finalReplicasResp, err := stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("failed to receive replicas response: %w", err)
+		}
+		finalReplicasAck := ChunkDataAckFromProto(finalReplicasResp)
+
+		if !finalReplicasAck.Success {
+			return nil, fmt.Errorf("datanode failed to replicate chunk: %s", finalReplicasAck.Message)
+		}
+
+		logger.Info("Replicas received", slog.Any("replicas", finalReplicasAck.Replicas))
+		return finalReplicasAck.Replicas, nil
 	}
 
 	logger.Info("Chunk data stream completed successfully")
-	return nil
+	return nil, nil
 }
 
 func (s *Streamer) ReceiveChunkStream(ctx context.Context, stream grpc.ServerStreamingClient[proto.ChunkDataStream],

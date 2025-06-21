@@ -17,5 +17,7 @@ type Client struct {
 
 func NewClient(coordinatorClient *coordinator.CoordinatorClient, logger *slog.Logger) *Client {
 	clientLogger := logging.ExtendLogger(logger, slog.String("component", "client"))
-	return &Client{coordinatorClient: coordinatorClient, streamer: common.NewStreamer(common.DefaultStreamerConfig()), logger: clientLogger}
+	streamer := common.NewStreamer(common.DefaultStreamerConfig())
+	streamer.Config.WaitReplicas = true
+	return &Client{coordinatorClient: coordinatorClient, streamer: streamer, logger: clientLogger}
 }

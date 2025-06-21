@@ -97,7 +97,29 @@ func (d *ChunkDiskStorage) Store(chunkHeader common.ChunkHeader, data []byte) er
 	return nil
 }
 
-func (d *ChunkDiskStorage) GetChunk(chunkID string) ([]byte, error) {
+// GetChunk returns the data of a chunk with the header.
+func (d *ChunkDiskStorage) GetChunk(chunkID string) (common.ChunkHeader, []byte, error) {
+	fullPath, err := d.getChunkPath(chunkID)
+	if err != nil {
+		return common.ChunkHeader{}, nil, err
+	}
+
+	header, err := d.GetChunkHeader(chunkID)
+	if err != nil {
+		return common.ChunkHeader{}, nil, fmt.Errorf("failed to get chunk header: %w", err)
+	}
+
+	data, err := d.GetChunkData(chunkID)
+	if err != nil {
+		return common.ChunkHeader{}, nil, fmt.Errorf("failed to get chunk data: %w", err)
+	}
+
+	d.logger.Info("Retrieved chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
+	return header, data, nil
+}
+
+// GetChunkData returns the data of a chunk without the header.
+func (d *ChunkDiskStorage) GetChunkData(chunkID string) ([]byte, error) {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return nil, err
@@ -108,10 +130,15 @@ func (d *ChunkDiskStorage) GetChunk(chunkID string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read chunk file %s: %w", fullPath, err)
 	}
 
+	if len(data) < d.serializer.HeaderSize() {
+		return nil, fmt.Errorf("chunk file %s is too small to contain a header", fullPath)
+	}
+
 	d.logger.Info("Retrieved chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
-	return data, nil
+	return data[d.serializer.HeaderSize():], nil
 }
 
+// GetChunkHeader returns the header of a chunk.
 func (d *ChunkDiskStorage) GetChunkHeader(chunkID string) (common.ChunkHeader, error) {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {

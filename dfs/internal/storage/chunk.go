@@ -6,7 +6,8 @@ type ChunkStorage interface {
 	Store(chunkHeader common.ChunkHeader, data []byte) error
 
 	GetChunkHeader(chunkID string) (common.ChunkHeader, error)
-	GetChunk(chunkID string) ([]byte, error)
+	GetChunkData(chunkID string) ([]byte, error)
+	GetChunk(chunkID string) (common.ChunkHeader, []byte, error)
 
 	Delete(chunkID string) error
 	Exists(chunkID string) bool

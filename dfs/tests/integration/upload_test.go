@@ -65,7 +65,7 @@ func TestClientUpload(t *testing.T) {
 
 	for _, tt := range fileSizeTestCases {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			// t.Parallel()
 
 			path := filepath.Join(testFilesDir, tt.filepath)
 			file, err := os.Open(path)
@@ -84,6 +84,8 @@ func TestClientUpload(t *testing.T) {
 			streamer := common.NewStreamer(common.StreamerConfig{
 				ChunkStreamSize: defaultChunkSize,
 			})
+			streamer.Config.WaitReplicas = true // Wait for the final stream with the replicas information
+
 			for _, info := range chunkInfos {
 				for _, replica := range info.Replicas {
 					dnClient, _ := datanode.NewDataNodeClient(replica)
@@ -99,7 +101,7 @@ func TestClientUpload(t *testing.T) {
 
 					stream, err := dnClient.DownloadChunkStream(context.Background(), common.DownloadStreamRequest{
 						SessionID:       resp.SessionID,
-						ChunkStreamSize: int32(defaultChunkSize),
+						ChunkStreamSize: int32(common.DefaultStreamerConfig().ChunkStreamSize), // Follows the default chunk stream size -- 256KB
 					})
 					if err != nil {
 						t.Errorf("failed to create download stream: %v", err)
