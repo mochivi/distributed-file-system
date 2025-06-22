@@ -37,7 +37,7 @@ message UploadResponse {
 
 message ChunkLocation {
   string chunk_id = 1;
-  DataNodeInfo node = 2;
+  repeated DataNodeInfo nodes = 2;
 }
 
 // Download file request/response

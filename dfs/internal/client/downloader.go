@@ -181,7 +181,7 @@ func (d *Downloader) queueWork(session *downloadSession, sessionID string) error
 			return err
 		}
 
-		client, err := datanode.NewDataNodeClient(location.Node)
+		client, err := datanode.NewDataNodeClient(location.Nodes[0])
 		if err != nil {
 			return fmt.Errorf("failed to create datanode client: %w", err)
 		}

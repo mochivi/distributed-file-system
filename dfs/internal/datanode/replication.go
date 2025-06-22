@@ -81,7 +81,7 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, ch
 	)
 	errChan := make(chan error, len(clients))
 
-	for i, client := range clients {
+	for _, client := range clients {
 		clientLogger := logging.ExtendLogger(logger, slog.String("client_id", client.Node.ID), slog.String("client_address", client.Node.Endpoint()))
 		// Stop starting new goroutines if we already have enough replicas
 		if int(acceptedCount.Load()) >= requiredReplicas {
@@ -93,7 +93,7 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, ch
 		acceptedCount.Add(1)
 
 		clientLogger.Debug("Replicating to client")
-		go func(clientIndex int, c *DataNodeClient) {
+		go func() {
 			defer func() {
 				<-semaphore // Release slot
 				wg.Done()
@@ -102,14 +102,14 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, ch
 			ctx, cancel := context.WithTimeout(context.Background(), rm.Config.ReplicateTimeout)
 			defer cancel()
 
-			if err := rm.replicate(ctx, c, chunkHeader, data, clientLogger); err != nil {
-				errChan <- fmt.Errorf("replication failed for client %d: %v", clientIndex, err)
+			if err := rm.replicate(ctx, client, chunkHeader, data, clientLogger); err != nil {
+				errChan <- fmt.Errorf("replication failed for client %s: %v", client.Node.Endpoint(), err)
 				return
 			}
-			replicatedNodes.AddNode(c.Node)
+			replicatedNodes.AddNode(client.Node)
 
 			clientLogger.Debug("Replication succeeded")
-		}(i, client)
+		}()
 	}
 
 	wg.Wait()

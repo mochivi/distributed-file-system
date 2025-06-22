@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
@@ -40,18 +41,75 @@ type UploaderWork struct {
 	sessionID   string
 	chunkHeader common.ChunkHeader
 	data        []byte
-	client      *datanode.DataNodeClient
+	clientPool  *ClientPool
+}
+
+func (w *UploaderWork) GetClient() (*datanode.DataNodeClient, error) {
+	client, sessionID, err := w.clientPool.GetClient(w.chunkHeader)
+	if err != nil {
+		return nil, err
+	}
+	w.sessionID = sessionID
+	return client, nil
+}
+
+type ClientPool struct {
+	index   int
+	clients []*datanode.DataNodeClient
+	mu      sync.Mutex
+}
+
+func NewClientPool(clients []*datanode.DataNodeClient) *ClientPool {
+	return &ClientPool{
+		clients: clients,
+	}
+}
+
+func (c *ClientPool) GetClient(chunkHeader common.ChunkHeader) (*datanode.DataNodeClient, string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	attempts := 0
+	for attempts < len(c.clients) {
+		client := c.clients[c.index]
+		// Check if client accepts to store the chunk
+		storeChunkResponse, err := client.StoreChunk(context.Background(), chunkHeader)
+		if err != nil {
+			attempts++
+			c.RotateClient()
+			continue
+		}
+
+		if !storeChunkResponse.Accept {
+			attempts++
+			c.RotateClient()
+			continue
+		}
+
+		return client, storeChunkResponse.SessionID, nil
+	}
+
+	return nil, "", fmt.Errorf("failed to get client")
+}
+
+func (c *ClientPool) RotateClient() {
+	c.mu.Lock()
+	if c.index >= len(c.clients) {
+		c.index = 0
+	}
+	c.index++
+	c.mu.Unlock()
+}
+
+func (c *ClientPool) AddClient(client *datanode.DataNodeClient) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.clients = append(c.clients, client)
 }
 
 type UploaderConfig struct {
 	NumWorkers      int
 	ChunkRetryCount int
-}
-
-// Uploads chunks to peer
-type Uploader struct {
-	streamer *common.Streamer
-	config   UploaderConfig
 }
 
 type uploadSession struct {
@@ -68,6 +126,12 @@ type uploadSession struct {
 	logger     *slog.Logger // scoped to the upload session
 }
 
+// Uploads chunks to peer
+type Uploader struct {
+	streamer *common.Streamer
+	config   UploaderConfig
+}
+
 func NewUploader(streamer *common.Streamer, logger *slog.Logger, config UploaderConfig) *Uploader {
 	return &Uploader{
 		streamer: streamer,
@@ -75,7 +139,7 @@ func NewUploader(streamer *common.Streamer, logger *slog.Logger, config Uploader
 	}
 }
 
-func (u *Uploader) UploadFile(ctx context.Context, file *os.File, chunkLocations []coordinator.ChunkLocation, sessionID string, logger *slog.Logger, chunksize int) ([]common.ChunkInfo, error) {
+func (u *Uploader) UploadFile(ctx context.Context, file *os.File, chunkLocations []coordinator.ChunkLocation, logger *slog.Logger, chunksize int) ([]common.ChunkInfo, error) {
 	session := &uploadSession{
 		ctx:            ctx,
 		chunkLocations: chunkLocations,
@@ -133,6 +197,48 @@ func (u *Uploader) UploadFile(ctx context.Context, file *os.File, chunkLocations
 	return chunkInfos, nil
 }
 
+// Reads file and queue work
+func (u *Uploader) QueueWork(ctx context.Context, session *uploadSession, file *os.File, chunksize int) error {
+	for i, chunkUploadLocation := range session.chunkLocations {
+		chunkData := make([]byte, chunksize)
+		n, err := file.Read(chunkData)
+		if err != nil && err != io.EOF {
+			close(session.workChan)
+			session.logger.Error("Failed to read chunk", slog.Int("chunk_index", i), slog.String("error", err.Error()))
+			return fmt.Errorf("failed to read chunk %d: %w", i, err)
+		}
+		chunkData = chunkData[:n]
+
+		checksum := common.CalculateChecksum(chunkData)
+		chunkHeader := common.ChunkHeader{
+			ID:       chunkUploadLocation.ChunkID,
+			Index:    i,
+			Size:     int64(len(chunkData)),
+			Checksum: checksum,
+		}
+
+		clientPool := NewClientPool(make([]*datanode.DataNodeClient, 0, len(chunkUploadLocation.Nodes)))
+		for _, node := range chunkUploadLocation.Nodes {
+			client, err := datanode.NewDataNodeClient(node)
+			if err != nil {
+				session.logger.Error("Failed to create connection to datanode client", slog.String("error", err.Error()))
+				return fmt.Errorf("failed to create connection to datanode client: %w", err)
+			}
+			clientPool.AddClient(client)
+		}
+
+		work := UploaderWork{
+			chunkHeader: chunkHeader,
+			data:        chunkData,
+			clientPool:  clientPool,
+		}
+
+		session.workChan <- work
+	}
+
+	return nil
+}
+
 func (u *Uploader) processWork(work UploaderWork, session *uploadSession) error {
 	retryCount := 0
 	var replicatedNodes []*common.DataNodeInfo
@@ -144,6 +250,7 @@ func (u *Uploader) processWork(work UploaderWork, session *uploadSession) error 
 			if retryCount >= u.config.ChunkRetryCount {
 				return fmt.Errorf("failed to store chunk %s after %d retries", work.chunkHeader.ID, retryCount)
 			}
+			time.Sleep(time.Duration(retryCount) * time.Second)
 			continue
 		}
 		break
@@ -162,7 +269,13 @@ func (u *Uploader) uploadChunk(work UploaderWork, session *uploadSession) ([]*co
 	session.logger.Info("Streaming chunk")
 
 	// Open stream to send chunk data to the datanode
-	stream, err := work.client.UploadChunkStream(session.ctx)
+	client, err := work.GetClient()
+	if err != nil {
+		session.logger.Error("Failed to get client", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("failed to get client: %w", err)
+	}
+
+	stream, err := client.UploadChunkStream(session.ctx)
 	if err != nil {
 		session.logger.Error("Failed to create upload stream")
 		return nil, fmt.Errorf("failed to create stream for chunk %s: %w", work.chunkHeader.ID, err)
@@ -186,54 +299,4 @@ func (u *Uploader) uploadChunk(work UploaderWork, session *uploadSession) ([]*co
 	session.logger.Info("Chunk streaming completed")
 
 	return replicatedNodes, nil
-}
-
-// Reads file and queue work
-func (u *Uploader) QueueWork(ctx context.Context, session *uploadSession, file *os.File, chunksize int) error {
-	for i, chunkUploadLocation := range session.chunkLocations {
-		chunkData := make([]byte, chunksize)
-		n, err := file.Read(chunkData)
-		if err != nil && err != io.EOF {
-			close(session.workChan)
-			session.logger.Error("Failed to read chunk", slog.Int("chunk_index", i), slog.String("error", err.Error()))
-			return fmt.Errorf("failed to read chunk %d: %w", i, err)
-		}
-		chunkData = chunkData[:n]
-
-		checksum := common.CalculateChecksum(chunkData)
-		chunkHeader := common.ChunkHeader{
-			ID:       chunkUploadLocation.ChunkID,
-			Index:    i,
-			Size:     int64(len(chunkData)),
-			Checksum: checksum,
-		}
-
-		client, err := datanode.NewDataNodeClient(chunkUploadLocation.Node)
-		if err != nil {
-			session.logger.Error("Failed to create connection to datanode client", slog.String("error", err.Error()))
-			return fmt.Errorf("failed to create connection to datanode client: %w", err)
-		}
-
-		// Check if client accepts to store the chunk
-		storeChunkResponse, err := client.StoreChunk(ctx, chunkHeader)
-		if err != nil {
-			session.logger.Error("Failed to prepare chunk %s for upload: %w", chunkHeader.ID, err)
-			return fmt.Errorf("failed to prepare chunk %s for upload: %w", chunkHeader.ID, err)
-		}
-
-		if !storeChunkResponse.Accept {
-			session.logger.Error("Node did not accept chunk upload %s: %s", chunkHeader.ID, storeChunkResponse.Message)
-			return fmt.Errorf("node did not accept chunk upload %s: %s", chunkHeader.ID, storeChunkResponse.Message)
-		}
-		session.logger.Info("Chunk accepted", slog.String("chunk_id", chunkHeader.ID))
-
-		session.workChan <- UploaderWork{
-			sessionID:   storeChunkResponse.SessionID, // streaming sessionID, NOT metadata sessionID
-			chunkHeader: chunkHeader,
-			data:        chunkData,
-			client:      client,
-		}
-	}
-
-	return nil
 }

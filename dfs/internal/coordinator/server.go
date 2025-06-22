@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math/rand"
 
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
@@ -44,13 +43,20 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		chunkID := common.FormatChunkID(req.Path, i)
 
 		// Randomly select a node from the available nodes
-		nodeIndex := rand.Intn(len(nodes))
-		node := nodes[nodeIndex]
+		selectedNodes := make([]*common.DataNodeInfo, 0, 3)
+		count := 0
+		for _, node := range nodes {
+			selectedNodes = append(selectedNodes, node)
+			count++
+			if count >= 3 {
+				break
+			}
+		}
 
 		// Add chunk location to assignment
 		assignments[i] = ChunkLocation{
 			ChunkID: chunkID,
-			Node:    node,
+			Nodes:   selectedNodes,
 		}
 	}
 
@@ -79,7 +85,7 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 
 	// Find available nodes to download from for this chunk
 	for i, chunk := range fileInfo.Chunks {
-		node, ok := c.nodeManager.GetAvailableNodeForChunk(chunk.Replicas)
+		nodes, ok := c.nodeManager.GetAvailableNodesForChunk(chunk.Replicas)
 		if !ok {
 			c.logger.Error("Failed to get available node for chunk", slog.String("chunk_id", chunk.Header.ID), slog.String("file_path", req.Path))
 			return nil, status.Error(codes.NotFound, "no available nodes")
@@ -87,7 +93,7 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 
 		chunkLocations[i] = ChunkLocation{
 			ChunkID: chunk.Header.ID,
-			Node:    node,
+			Nodes:   nodes,
 		}
 	}
 

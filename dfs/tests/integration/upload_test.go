@@ -104,10 +104,10 @@ func TestClientUpload(t *testing.T) {
 						ChunkStreamSize: int32(common.DefaultStreamerConfig().ChunkStreamSize), // Follows the default chunk stream size -- 256KB
 					})
 					if err != nil {
-						t.Errorf("failed to create download stream: %v", err)
+						t.Fatalf("failed to create download stream: %v", err)
 					}
 
-					buffer := bytes.NewBuffer(make([]byte, info.Header.Size))
+					buffer := bytes.NewBuffer(make([]byte, 0, info.Header.Size))
 
 					if err := streamer.ReceiveChunkStream(context.Background(), stream, buffer, logger, common.DownloadChunkStreamParams{
 						SessionID:   resp.SessionID,
@@ -149,28 +149,54 @@ func TestClientUpload(t *testing.T) {
 			}
 
 			uploadAt := filepath.Join(baseUploadAt, tt.filepath, strconv.Itoa(rand.Intn(1000000)))
-			_, err = client.UploadFile(context.Background(), file, uploadAt, tt.chunkSize)
+			chunkInfos, err := client.UploadFile(context.Background(), file, uploadAt, tt.chunkSize)
 			if err != nil {
 				t.Errorf("failed to upload file: %v", err)
 			}
 
 			file.Close()
 
-			// // Validate if the chunks were replicated to the provided nodes and their checksum matches the expectation
-			// for _, info := range chunkInfos {
-			// 	for _, replica := range info.Replicas {
-			// 		dnClient, _ := datanode.NewDataNodeClient(replica)
+			// Validate if the chunks were replicated to the provided nodes and their checksum matches the expectation
+			streamer := common.NewStreamer(common.StreamerConfig{
+				ChunkStreamSize: tt.chunkSize,
+			})
+			streamer.Config.WaitReplicas = true // Wait for the final stream with the replicas information
 
-			// 		resp, err := dnClient.RetrieveChunk(context.Background(), common.RetrieveChunkRequest{ChunkID: info.ID})
-			// 		if err != nil {
-			// 			t.Errorf("retrieve %s: %v", info.ID, err)
-			// 		}
+			for _, info := range chunkInfos {
+				for _, replica := range info.Replicas {
+					dnClient, _ := datanode.NewDataNodeClient(replica)
 
-			// 		if checksum := common.CalculateChecksum(resp.Data); checksum != info.Checksum {
-			// 			t.Errorf("checksum mismatch for %s", info.ID)
-			// 		}
-			// 	}
-			// }
+					resp, err := dnClient.PrepareChunkDownload(context.Background(), common.DownloadChunkRequest{ChunkID: info.Header.ID})
+					if err != nil {
+						t.Errorf("retrieve %s: %v", info.Header.ID, err)
+					}
+
+					if !resp.Accept {
+						t.Errorf("node %s did not accept chunk %s download", replica.ID, info.Header.ID)
+					}
+
+					stream, err := dnClient.DownloadChunkStream(context.Background(), common.DownloadStreamRequest{
+						SessionID:       resp.SessionID,
+						ChunkStreamSize: int32(common.DefaultStreamerConfig().ChunkStreamSize), // Follows the default chunk stream size -- 256KB
+					})
+					if err != nil {
+						t.Fatalf("failed to create download stream: %v", err)
+					}
+
+					buffer := bytes.NewBuffer(make([]byte, 0, info.Header.Size))
+
+					if err := streamer.ReceiveChunkStream(context.Background(), stream, buffer, logger, common.DownloadChunkStreamParams{
+						SessionID:   resp.SessionID,
+						ChunkHeader: info.Header,
+					}); err != nil {
+						t.Errorf("failed to receive chunk stream: %v", err)
+					}
+
+					if checksum := common.CalculateChecksum(buffer.Bytes()); checksum != info.Header.Checksum {
+						t.Errorf("checksum mismatch for %s", info.Header.ID)
+					}
+				}
+			}
 		})
 	}
 }

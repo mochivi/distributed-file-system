@@ -195,7 +195,7 @@ func (x *UploadResponse) GetSessionId() string {
 type ChunkLocation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ChunkId       string                 `protobuf:"bytes,1,opt,name=chunk_id,json=chunkId,proto3" json:"chunk_id,omitempty"`
-	Node          *DataNodeInfo          `protobuf:"bytes,2,opt,name=node,proto3" json:"node,omitempty"`
+	Nodes         []*DataNodeInfo        `protobuf:"bytes,2,rep,name=nodes,proto3" json:"nodes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -237,9 +237,9 @@ func (x *ChunkLocation) GetChunkId() string {
 	return ""
 }
 
-func (x *ChunkLocation) GetNode() *DataNodeInfo {
+func (x *ChunkLocation) GetNodes() []*DataNodeInfo {
 	if x != nil {
-		return x.Node
+		return x.Nodes
 	}
 	return nil
 }
@@ -1075,10 +1075,10 @@ const file_coordinator_proto_rawDesc = "" +
 	"\x0eUploadResponse\x12;\n" +
 	"\x0fchunk_locations\x18\x01 \x03(\v2\x12.dfs.ChunkLocationR\x0echunkLocations\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x02 \x01(\tR\tsessionId\"Q\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\"S\n" +
 	"\rChunkLocation\x12\x19\n" +
-	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12%\n" +
-	"\x04node\x18\x02 \x01(\v2\x11.dfs.DataNodeInfoR\x04node\"%\n" +
+	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12'\n" +
+	"\x05nodes\x18\x02 \x03(\v2\x11.dfs.DataNodeInfoR\x05nodes\"%\n" +
 	"\x0fDownloadRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"\x9a\x01\n" +
 	"\x10DownloadResponse\x12*\n" +
@@ -1192,7 +1192,7 @@ var file_coordinator_proto_goTypes = []any{
 }
 var file_coordinator_proto_depIdxs = []int32{
 	3,  // 0: dfs.UploadResponse.chunk_locations:type_name -> dfs.ChunkLocation
-	19, // 1: dfs.ChunkLocation.node:type_name -> dfs.DataNodeInfo
+	19, // 1: dfs.ChunkLocation.nodes:type_name -> dfs.DataNodeInfo
 	20, // 2: dfs.DownloadResponse.file_info:type_name -> dfs.FileInfo
 	3,  // 3: dfs.DownloadResponse.chunk_locations:type_name -> dfs.ChunkLocation
 	21, // 4: dfs.ConfirmUploadRequest.chunk_infos:type_name -> dfs.ChunkInfo

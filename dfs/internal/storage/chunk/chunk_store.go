@@ -125,17 +125,23 @@ func (d *ChunkDiskStorage) GetChunkData(chunkID string) ([]byte, error) {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(fullPath)
+	file, err := os.Open(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read chunk file %s: %w", fullPath, err)
 	}
 
-	if len(data) < d.serializer.HeaderSize() {
-		return nil, fmt.Errorf("chunk file %s is too small to contain a header", fullPath)
+	// Consume the header with the same logic used when deserialising.
+	if _, err := d.serializer.DeserializeHeader(file); err != nil {
+		return nil, err
 	}
 
-	d.logger.Info("Retrieved chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
-	return data[d.serializer.HeaderSize():], nil
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read chunk data: %w", err)
+	}
+
+	d.logger.Info("Retrieved chunk data", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
+	return data, nil
 }
 
 // GetChunkHeader returns the header of a chunk.

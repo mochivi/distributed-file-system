@@ -48,6 +48,17 @@ func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.Uploa
 		}.ToProto(), nil
 	}
 
+	if existing, ok := s.sessionManager.LoadByChunk(req.ChunkHeader.ID); ok {
+		switch existing.Status {
+		case SessionCompleted, SessionFailed, SessionExpired:
+			s.sessionManager.Delete(existing.SessionID) // purge zombie
+		default: // SessionActive
+			return common.NodeReady{
+				Accept:  false,
+				Message: "session still active",
+			}.ToProto(), nil
+		}
+	}
 	sessionID := uuid.NewString()
 	if err := s.createStreamingSession(sessionID, req.ChunkHeader, req.Propagate, logger); err != nil {
 		logger.Error("Failed to create streaming session", slog.String("error", err.Error()))
@@ -140,6 +151,7 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 			if session != nil {
 				session.logger.Error("Failed to receive chunk data", slog.String("error", err.Error()))
 			}
+			session.Status = SessionFailed
 			return status.Errorf(codes.Internal, "failed to receive chunk data: %v", err)
 		}
 
@@ -153,7 +165,10 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 			if !exists {
 				return status.Errorf(codes.NotFound, "invalid session")
 			}
-			defer s.sessionManager.Delete(session.SessionID) // Delete session after stream attempt
+			defer func() {
+				session.logger.Info("Deleting session", slog.String("session_id", session.SessionID))
+				s.sessionManager.Delete(session.SessionID)
+			}()
 
 			// Create buffer with pre-defined capacity for performance
 			buf := make([]byte, 0, session.ChunkHeader.Size)
@@ -163,6 +178,7 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 		// Verify data integrity and ordering
 		if chunk.Offset != totalReceived {
 			session.logger.Error("Data out of order", slog.Int("expected", chunk.Offset), slog.Int("got", totalReceived))
+			session.Status = SessionFailed
 			return status.Errorf(codes.Internal, "data out of order")
 		}
 
@@ -196,6 +212,7 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 		// session.logger.Debug("Sending acknowledgment", slog.Int("bytes_received", totalReceived))
 		if err := stream.Send(ack.ToProto()); err != nil {
 			session.logger.Error("Failed to send acknowledgment", slog.String("error", err.Error()))
+			session.Status = SessionFailed
 			return status.Errorf(codes.Internal, "failed to send acknowledgment: %v", err)
 		}
 
@@ -207,6 +224,7 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 
 			if !bytes.Equal(computedHash, expectedHash) {
 				session.logger.Error("Checksum mismatch", slog.String("expected", session.Checksum), slog.String("computed", hex.EncodeToString(computedHash)))
+				session.Status = SessionFailed
 				return status.Errorf(codes.Internal, "checksum mismatch")
 			}
 
@@ -214,6 +232,7 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 			err := s.store.Store(session.ChunkHeader, buffer.Bytes())
 			if err != nil {
 				session.logger.Error("Failed to store chunk", slog.String("error", err.Error()))
+				session.Status = SessionFailed
 				return status.Errorf(codes.Internal, "failed to store chunk: %v", err)
 			}
 
@@ -226,6 +245,7 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 			}
 			if err := stream.Send(finalAck.ToProto()); err != nil {
 				session.logger.Error("Failed to send final acknowledgment", slog.String("error", err.Error()))
+				session.Status = SessionFailed
 				return status.Errorf(codes.Internal, "failed to send final acknowledgment: %v", err)
 			}
 		}
@@ -238,6 +258,7 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 		replicaNodes, err := s.replicate(session.ChunkHeader, buffer.Bytes())
 		if err != nil {
 			session.logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
+			session.Status = SessionFailed
 			return status.Errorf(codes.Internal, "failed to replicate chunk: %v", err)
 		}
 		session.logger.Info("Chunk replicated successfully", slog.Any("replica_nodes", replicaNodes))
@@ -249,9 +270,11 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 			Replicas:  replicaNodes,
 		}.ToProto()); err != nil {
 			session.logger.Error("Failed to send chunk data ack", slog.String("error", err.Error()))
+			session.Status = SessionFailed
 			return status.Errorf(codes.Internal, "failed to send chunk data ack with replicas: %v", err)
 		}
 	}
+	session.Status = SessionCompleted
 
 	return nil
 }

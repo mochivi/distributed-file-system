@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -27,8 +27,8 @@ type Chunk struct {
 
 type ChunkSerializer interface {
 	SerializeHeader(chunkHeader common.ChunkHeader) ([]byte, error)
-	DeserializeHeader(file *os.File) (common.ChunkHeader, error)
-	HeaderSize() int
+	DeserializeHeader(reader io.Reader) (common.ChunkHeader, error)
+	HeaderSize(chunkHeader common.ChunkHeader) (int, error)
 }
 
 type ProtoSerializer struct {
@@ -62,10 +62,10 @@ func (s *ProtoSerializer) SerializeHeader(chunkHeader common.ChunkHeader) ([]byt
 	return buf.Bytes(), nil
 }
 
-func (s *ProtoSerializer) DeserializeHeader(file *os.File) (common.ChunkHeader, error) {
+func (s *ProtoSerializer) DeserializeHeader(reader io.Reader) (common.ChunkHeader, error) {
 	// 1) read magic
 	magic := make([]byte, 4)
-	if _, err := file.Read(magic); err != nil {
+	if _, err := reader.Read(magic); err != nil {
 		return common.ChunkHeader{}, err
 	}
 	if string(magic) != s.Magic {
@@ -74,7 +74,7 @@ func (s *ProtoSerializer) DeserializeHeader(file *os.File) (common.ChunkHeader, 
 
 	// 2) read version
 	version := make([]byte, 1)
-	if _, err := file.Read(version); err != nil {
+	if _, err := reader.Read(version); err != nil {
 		return common.ChunkHeader{}, err
 	}
 	if version[0] != s.Version {
@@ -83,14 +83,14 @@ func (s *ProtoSerializer) DeserializeHeader(file *os.File) (common.ChunkHeader, 
 
 	// 3) read length
 	length := make([]byte, 4)
-	if _, err := file.Read(length); err != nil {
+	if _, err := reader.Read(length); err != nil {
 		return common.ChunkHeader{}, err
 	}
 	lengthInt := binary.BigEndian.Uint32(length)
 
 	// 4) read header
 	headerBytes := make([]byte, lengthInt)
-	if _, err := file.Read(headerBytes); err != nil {
+	if _, err := reader.Read(headerBytes); err != nil {
 		return common.ChunkHeader{}, err
 	}
 
@@ -101,6 +101,11 @@ func (s *ProtoSerializer) DeserializeHeader(file *os.File) (common.ChunkHeader, 
 	return common.ChunkHeaderFromProto(headerPB), nil
 }
 
-func (s *ProtoSerializer) HeaderSize() int {
-	return 13 // 4 B magic + 1 B version + 4 B length + 4 B header
+func (s *ProtoSerializer) HeaderSize(chunkHeader common.ChunkHeader) (int, error) {
+	headerPB := chunkHeader.ToProto()
+	headerBytes, err := pb.Marshal(headerPB)
+	if err != nil {
+		return 0, err
+	}
+	return 13 + len(headerBytes), nil // 4 B magic + 1 B version + 4 B length + header size
 }

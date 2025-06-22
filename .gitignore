@@ -20,3 +20,6 @@ dfs/bin/*
 dfs/test-data/*
 dfs/tests/integration/test_files/*
 tests/*
+
+# logs
+logs/*

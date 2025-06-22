@@ -86,11 +86,23 @@ func (sm *SessionManager) Delete(sessionID string) {
 // Temporary solution to check if a chunk is already being streamed, stops duplicate requests
 func (sm *SessionManager) ExistsForChunk(chunkID string) bool {
 	for _, session := range sm.sessions {
-		if session.ChunkHeader.ID == chunkID {
+		if session.ChunkHeader.ID == chunkID && session.Status == SessionActive {
 			return true
 		}
 	}
 	return false
+}
+
+func (sm *SessionManager) LoadByChunk(chunkID string) (*StreamingSession, bool) {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	for _, session := range sm.sessions {
+		if session.ChunkHeader.ID == chunkID {
+			return session, true
+		}
+	}
+	return nil, false
 }
 
 // DataNode creates and stores a session

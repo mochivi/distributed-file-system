@@ -43,6 +43,7 @@ type ISessionManager interface {
 	Load(sessionID string) (*StreamingSession, bool)
 	Delete(sessionID string)
 	ExistsForChunk(chunkID string) bool
+	LoadByChunk(chunkID string) (*StreamingSession, bool)
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
