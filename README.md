@@ -16,12 +16,9 @@ It is a learning project that demonstrates chunk-based storage, streaming gRPC r
 4. [Quick start](#quick-start)
 5. [Configuration](#configuration)
 6. [Project layout](#project-layout)
-7. [Usage examples](#usage-examples)
-8. [Testing](#testing)
-9. [Troubleshooting](#troubleshooting)
-10. [Roadmap](#roadmap)
-11. [Contributing](#contributing)
-12. [License](#license)
+7. [Testing](#testing)
+8. [Troubleshooting](#troubleshooting)
+9. [Roadmap](#roadmap)
 
 ---
 
@@ -46,27 +43,6 @@ It is a learning project that demonstrates chunk-based storage, streaming gRPC r
 
 ---
 
-## Installation
-Clone the repository and pull sub-modules (none right now but good habit):
-
-```bash
-$ git clone https://github.com/mochivi/distributed-file-system.git
-$ cd distributed-file-system
-```
-
-Generate protobuf stubs (optional):
-```bash
-make proto
-```
-
-Build binaries & Docker images:
-```bash
-make build          # go build ./...
-make docker-build   # docker build coordinator & datanode images
-```
-
----
-
 ## Quick start
 Run the integration cluster locally (1 coordinator + 6 datanodes):
 
@@ -78,8 +54,6 @@ Logs are tailed to `./logs/*.log`.  Shut everything down with:
 ```bash
 make integration-down
 ```
-
-> **Tip:** The compose file [`docker-compose.test.yml`](docker-compose.test.yml) can be run directly with `docker compose up` if you prefer.
 
 ---
 
@@ -105,29 +79,7 @@ cmd/            Entrypoints (main.go for coordinator & datanode)
 internal/       Core libraries (client, common, coordinator, datanode, storage)
 pkg/proto/      Generated protobuf & gRPC stubs
 deploy/         Dockerfiles, compose, CI scripts
-tests/          Unit + integration tests
 ```
-
----
-
-## Usage examples
-Upload a file (from the repository root):
-```bash
-# assuming the compose environment is running
-$ go run ./cmd/client upload --file ./README.md --path /user/docs/readme.txt
-```
-
-Download it back:
-```bash
-$ go run ./cmd/client download --path /user/docs/readme.txt --out /tmp/readme.txt
-```
-
-List chunks on a DataNode:
-```bash
-$ grpcurl -plaintext localhost:8081 datanode.DataNodeService/ListChunks
-```
-
-More examples live in [`tests/integration`](tests/integration/) and the Makefile.
 
 ---
 
