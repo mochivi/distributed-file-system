@@ -49,7 +49,7 @@ type downloadSession struct {
 	logger   *slog.Logger // scoped to the upload session
 }
 
-func NewDownloader(config DownloaderConfig, streamer *common.Streamer) *Downloader {
+func NewDownloader(streamer *common.Streamer, config DownloaderConfig) *Downloader {
 	return &Downloader{
 		config:   config,
 		streamer: streamer,

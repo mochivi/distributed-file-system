@@ -42,7 +42,7 @@ func DefaultDatanodeConfig() DataNodeConfig {
 		},
 
 		Replication: ReplicateManagerConfig{
-			ReplicateTimeout: 2 * time.Minute,
+			ReplicateTimeout: 10 * time.Minute,
 		},
 	}
 }

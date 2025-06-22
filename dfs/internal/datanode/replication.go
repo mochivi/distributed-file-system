@@ -90,7 +90,6 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, ch
 
 		semaphore <- struct{}{} // Acquire slot (blocks if channel full)
 		wg.Add(1)
-		acceptedCount.Add(1)
 
 		clientLogger.Debug("Replicating to client")
 		go func() {
@@ -99,15 +98,12 @@ func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, ch
 				wg.Done()
 			}()
 
-			ctx, cancel := context.WithTimeout(context.Background(), rm.Config.ReplicateTimeout)
-			defer cancel()
-
-			if err := rm.replicate(ctx, client, chunkHeader, data, clientLogger); err != nil {
+			if err := rm.replicate(context.Background(), client, chunkHeader, data, clientLogger); err != nil {
 				errChan <- fmt.Errorf("replication failed for client %s: %v", client.Node.Endpoint(), err)
 				return
 			}
 			replicatedNodes.AddNode(client.Node)
-
+			acceptedCount.Add(1)
 			clientLogger.Debug("Replication succeeded")
 		}()
 	}

@@ -29,7 +29,7 @@ const (
 func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.UploadChunkRequest) (*proto.NodeReady, error) {
 	req := common.UploadChunkRequestFromProto(pb)
 
-	logger := logging.OperationLogger(s.logger, "prepare_chunk_upload", slog.String("chunk_id", req.ChunkHeader.ID))
+	logger := logging.OperationLogger(s.logger, "chunk_upload", slog.String("chunk_id", req.ChunkHeader.ID))
 	logger.Info("Received PrepareChunkUpload request")
 
 	// Validate request
@@ -76,7 +76,7 @@ func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.Uploa
 func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.DownloadChunkRequest) (*proto.DownloadReady, error) {
 	req := common.DownloadChunkRequestFromProto(pb)
 
-	logger := logging.OperationLogger(s.logger, "prepare_chunk_download", slog.String("chunk_id", req.ChunkID))
+	logger := logging.OperationLogger(s.logger, "chunk_download", slog.String("chunk_id", req.ChunkID))
 	logger.Info("Received PrepareChunkDownload request")
 
 	if !s.store.Exists(req.ChunkID) {
@@ -269,7 +269,7 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 			Message:   "Chunk replicated successfully",
 			Replicas:  replicaNodes,
 		}.ToProto()); err != nil {
-			session.logger.Error("Failed to send chunk data ack", slog.String("error", err.Error()))
+			session.logger.Error("Failed to send chunk data ack with replicas", slog.String("error", err.Error()))
 			session.Status = SessionFailed
 			return status.Errorf(codes.Internal, "failed to send chunk data ack with replicas: %v", err)
 		}
@@ -311,7 +311,7 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 			break // We've sent the entire file.
 		}
 		if err != nil {
-			logger.Error("Failed to read from chunk source", slog.String("error", err.Error()))
+			session.logger.Error("Failed to read from chunk source", slog.String("error", err.Error()))
 			return status.Errorf(codes.Internal, "failed to read from chunk source: %v", err)
 		}
 
@@ -322,14 +322,14 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 			Offset:    offset,
 			IsFinal:   offset+int64(n) >= int64(len(chunkData)),
 		}); err != nil {
-			logger.Error("Failed to send data frame to client", slog.String("error", err.Error()))
+			session.logger.Error("Failed to send data frame to client", slog.String("error", err.Error()))
 			return err
 		}
 
 		offset += int64(n)
 	}
 
-	logger.Info("Successfully completed streaming chunk to client")
+	session.logger.Info("Successfully completed streaming chunk to client")
 	return nil
 }
 
@@ -372,8 +372,8 @@ func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context, coordinato
 func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([]*common.DataNodeInfo, error) {
 	logger := logging.OperationLogger(s.logger, "replicate_chunk", slog.String("chunk_id", chunkInfo.ID))
 
-	// Select N_NODES possible nodes to replicate to
-	nodes, err := s.nodeManager.SelectBestNodes(N_NODES)
+	// Select N_NODES possible nodes to replicate to, excluding the current node
+	nodes, err := s.nodeManager.SelectBestNodes(N_NODES, s.Config.Info.ID)
 	if err != nil {
 		logger.Error("Failed to select nodes", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to select nodes: %v", err)
@@ -386,7 +386,6 @@ func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([
 		return nil, fmt.Errorf("failed to replicate chunk: %v", err)
 	}
 	replicaNodes = append(replicaNodes, &s.Config.Info) // Add self to the list of replica nodes
-	logger.Info("Chunk replicated successfully")
 
 	return replicaNodes, nil
 }

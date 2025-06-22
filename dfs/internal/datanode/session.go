@@ -112,7 +112,7 @@ func (s *DataNodeServer) createStreamingSession(sessionId string, chunkHeader co
 		SessionID:       sessionId,
 		ChunkHeader:     chunkHeader,
 		CreatedAt:       time.Now(),
-		ExpiresAt:       time.Now().Add(s.Config.Session.SessionTimeout),
+		ExpiresAt:       time.Now().Add(s.Config.Session.SessionTimeout), // How much the client has until they submit a request initiating the streaming session
 		Propagate:       propagate,
 		Status:          SessionActive,
 		RunningChecksum: sha256.New(),

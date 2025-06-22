@@ -22,7 +22,8 @@ services:
       - DATANODE_HOST=datanode1
       - DISK_STORAGE_BASE_DIR=/app
     depends_on:
-      - coordinator
+      coordinator:
+        condition: service_started
     networks:
       - dfs-network
 
@@ -38,7 +39,8 @@ services:
       - DATANODE_HOST=datanode2
       - DISK_STORAGE_BASE_DIR=/app
     depends_on:
-      - coordinator
+      coordinator:
+        condition: service_started
     networks:
       - dfs-network
 
@@ -54,7 +56,8 @@ services:
       - DATANODE_HOST=datanode3
       - DISK_STORAGE_BASE_DIR=/app
     depends_on:
-      - coordinator
+      coordinator:
+        condition: service_started
     networks:
       - dfs-network
 
@@ -70,7 +73,8 @@ services:
       - DATANODE_HOST=datanode4
       - DISK_STORAGE_BASE_DIR=/app
     depends_on:
-      - coordinator
+      coordinator:
+        condition: service_started
     networks:
       - dfs-network
 
@@ -86,7 +90,8 @@ services:
       - DATANODE_HOST=datanode5
       - DISK_STORAGE_BASE_DIR=/app
     depends_on:
-      - coordinator
+      coordinator:
+        condition: service_started
     networks:
       - dfs-network
 
@@ -102,7 +107,8 @@ services:
       - DATANODE_HOST=datanode6
       - DISK_STORAGE_BASE_DIR=/app
     depends_on:
-      - coordinator
+      coordinator:
+        condition: service_started
     networks:
       - dfs-network
 
@@ -127,8 +133,8 @@ services:
       - datanode6
     networks:
       - dfs-network
-    tmpfs: #Store test files in RAM to avoid disk I/O and SSD wear
-      - /app/test-files:size=2G
+    # tmpfs: #Store test files in RAM to avoid disk I/O and SSD wear
+    #   - /app/test-files:size=2G
     ports:
       - "2345:2345"
 

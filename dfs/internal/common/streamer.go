@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"log/slog"
 	"time"
 
@@ -159,6 +160,7 @@ func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamin
 		// Check for context cancellation
 		select {
 		case <-ctx.Done():
+			logger.Info("Chunk data stream cancelled by client")
 			return nil, ctx.Err()
 		default:
 		}
@@ -191,11 +193,25 @@ func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamin
 
 	// If streamer is being used by a client, must wait for another final stream with the replicas information
 	if s.Config.WaitReplicas {
-		finalReplicasResp, err := stream.Recv()
-		if err != nil {
-			return nil, fmt.Errorf("failed to receive replicas response: %w", err)
+		attempt := 0
+		var finalReplicasAck ChunkDataAck
+		for attempt < 3 {
+			finalReplicasResp, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					logger.Debug("Retrying to receive replicas response", slog.Int("attempt", attempt))
+					attempt++
+					time.Sleep(time.Duration(attempt) * 2 * time.Second) // Exponential backoff
+					continue
+				}
+				return nil, fmt.Errorf("failed to receive replicas response: %w", err)
+			}
+			finalReplicasAck = ChunkDataAckFromProto(finalReplicasResp)
+
+			if !finalReplicasAck.Success {
+				return nil, fmt.Errorf("datanode failed to replicate chunk: %s", finalReplicasAck.Message)
+			}
 		}
-		finalReplicasAck := ChunkDataAckFromProto(finalReplicasResp)
 
 		if !finalReplicasAck.Success {
 			return nil, fmt.Errorf("datanode failed to replicate chunk: %s", finalReplicasAck.Message)

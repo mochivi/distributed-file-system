@@ -11,13 +11,15 @@ import (
 // Client performs operations to reach coordinator or data nodes
 type Client struct {
 	coordinatorClient *coordinator.CoordinatorClient
+	uploader          *Uploader
+	downloader        *Downloader
 	streamer          *common.Streamer
 	logger            *slog.Logger
 }
 
-func NewClient(coordinatorClient *coordinator.CoordinatorClient, logger *slog.Logger) *Client {
+func NewClient(coordinatorClient *coordinator.CoordinatorClient, uploader *Uploader, downloader *Downloader, logger *slog.Logger) *Client {
 	clientLogger := logging.ExtendLogger(logger, slog.String("component", "client"))
 	streamer := common.NewStreamer(common.DefaultStreamerConfig())
 	streamer.Config.WaitReplicas = true
-	return &Client{coordinatorClient: coordinatorClient, streamer: streamer, logger: clientLogger}
+	return &Client{coordinatorClient: coordinatorClient, streamer: streamer, logger: clientLogger, uploader: uploader, downloader: downloader}
 }

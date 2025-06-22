@@ -45,13 +45,7 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 
 	uploadCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	// Uploader submits requests to all datanodes with each chunk
-	uploader := NewUploader(c.streamer, metadataSessionLogger, UploaderConfig{
-		NumWorkers:      10,
-		ChunkRetryCount: 3,
-	})
-	chunkInfos, err := uploader.UploadFile(uploadCtx, file, uploadResponse.ChunkLocations, metadataSessionLogger, chunksize)
+	chunkInfos, err := c.uploader.UploadFile(uploadCtx, file, uploadResponse.ChunkLocations, metadataSessionLogger, chunksize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload file: %w", err)
 	}
@@ -92,13 +86,7 @@ func (c *Client) DownloadFile(ctx context.Context, path string) (string, error) 
 	// Control all the goroutines and requests we will make
 	downloadCtx, cancel := context.WithCancel(ctx)
 	defer cancel() // any early return will terminate the created goroutines
-
-	downloader := NewDownloader(DownloaderConfig{
-		NumWorkers:      10,
-		ChunkRetryCount: 3,
-	}, c.streamer)
-
-	tempFile, err := downloader.DownloadFile(downloadCtx, downloadResponse.ChunkLocations, downloadResponse.SessionID, int(downloadResponse.FileInfo.Size), logger)
+	tempFile, err := c.downloader.DownloadFile(downloadCtx, downloadResponse.ChunkLocations, downloadResponse.SessionID, int(downloadResponse.FileInfo.Size), logger)
 	if err != nil {
 		return "", fmt.Errorf("failed to download file: %w", err)
 	}

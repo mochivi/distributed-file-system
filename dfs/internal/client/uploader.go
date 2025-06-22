@@ -12,6 +12,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
 // chunkInfoMap stores information about each datanode where chunks are stored
@@ -161,7 +162,6 @@ func (u *Uploader) UploadFile(ctx context.Context, file *os.File, chunkLocations
 			defer session.wg.Done()
 			for work := range session.workChan {
 				if err := u.processWork(work, session); err != nil {
-					session.logger.Error(fmt.Sprintf("Worker %d failed", workerID), slog.String("error", err.Error()))
 					session.errChan <- err
 				}
 			}
@@ -240,6 +240,7 @@ func (u *Uploader) QueueWork(ctx context.Context, session *uploadSession, file *
 }
 
 func (u *Uploader) processWork(work UploaderWork, session *uploadSession) error {
+	workLogger := logging.OperationLogger(session.logger, "upload_chunk", slog.String("chunk_id", work.chunkHeader.ID))
 	retryCount := 0
 	var replicatedNodes []*common.DataNodeInfo
 	for retryCount < u.config.ChunkRetryCount {
@@ -248,8 +249,10 @@ func (u *Uploader) processWork(work UploaderWork, session *uploadSession) error 
 		if err != nil {
 			retryCount++
 			if retryCount >= u.config.ChunkRetryCount {
+				workLogger.Error("Failed to store chunk after retries", slog.Int("retry_count", retryCount))
 				return fmt.Errorf("failed to store chunk %s after %d retries", work.chunkHeader.ID, retryCount)
 			}
+			workLogger.Info("Retrying to store chunk", slog.Int("retry_count", retryCount))
 			time.Sleep(time.Duration(retryCount) * time.Second)
 			continue
 		}
@@ -266,18 +269,19 @@ func (u *Uploader) processWork(work UploaderWork, session *uploadSession) error 
 }
 
 func (u *Uploader) uploadChunk(work UploaderWork, session *uploadSession) ([]*common.DataNodeInfo, error) {
-	session.logger.Info("Streaming chunk")
+	workLogger := logging.OperationLogger(session.logger, "upload_chunk", slog.String("chunk_id", work.chunkHeader.ID))
+	workLogger.Info("Streaming chunk")
 
 	// Open stream to send chunk data to the datanode
 	client, err := work.GetClient()
 	if err != nil {
-		session.logger.Error("Failed to get client", slog.String("error", err.Error()))
+		workLogger.Error("Failed to get client", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to get client: %w", err)
 	}
 
 	stream, err := client.UploadChunkStream(session.ctx)
 	if err != nil {
-		session.logger.Error("Failed to create upload stream")
+		workLogger.Error("Failed to create upload stream")
 		return nil, fmt.Errorf("failed to create stream for chunk %s: %w", work.chunkHeader.ID, err)
 	}
 
@@ -288,15 +292,15 @@ func (u *Uploader) uploadChunk(work UploaderWork, session *uploadSession) ([]*co
 		Data:        work.data,
 	})
 	if err != nil {
-		session.logger.Error("Failed to stream chunk", slog.String("error", err.Error()))
+		workLogger.Error("Failed to stream chunk", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to stream chunk %s: %w", work.chunkHeader.ID, err)
 	}
 	if replicatedNodes == nil {
-		session.logger.Error("Datanode failed to replicate chunk", slog.String("chunk_id", work.chunkHeader.ID))
+		workLogger.Error("Datanode failed to replicate chunk", slog.String("chunk_id", work.chunkHeader.ID))
 		return nil, fmt.Errorf("datanode failed to replicate chunk %s", work.chunkHeader.ID)
 	}
 
-	session.logger.Info("Chunk streaming completed")
+	workLogger.Info("Chunk streaming completed")
 
 	return replicatedNodes, nil
 }

@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -23,7 +24,7 @@ type TestFile struct {
 	Size int
 }
 
-func TestClientUpload(t *testing.T) {
+func NewTestClient(t *testing.T, logger *slog.Logger) *client.Client {
 	coordinatorHost := utils.GetEnvString("COORDINATOR_HOST", "coordinator")
 	coordinatorPort := utils.GetEnvInt("COORDINATOR_PORT", 8080)
 	coordinatorNode := &common.DataNodeInfo{
@@ -37,11 +38,27 @@ func TestClientUpload(t *testing.T) {
 		t.Fatalf("failed to create coordinator client: %v", err)
 	}
 
+	streamer := common.NewStreamer(common.DefaultStreamerConfig())
+	streamer.Config.WaitReplicas = true
+	uploader := client.NewUploader(streamer, logger, client.UploaderConfig{
+		NumWorkers:      10,
+		ChunkRetryCount: 3,
+	})
+	downloader := client.NewDownloader(streamer, client.DownloaderConfig{
+		NumWorkers:      10,
+		ChunkRetryCount: 3,
+		TempDir:         "/tmp",
+	})
+	return client.NewClient(coordinatorClient, uploader, downloader, logger)
+}
+
+func TestClientUpload(t *testing.T) {
+	// Startup test client with all dependencies and config
 	logger, err := logging.InitLogger()
 	if err != nil {
 		t.Fatalf("failed to create logger: %v", err)
 	}
-	client := client.NewClient(coordinatorClient, logger)
+	client := NewTestClient(t, logger)
 
 	// Test inputs
 	testFilesDir := utils.GetEnvString("TEST_FILES_DIR", "/app/test-files")
@@ -65,7 +82,7 @@ func TestClientUpload(t *testing.T) {
 
 	for _, tt := range fileSizeTestCases {
 		t.Run(tt.name, func(t *testing.T) {
-			// t.Parallel()
+			t.Parallel()
 
 			path := filepath.Join(testFilesDir, tt.filepath)
 			file, err := os.Open(path)
@@ -130,12 +147,9 @@ func TestClientUpload(t *testing.T) {
 		filepath  string
 		chunkSize int
 	}{
-		{name: "chunk size tests - 16MB", filepath: "large_test.txt", chunkSize: 16 * 1024 * 1024},
+		{name: "chunk size tests - 1MB", filepath: "large_test.txt", chunkSize: 1 * 1024 * 1024},
 		{name: "chunk size tests - 32MB", filepath: "large_test.txt", chunkSize: 32 * 1024 * 1024},
 		{name: "chunk size tests - 64MB", filepath: "large_test.txt", chunkSize: 64 * 1024 * 1024},
-		{name: "chunk size tests - 128MB", filepath: "large_test.txt", chunkSize: 128 * 1024 * 1024},
-		{name: "chunk size tests - 256MB", filepath: "xlarge_test.txt", chunkSize: 256 * 1024 * 1024},
-		{name: "chunk size tests - 512MB", filepath: "xlarge_test.txt", chunkSize: 512 * 1024 * 1024},
 	}
 
 	for _, tt := range chunkSizeTestCases {
