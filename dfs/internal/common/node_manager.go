@@ -160,17 +160,19 @@ func (m *NodeManager) SelectBestNodes(n int, self ...string) ([]*DataNodeInfo, e
 }
 
 // Retrieves which nodes have some chunk
-func (m *NodeManager) GetAvailableNodeForChunk(replicaIDs []*DataNodeInfo) (*DataNodeInfo, bool) {
+// TODO: implement a check with the data nodes to see if they have the chunk before adding
+func (m *NodeManager) GetAvailableNodesForChunk(replicaIDs []*DataNodeInfo) ([]*DataNodeInfo, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
+	nodes := make([]*DataNodeInfo, 0, len(replicaIDs))
 	for _, replica := range replicaIDs {
 		if node, exists := m.nodes[replica.ID]; exists && node.Status == NodeHealthy {
-			return node, true
+			nodes = append(nodes, node)
 		}
 	}
 
-	return nil, false
+	return nodes, len(nodes) > 0
 }
 
 // addToHistory adds an update to the circular buffer

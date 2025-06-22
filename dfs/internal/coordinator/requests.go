@@ -71,8 +71,9 @@ func (dr DownloadRequest) ToProto() *proto.DownloadRequest {
 }
 
 type DownloadResponse struct {
-	fileInfo       common.FileInfo
-	chunkLocations []ChunkLocation
+	FileInfo       common.FileInfo
+	ChunkLocations []ChunkLocation
+	SessionID      string
 }
 
 func DownloadResponseFromProto(pb *proto.DownloadResponse) DownloadResponse {
@@ -81,19 +82,21 @@ func DownloadResponseFromProto(pb *proto.DownloadResponse) DownloadResponse {
 		chunkLocations = append(chunkLocations, ChunkLocationFromProto(chunkLocation))
 	}
 	return DownloadResponse{
-		fileInfo:       common.FileInfoFromProto(pb.FileInfo),
-		chunkLocations: chunkLocations,
+		FileInfo:       common.FileInfoFromProto(pb.FileInfo),
+		ChunkLocations: chunkLocations,
+		SessionID:      pb.SessionId,
 	}
 }
 
 func (dr DownloadResponse) ToProto() *proto.DownloadResponse {
-	protoChunkLocations := make([]*proto.ChunkLocation, len(dr.chunkLocations))
-	for _, item := range dr.chunkLocations {
+	protoChunkLocations := make([]*proto.ChunkLocation, len(dr.ChunkLocations))
+	for _, item := range dr.ChunkLocations {
 		protoChunkLocations = append(protoChunkLocations, item.ToProto())
 	}
 	return &proto.DownloadResponse{
-		FileInfo:       dr.fileInfo.ToProto(),
+		FileInfo:       dr.FileInfo.ToProto(),
 		ChunkLocations: protoChunkLocations,
+		SessionId:      dr.SessionID,
 	}
 }
 

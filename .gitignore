@@ -15,3 +15,15 @@
 # Some build stuff
 bin/*
 dfs/bin/*
+
+# test files
+dfs/test-data/*
+dfs/tests/integration/test_files/*
+tests/*
+
+# logs
+logs/*
+
+# docs -- not yet ready for public release
+docs/deployment.md
+docs/contributing.md

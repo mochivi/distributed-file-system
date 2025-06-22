@@ -24,4 +24,19 @@ echo "All test files created:"
 ls -lh ${TEST_FILES_DIR}/*test*.txt
 
 echo "running tests..."
-go test -v -parallel 8 -timeout=300s ./tests/integration/...
+
+if [ "$DEBUG" = "true" ]; then
+    echo "Running in debug mode - waiting for debugger connection on port 2345"
+    # Run specific test with debugger
+    if [ -n "$TEST_NAME" ]; then
+        dlv test --headless --listen=:2345 --api-version=2 --accept-multiclient --log -- -test.run="$TEST_NAME" ./tests/integration/... 
+    else
+        # Run all tests with debugger
+        dlv test --headless --listen=:2345 --api-version=2 --accept-multiclient --log ./tests/integration/...
+    fi
+else
+    echo "Running in normal mode"
+    # Your original test logic here
+    # Replace this with the contents of your original client-test.sh
+    go test -v -parallel 8 -timeout=300s ./tests/integration/...
+fi

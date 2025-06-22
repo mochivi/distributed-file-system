@@ -13,6 +13,15 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
+type SessionStatus int
+
+const (
+	SessionActive SessionStatus = iota
+	SessionCompleted
+	SessionFailed
+	SessionExpired
+)
+
 // SessionManager handles currently open chunk streaming sessions with clients
 type SessionManager struct {
 	sessions map[string]*StreamingSession
@@ -26,7 +35,8 @@ type StreamingSession struct {
 	ExpiresAt time.Time
 
 	// Chunk metadata
-	common.ChunkMeta
+	common.ChunkHeader
+	Propagate bool
 
 	// Runtime state
 	BytesReceived   int64
@@ -34,7 +44,7 @@ type StreamingSession struct {
 	RunningChecksum hash.Hash // Running checksum calculation
 
 	// Concurrency control
-	mutex  sync.RWMutex
+	// mutex  sync.RWMutex
 	Status SessionStatus
 
 	// scoped logger for this session
@@ -49,8 +59,8 @@ func (sm *SessionManager) Store(sessionID string, session *StreamingSession) err
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	if sm.ExistsForChunk(session.ChunkID) {
-		return fmt.Errorf("session for chunk %s already exists", session.ChunkID)
+	if sm.ExistsForChunk(session.ChunkHeader.ID) {
+		return fmt.Errorf("session for chunk %s already exists", session.ChunkHeader.ID)
 	}
 
 	sm.sessions[sessionID] = session
@@ -76,21 +86,34 @@ func (sm *SessionManager) Delete(sessionID string) {
 // Temporary solution to check if a chunk is already being streamed, stops duplicate requests
 func (sm *SessionManager) ExistsForChunk(chunkID string) bool {
 	for _, session := range sm.sessions {
-		if session.ChunkID == chunkID {
+		if session.ChunkHeader.ID == chunkID && session.Status == SessionActive {
 			return true
 		}
 	}
 	return false
 }
 
+func (sm *SessionManager) LoadByChunk(chunkID string) (*StreamingSession, bool) {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	for _, session := range sm.sessions {
+		if session.ChunkHeader.ID == chunkID {
+			return session, true
+		}
+	}
+	return nil, false
+}
+
 // DataNode creates and stores a session
-func (s *DataNodeServer) createStreamingSession(sessionId string, chunkMeta common.ChunkMeta, logger *slog.Logger) error {
-	streamLogger := logging.OperationLogger(logger, "create_streaming_session", slog.String("session_id", sessionId))
+func (s *DataNodeServer) createStreamingSession(sessionId string, chunkHeader common.ChunkHeader, propagate bool, logger *slog.Logger) error {
+	streamLogger := logging.OperationLogger(logger, "chunk_streaming_session", slog.String("session_id", sessionId))
 	session := &StreamingSession{
 		SessionID:       sessionId,
-		ChunkMeta:       chunkMeta,
+		ChunkHeader:     chunkHeader,
 		CreatedAt:       time.Now(),
-		ExpiresAt:       time.Now().Add(s.Config.Session.SessionTimeout),
+		ExpiresAt:       time.Now().Add(s.Config.Session.SessionTimeout), // How much the client has until they submit a request initiating the streaming session
+		Propagate:       propagate,
 		Status:          SessionActive,
 		RunningChecksum: sha256.New(),
 		logger:          streamLogger,
@@ -103,19 +126,19 @@ func (s *DataNodeServer) createStreamingSession(sessionId string, chunkMeta comm
 }
 
 // DataNode retrieves the streaming session
-func (s *DataNodeServer) getStreamingSession(sessionId string) *StreamingSession {
+func (s *DataNodeServer) getStreamingSession(sessionId string) (*StreamingSession, bool) {
 	session, exists := s.sessionManager.Load(sessionId)
 	if !exists {
-		return nil
+		return nil, false
 	}
 
 	// Check if expired
 	if time.Now().After(session.ExpiresAt) {
 		s.sessionManager.Delete(sessionId)
-		return nil
+		return nil, false
 	}
 
 	session.logger.Debug("Streaming session retrieved")
 
-	return session
+	return session, true
 }

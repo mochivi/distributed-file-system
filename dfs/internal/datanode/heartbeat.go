@@ -13,8 +13,7 @@ import (
 )
 
 var (
-	ErrUnsucessfulHearbeat = errors.New("heartbeat error")
-	ErrRequireResync       = errors.New("require node resync")
+	ErrRequireResync = errors.New("require node resync")
 )
 
 // TODO: datanode should be aware of coordinator rotations
@@ -22,6 +21,7 @@ func (s *DataNodeServer) HeartbeatLoop(ctx context.Context, node *common.DataNod
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
+	errorCount := 0
 	for {
 		coordinatorClient, err := coordinator.NewCoordinatorClient(node)
 		if err != nil {
@@ -30,7 +30,12 @@ func (s *DataNodeServer) HeartbeatLoop(ctx context.Context, node *common.DataNod
 
 		if err := s.heartbeat(ctx, coordinatorClient); err != nil {
 			coordinatorClient.Close()
-			return err
+			errorCount++
+			if errorCount > 3 {
+				return fmt.Errorf("heartbeat failed: %w", err)
+			}
+			ticker.Reset(30 * time.Duration(errorCount) * time.Second)
+			continue
 		}
 		coordinatorClient.Close()
 
@@ -56,11 +61,11 @@ func (s *DataNodeServer) heartbeat(ctx context.Context, client *coordinator.Coor
 
 	resp, err := client.DataNodeHeartbeat(ctx, req)
 	if err != nil {
-		return ErrUnsucessfulHearbeat
+		return fmt.Errorf("heartbeat failed: %w", err)
 	}
 
 	if !resp.Success {
-		return fmt.Errorf("heartbeat failed with message '%s': %w", resp.Message, ErrUnsucessfulHearbeat)
+		return fmt.Errorf("heartbeat failed with message '%s'", resp.Message)
 	}
 
 	if resp.RequiresFullResync {

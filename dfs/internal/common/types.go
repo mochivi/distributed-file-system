@@ -59,25 +59,44 @@ func (fi FileInfo) ToProto() *proto.FileInfo {
 	}
 }
 
-// ChunkInfo + proto conversions
-type ChunkInfo struct {
+// ChunkHeader + proto conversions
+type ChunkHeader struct {
 	ID       string
-	Size     int
-	Replicas []*DataNodeInfo // DataNode IDs storing this chunk
+	Version  byte
+	Index    int // Index of the chunk in the file
+	Size     int64
 	Checksum string
 }
 
-func ChunkInfoFromProto(pb *proto.ChunkInfo) ChunkInfo {
-	replicas := make([]*DataNodeInfo, 0, len(pb.Replicas))
-	for _, replica := range pb.Replicas {
-		nodeInfo := DataNodeInfoFromProto(replica)
-		replicas = append(replicas, &nodeInfo)
-	}
-	return ChunkInfo{
+func ChunkHeaderFromProto(pb *proto.ChunkHeader) ChunkHeader {
+	return ChunkHeader{
 		ID:       pb.Id,
-		Size:     int(pb.Size),
-		Replicas: replicas,
+		Version:  byte(pb.Version),
+		Index:    int(pb.Index),
+		Size:     pb.Size,
 		Checksum: pb.Checksum,
+	}
+}
+
+func (ch ChunkHeader) ToProto() *proto.ChunkHeader {
+	return &proto.ChunkHeader{
+		Id:       ch.ID,
+		Version:  uint32(ch.Version),
+		Index:    int32(ch.Index),
+		Size:     ch.Size,
+		Checksum: ch.Checksum,
+	}
+}
+
+type ChunkInfo struct {
+	Header   ChunkHeader
+	Replicas []*DataNodeInfo // DataNode IDs storing this chunk
+}
+
+func ChunkInfoFromProto(pb *proto.ChunkInfo) ChunkInfo {
+	return ChunkInfo{
+		Header:   ChunkHeaderFromProto(pb.Header),
+		Replicas: make([]*DataNodeInfo, 0, len(pb.Replicas)),
 	}
 }
 
@@ -87,10 +106,8 @@ func (ci ChunkInfo) ToProto() *proto.ChunkInfo {
 		protoReplicas = append(protoReplicas, replica.ToProto())
 	}
 	return &proto.ChunkInfo{
-		Id:       ci.ID,
-		Size:     int64(ci.Size),
+		Header:   ci.Header.ToProto(),
 		Replicas: protoReplicas,
-		Checksum: ci.Checksum,
 	}
 }
 

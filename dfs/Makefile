@@ -21,9 +21,12 @@ build: proto
 	@go build -o bin/client ./cmd/client
 	@echo "Build complete"
 
+# Optional log file for docker compose output (can be overridden: `make integration LOG_FILE=my.log`)
+LOG_FILE ?= ../logs/integration_run.log
+
 integration:
-	@echo "Running integration tests"
-	@docker compose -f docker-compose.test.yml up --build
+	@echo "Running integration tests (logs -> $(LOG_FILE))"
+	@docker compose -f docker-compose.test.yml up --build 2>&1 | tee $(LOG_FILE)
 
 integration-down:
 	@echo "Downing containers..."

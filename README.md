@@ -1,139 +1,154 @@
 # Distributed File System (DFS) – Go implementation
 
-A self-contained, **distributed file system written in Go**.  
-It was built as a learning project to sharpen my skills around systems design, gRPC, and distributed systems.
+[![Go](https://img.shields.io/badge/go-1.22+-00ADD8?logo=go)](https://golang.org/) [![CI](https://github.com/mochivi/distributed-file-system/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/mochivi/distributed-file-system/actions) [![License](https://img.shields.io/github/license/mochivi/distributed-file-system)](LICENSE)
 
-👉 **Read the detailed design document here → [docs/design.md](docs/design.md)**
+A **self-contained distributed file-system** written in Go.  
+It is a learning project that demonstrates chunk-based storage, streaming gRPC replication, and metadata coordination – all designed to run locally via Docker.
 
-## Why I wrote this
+> 📖 Detailed design notes are kept in [`docs/design.md`](docs/design.md).
 
-1. **Systems design practice** – implement real-world concerns such as chunk replication, leaderless coordination, and node resync.
-2. **Production-style engineering** – clean logging, modular packages, Docker‐first deployment, GitHub Actions CI.
+---
 
-## High-level architecture
+## Table of contents
+1. [Features](#features)
+2. [Prerequisites](#prerequisites)
+3. [Installation](#installation)
+4. [Quick start](#quick-start)
+5. [Configuration](#configuration)
+6. [Project layout](#project-layout)
+7. [Usage examples](#usage-examples)
+8. [Testing](#testing)
+9. [Troubleshooting](#troubleshooting)
+10. [Roadmap](#roadmap)
+11. [Contributing](#contributing)
+12. [License](#license)
 
-```mermaid
-flowchart LR
-    subgraph "Client"
-        A["CLI / SDK"]
-    end
+---
 
-    subgraph "Coordinator"
-        C1["gRPC API<br/>Metadata manager"]
-    end
+## Features
+* **Coordinator** service that stores *metadata only* (file → chunk map, node membership).
+* **DataNode** that stores chunk bytes on local disk and replicates to peers.
+* **Client SDK** that splits files, uploads chunks in parallel and confirms the upload.
+* Bidirectional streaming gRPC (`ChunkDataStream`) with back-pressure and checksums.
+* Default **replication factor = 3** (1 primary + 2 replicas).
+* Integration test-bed – `docker-compose` spins up 1 × Coordinator + 6 × DataNodes.
+* Pluggable chunk storage – local filesystem today; S3 / GCS adapters planned.
+* Zero external dependencies beyond Go stdlib + gRPC.
 
-    subgraph "Storage cluster"
-        DN1["DataNode – primary"]
-        DN2["DataNode – replica 1"]
-        DN3["DataNode – replica 2"]
-    end
+---
 
-    A -- "Upload / Download" --> C1
-    C1 -- "Chunk plan" --> A
+## Prerequisites
+| Tool | Version | Notes |
+|------|---------|-------|
+| Go   | 1.22 or newer | for building binaries & running unit tests |
+| Docker & Compose | 20.10+ | used for local multi-node cluster |
+| `protoc` + `protoc-gen-go` | optional | only required when modifying `.proto` files |
 
-    %% Client writes chunk to primary
-    A -- "StoreChunk (stream)" --> DN1
+---
 
-    %% Primary replicates chunk via streaming gRPC
-    DN1 -- "ReplicateChunk (stream)" --> DN2
-    DN1 -- "ReplicateChunk (stream)" --> DN3
+## Installation
+Clone the repository and pull sub-modules (none right now but good habit):
 
-    %% Reads can hit any replica
-    A -- "RetrieveChunk" --> DN2
-    A -- "RetrieveChunk" --> DN3
-
-    %% Health-checks
-    DN1 -- "Heartbeat" --> C1
-    DN2 -- "Heartbeat" --> C1
-    DN3 -- "Heartbeat" --> C1
-```
-
-* **Coordinator** – stateless service that holds _metadata only_ (paths, chunk maps). It never stores file bytes.  
-* **DataNode** – stores chunks on local disk, streams data via gRPC, and replicates to peers.  
-* **Client** – CLI / SDK. Splits files, uploads chunks in parallel, confirms upload.
-
-Replication default is **factor 3 → 1 primary + 2 replicas** (constant `N_REPLICAS` in `datanode/server.go`) but it is fully configurable via environment or config file.
-
-## Feature set (implemented)
-
-• gRPC APIs generated via Protocol Buffers  
-• Content-addressed chunking with SHA-256 checksums  
-• Pluggable chunk storage (local disk today)  
-• Heart-beat & node health tracking  
-• Automatic re-replication on write  
-• Integration test-bed with `docker-compose` spinning up 1 × Coordinator + 6 × DataNodes
-• Shared `common.Streamer` abstraction – single implementation used by client uploads *and* DataNode-to-DataNode replication
-• Extended integration-test matrix exercising multiple file sizes (1 MB → 1 GB) and chunk sizes (16 MB → 512 MB)
-
-## Roadmap
-
-- [ ] Garbage cleaning
-- [ ] File encryption
-- [ ] TLS
-- [ ] Access control & authentication  
-- [ ] Gateway API
-- [ ] Client CLI
-- [ ] Observability - log streams
-
-## Project layout
-
-```text
-cmd/            # Entrypoints (main.go for coordinator & datanode)
-internal/       # Core libraries – clean Go modules, no external deps
-pkg/proto/      # Generated protobuf & gRPC stubs
-deploy/         # Dockerfiles, Compose, GitHub Action scripts
-tests/          # Unit + integration tests (go test)
-```
-
-## Getting started locally
-
-Prerequisites: Go 1.24+, Docker / Docker Compose.
-
-Generating proto files:
 ```bash
-make clean
+$ git clone https://github.com/mochivi/distributed-file-system.git
+$ cd distributed-file-system
+```
+
+Generate protobuf stubs (optional):
+```bash
 make proto
 ```
 
-Running integration tests:
-
+Build binaries & Docker images:
 ```bash
-make integration
+make build          # go build ./...
+make docker-build   # docker build coordinator & datanode images
 ```
 
-Cleanup containers
+---
+
+## Quick start
+Run the integration cluster locally (1 coordinator + 6 datanodes):
+
+```bash
+make integration        # same target used by CI
+```
+
+Logs are tailed to `./logs/*.log`.  Shut everything down with:
 ```bash
 make integration-down
 ```
 
-## Continuous Integration
+> **Tip:** The compose file [`docker-compose.test.yml`](docker-compose.test.yml) can be run directly with `docker compose up` if you prefer.
 
-GitHub Actions workflow **`integration-tests.yml`** automatically:
-1. Checks out the repo, sets up Go with caching.  
-2. Builds and runs the full Compose environment in the cloud runner.  
-3. Captures structured logs and uploads them as an artifact for post-run analysis.
+---
 
-## Node-management internals
+## Configuration
+Configuration is currently environment-variable driven.  The most common knobs are:
 
-The **NodeManager** in the coordinator (and a read-only copy inside every DataNode) is the single source of truth for cluster membership and health.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `COORDINATOR_HOST` | `coordinator` | Hostname used by DataNodes & client to reach the coordinator |
+| `COORDINATOR_PORT` | `8080` | gRPC port exposed by coordinator |
+| `DATANODE_HOST` | container name | Advertised host for the DataNode |
+| `DATANODE_PORT` | `8081` | gRPC port for DataNode |
+| `REPLICATE_TIMEOUT` | `2m` | How long the primary waits for each replica during upload |
+| `N_REPLICAS` | **constant 3** | Replication factor (configurable at build-time – TODO make runtime cfg) |
 
-Key mechanics:
+A complete reference with examples lives in [`docs/configuration.md`](docs/configuration.md).
 
-* **Versioned updates** – every add / remove / status change bumps a monotonically increasing `currentVersion`.  The last *N* updates are kept in a circular buffer so DataNodes can request *only* the diff since their last known version.
-* **Heartbeats** – DataNodes ping the coordinator every 30 s with their ID, disk-usage & health. The coordinator replies with:
-  * `updates[]` – incremental changes since the node's `lastSeenVersion`, or
-  * `requiresFullResync = true` if the node is too far behind.
-* **Selector plug-in** – `NodeSelector` interface lets you swap placement strategy.  The default picks the first healthy nodes; you can inject capacity-aware or network-aware selectors easily.
-* **Local caches** – DataNodes keep a local map so they can service reads without asking the coordinator; they apply the incremental updates lazily.
+---
 
-Primary write path:
-1. Client asks coordinator for an upload plan.  
-2. Coordinator fragments the file, chooses a primary + replica set per chunk, and returns `ChunkLocation{ChunkID, Node}` entries.
-3. Client sends **PrepareChunkUpload** with `ChunkMeta` to the primary. The node replies `ChunkUploadReady{sessionID}` if it has capacity.  
-4. Client opens a **ChunkDataStream** (bidirectional streaming RPC) identified by that session ID and pushes the chunk using `common.Streamer`.  
-5. Primary verifies checksum, persists chunk, then performs the same two-phase handshake with each replica (Prepare → Stream) via `ReplicateChunk`.  
-6. Replicas ACK; once the required number succeed the primary reports success.
+## Project layout
+```text
+cmd/            Entrypoints (main.go for coordinator & datanode)
+internal/       Core libraries (client, common, coordinator, datanode, storage)
+pkg/proto/      Generated protobuf & gRPC stubs
+deploy/         Dockerfiles, compose, CI scripts
+tests/          Unit + integration tests
+```
 
-This design keeps metadata centralized while letting data flow peer-to-peer for better throughput.
+---
 
-* **Streaming replication with back-pressure** – once a replica accepts a `ReplicateChunk` request, the primary opens a bidirectional `ChunkDataStream`.  Each data message carries an `offset`, `isFinal` flag and checksum; the replica replies with `ChunkDataAck{bytesReceived, readyForNext}` enabling TCP-like flow control so a slow disk doesn't overwhelm memory on either side.
+## Usage examples
+Upload a file (from the repository root):
+```bash
+# assuming the compose environment is running
+$ go run ./cmd/client upload --file ./README.md --path /user/docs/readme.txt
+```
+
+Download it back:
+```bash
+$ go run ./cmd/client download --path /user/docs/readme.txt --out /tmp/readme.txt
+```
+
+List chunks on a DataNode:
+```bash
+$ grpcurl -plaintext localhost:8081 datanode.DataNodeService/ListChunks
+```
+
+More examples live in [`tests/integration`](tests/integration/) and the Makefile.
+
+---
+
+## Testing
+* **Unit tests** – `make test` runs `go test ./...` with race detector.
+* **Integration** – `make integration` spins up the full cluster and runs end-to-end scenarios.
+* **Lint** – `make lint` executes `golangci-lint run` (requires the tool installed).
+
+CI executes *all* of the above on every pull request.
+
+---
+
+## Troubleshooting
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| `rpc error: code = Canceled desc = context canceled` in DataNode logs | Client closed the stream (timeout or test runner exited) while node was still in `Recv()` | Increase `REPLICATE_TIMEOUT` or wait for goroutines before exiting |
+| `failed to receive replicas response: EOF` on client | Replication exceeded timeout | Tune `REPLICATE_TIMEOUT` or reduce chunk size |
+
+See [`docs/troubleshooting.md`](docs/troubleshooting.md) for more.
+
+---
+
+## Roadmap
+See open issues labelled **`roadmap`** – major items include garbage cleaning, TLS, access control and a richer CLI.

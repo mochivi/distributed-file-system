@@ -1,84 +1,103 @@
 package common
 
-import "github.com/mochivi/distributed-file-system/pkg/proto"
+import (
+	"fmt"
 
-// Coordinates the chunk upload process, if propagate is true, the peer must replicate the chunk to other nodes
-type ChunkMeta struct {
-	ChunkID   string
-	ChunkSize int
-	Checksum  string
-	Propagate bool
+	"github.com/mochivi/distributed-file-system/pkg/proto"
+)
+
+type UploadChunkRequest struct {
+	ChunkHeader ChunkHeader
+	Propagate   bool
 }
 
-func ChunkMetaFromProto(pb *proto.ChunkMeta) ChunkMeta {
-	return ChunkMeta{
-		ChunkID:   pb.ChunkId,
-		ChunkSize: int(pb.ChunkSize),
-		Checksum:  pb.Checksum,
-		Propagate: pb.Propagate,
+func UploadChunkRequestFromProto(pb *proto.UploadChunkRequest) UploadChunkRequest {
+	return UploadChunkRequest{
+		ChunkHeader: ChunkHeaderFromProto(pb.ChunkHeader),
+		Propagate:   pb.Propagate,
 	}
 }
 
-func (cm ChunkMeta) ToProto() *proto.ChunkMeta {
-	return &proto.ChunkMeta{
-		ChunkId:   cm.ChunkID,
-		ChunkSize: int64(cm.ChunkSize),
-		Checksum:  cm.Checksum,
-		Propagate: cm.Propagate,
+func (ucr UploadChunkRequest) ToProto() *proto.UploadChunkRequest {
+	return &proto.UploadChunkRequest{
+		ChunkHeader: ucr.ChunkHeader.ToProto(),
+		Propagate:   ucr.Propagate,
 	}
 }
 
 // Coordinates the chunk upload process, if accept is true, the peer can start streaming the chunk data
-type ChunkUploadReady struct {
+type NodeReady struct {
 	Accept    bool
 	Message   string
 	SessionID string
 }
 
-func ChunkUploadReadyFromProto(pb *proto.ChunkUploadReady) ChunkUploadReady {
-	return ChunkUploadReady{
+func NodeReadyFromProto(pb *proto.NodeReady) NodeReady {
+	return NodeReady{
 		Accept:    pb.Accept,
 		Message:   pb.Message,
 		SessionID: pb.SessionId,
 	}
 }
 
-func (cuu ChunkUploadReady) ToProto() *proto.ChunkUploadReady {
-	return &proto.ChunkUploadReady{
+func (cuu NodeReady) ToProto() *proto.NodeReady {
+	return &proto.NodeReady{
 		Accept:    cuu.Accept,
 		Message:   cuu.Message,
 		SessionId: cuu.SessionID,
 	}
 }
 
-type RetrieveChunkRequest struct {
+type DownloadChunkRequest struct {
 	ChunkID string
 }
 
-func RetrieveChunkRequestFromProto(pb *proto.RetrieveChunkRequest) RetrieveChunkRequest {
-	return RetrieveChunkRequest{ChunkID: pb.ChunkId}
+func DownloadChunkRequestFromProto(pb *proto.DownloadChunkRequest) DownloadChunkRequest {
+	return DownloadChunkRequest{ChunkID: pb.ChunkId}
 }
-func (rtr RetrieveChunkRequest) ToProto() *proto.RetrieveChunkRequest {
-	return &proto.RetrieveChunkRequest{ChunkId: rtr.ChunkID}
-}
-
-type RetrieveChunkResponse struct {
-	Data     []byte
-	Checksum string
+func (r DownloadChunkRequest) ToProto() *proto.DownloadChunkRequest {
+	return &proto.DownloadChunkRequest{ChunkId: r.ChunkID}
 }
 
-func RetrieveChunkResponseFromProto(pb *proto.RetrieveChunkResponse) RetrieveChunkResponse {
-	return RetrieveChunkResponse{
-		Data:     pb.Data,
-		Checksum: pb.Checksum,
+type DownloadReady struct {
+	NodeReady
+	ChunkHeader ChunkHeader
+}
+
+func DownloadReadyFromProto(pb *proto.DownloadReady) DownloadReady {
+	return DownloadReady{
+		NodeReady:   NodeReadyFromProto(pb.Ready),
+		ChunkHeader: ChunkHeaderFromProto(pb.ChunkHeader),
 	}
 }
 
-func (rcr RetrieveChunkResponse) ToProto() *proto.RetrieveChunkResponse {
-	return &proto.RetrieveChunkResponse{
-		Data:     rcr.Data,
-		Checksum: rcr.Checksum,
+func (dr DownloadReady) ToProto() *proto.DownloadReady {
+	return &proto.DownloadReady{
+		Ready:       dr.NodeReady.ToProto(),
+		ChunkHeader: dr.ChunkHeader.ToProto(),
 	}
+}
+
+type DownloadStreamRequest struct {
+	SessionID       string
+	ChunkStreamSize int32
+}
+
+func DownloadStreamRequestFromProto(pb *proto.DownloadStreamRequest) (DownloadStreamRequest, error) {
+	req := DownloadStreamRequest{SessionID: pb.SessionId, ChunkStreamSize: pb.ChunkStreamSize}
+
+	if req.ChunkStreamSize > 1024*1024 {
+		return DownloadStreamRequest{}, fmt.Errorf("chunk stream size is too large")
+	}
+
+	if req.ChunkStreamSize <= 0 {
+		pb.ChunkStreamSize = int32(DefaultStreamerConfig().ChunkStreamSize)
+	}
+	return req, nil
+}
+
+func (r DownloadStreamRequest) ToProto() *proto.DownloadStreamRequest {
+	return &proto.DownloadStreamRequest{SessionId: r.SessionID, ChunkStreamSize: r.ChunkStreamSize}
 }
 
 type DeleteChunkRequest struct {
@@ -149,25 +168,37 @@ type ChunkDataAck struct {
 	Message       string
 	BytesReceived int
 	ReadyForNext  bool
+	Replicas      []*DataNodeInfo
 }
 
 func ChunkDataAckFromProto(pb *proto.ChunkDataAck) ChunkDataAck {
+	replicas := make([]*DataNodeInfo, len(pb.Replicas))
+	for i, replica := range pb.Replicas {
+		replicaInfo := DataNodeInfoFromProto(replica)
+		replicas[i] = &replicaInfo
+	}
 	return ChunkDataAck{
 		SessionID:     pb.SessionId,
 		Success:       pb.Success,
 		Message:       pb.Message,
 		BytesReceived: int(pb.BytesReceived),
 		ReadyForNext:  pb.ReadyForNext,
+		Replicas:      replicas,
 	}
 }
 
 func (cda ChunkDataAck) ToProto() *proto.ChunkDataAck {
+	replicas := make([]*proto.DataNodeInfo, len(cda.Replicas))
+	for i, replica := range cda.Replicas {
+		replicas[i] = replica.ToProto()
+	}
 	return &proto.ChunkDataAck{
 		SessionId:     cda.SessionID,
 		Success:       cda.Success,
 		Message:       cda.Message,
 		BytesReceived: int64(cda.BytesReceived),
 		ReadyForNext:  cda.ReadyForNext,
+		Replicas:      replicas,
 	}
 }
 

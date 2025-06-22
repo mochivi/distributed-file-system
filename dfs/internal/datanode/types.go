@@ -12,19 +12,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const (
-	DEFAULT_REPLICAS = 3
-)
-
-type SessionStatus int
-
-const (
-	SessionActive SessionStatus = iota
-	SessionCompleted
-	SessionFailed
-	SessionExpired
-)
-
 // Implements the proto.DataNodeServiceServer interface
 type DataNodeServer struct {
 	proto.UnimplementedDataNodeServiceServer
@@ -47,8 +34,8 @@ type DataNodeClient struct {
 }
 
 type IReplicationManager interface {
-	paralellReplicate(nodes []*common.DataNodeInfo, chunkMeta common.ChunkMeta, data []byte, requiredReplicas int) error
-	replicate(ctx context.Context, client *DataNodeClient, req common.ChunkMeta, data []byte, clientLogger *slog.Logger) error
+	paralellReplicate(nodes []*common.DataNodeInfo, chunkInfo common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error)
+	replicate(ctx context.Context, client *DataNodeClient, req common.ChunkHeader, data []byte, clientLogger *slog.Logger) error
 }
 
 type ISessionManager interface {
@@ -56,6 +43,7 @@ type ISessionManager interface {
 	Load(sessionID string) (*StreamingSession, bool)
 	Delete(sessionID string)
 	ExistsForChunk(chunkID string) bool
+	LoadByChunk(chunkID string) (*StreamingSession, bool)
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,

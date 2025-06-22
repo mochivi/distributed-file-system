@@ -2,8 +2,8 @@ package coordinator
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
-	"math/rand"
 
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
@@ -28,7 +28,7 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		chunkSize = c.config.ChunkSize * 1024 * 1024
 	}
 	numChunks := (req.Size + chunkSize - 1) / chunkSize
-	c.logger.Debug("File will be split into chunks", slog.Int("num_chunks", numChunks), slog.Int("chunk_size", chunkSize/(1024*1024)))
+	c.logger.Debug(fmt.Sprintf("File will be split into %d chunks of %dMB", numChunks, chunkSize/(1024*1024)))
 
 	// Get a list of the best nodes to upload to
 	nodes, err := c.nodeManager.SelectBestNodes(numChunks)
@@ -43,13 +43,20 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		chunkID := common.FormatChunkID(req.Path, i)
 
 		// Randomly select a node from the available nodes
-		nodeIndex := rand.Intn(len(nodes))
-		node := nodes[nodeIndex]
+		selectedNodes := make([]*common.DataNodeInfo, 0, 3)
+		count := 0
+		for _, node := range nodes {
+			selectedNodes = append(selectedNodes, node)
+			count++
+			if count >= 3 {
+				break
+			}
+		}
 
 		// Add chunk location to assignment
 		assignments[i] = ChunkLocation{
 			ChunkID: chunkID,
-			Node:    node,
+			Nodes:   selectedNodes,
 		}
 	}
 
@@ -78,22 +85,23 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 
 	// Find available nodes to download from for this chunk
 	for i, chunk := range fileInfo.Chunks {
-		node, ok := c.nodeManager.GetAvailableNodeForChunk(chunk.Replicas)
+		nodes, ok := c.nodeManager.GetAvailableNodesForChunk(chunk.Replicas)
 		if !ok {
-			c.logger.Error("Failed to get available node for chunk", slog.String("chunk_id", chunk.ID), slog.String("file_path", req.Path))
+			c.logger.Error("Failed to get available node for chunk", slog.String("chunk_id", chunk.Header.ID), slog.String("file_path", req.Path))
 			return nil, status.Error(codes.NotFound, "no available nodes")
 		}
 
 		chunkLocations[i] = ChunkLocation{
-			ChunkID: chunk.ID,
-			Node:    node,
+			ChunkID: chunk.Header.ID,
+			Nodes:   nodes,
 		}
 	}
 
 	c.logger.Debug("Replying to client with chunk locations", slog.Int("num_chunks", len(chunkLocations)))
 	return DownloadResponse{
-		fileInfo:       *fileInfo,
-		chunkLocations: chunkLocations,
+		FileInfo:       *fileInfo,
+		ChunkLocations: chunkLocations,
+		SessionID:      uuid.NewString(), // TODO: this should be a session id that is used to track the download
 	}.ToProto(), nil
 }
 

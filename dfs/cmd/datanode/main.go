@@ -20,6 +20,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
+	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
@@ -213,11 +214,15 @@ func initServer(nodeConfig datanode.DataNodeConfig, logger *slog.Logger) (*datan
 	// ChunkStore implementation is chosen here
 	baseDir := utils.GetEnvString("DISK_STORAGE_BASE_DIR", "/app")
 	rootDir := filepath.Join(baseDir, "data")
-	chunkStore, err := chunk.NewChunkDiskStorage(chunk.DiskStorageConfig{
+
+	diskStorageConfig := chunk.DiskStorageConfig{
 		Enabled: true,
 		Kind:    "block",
 		RootDir: rootDir,
-	}, logger)
+	}
+	chunkSerializer := encoding.NewProtoSerializer()
+
+	chunkStore, err := chunk.NewChunkDiskStorage(diskStorageConfig, chunkSerializer, logger)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
