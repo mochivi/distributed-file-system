@@ -23,3 +23,7 @@ tests/*
 
 # logs
 logs/*
+
+# docs -- not yet ready for public release
+docs/deployment.md
+docs/contributing.md
