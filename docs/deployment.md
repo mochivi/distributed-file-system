@@ -50,7 +50,7 @@ export DATANODE_HOST=127.0.0.1
 ---
 
 ## 3. Kubernetes
-An example Helm chart is planned (see issue #61).  Until then you can run the
+An example Helm chart is planned.  Until then you can run the
 containers directly:
 
 ```yaml
