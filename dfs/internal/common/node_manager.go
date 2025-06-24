@@ -5,12 +5,35 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
 
+type INodeManager interface {
+	GetCurrentVersion() int64
+	GetNode(nodeID string) (*DataNodeInfo, bool)
+	AddNode(node *DataNodeInfo)
+	RemoveNode(nodeID string) error
+	UpdateNode(node *DataNodeInfo) error
+	ListNodes() ([]*DataNodeInfo, int64)
+	GetUpdatesSince(sinceVersion int64) ([]NodeUpdate, int64, error)
+	IsVersionTooOld(version int64) bool
+	SelectBestNodes(n int, self ...string) ([]*DataNodeInfo, error)
+	GetAvailableNodesForChunk(replicaIDs []*DataNodeInfo) ([]*DataNodeInfo, bool)
+	ApplyHistory(updates []NodeUpdate)
+	InitializeNodes(nodes []*DataNodeInfo, currentVersion int64)
+	GetCoordinatorNode() (*DataNodeInfo, bool)
+	AddCoordinatorNode(node *DataNodeInfo)
+	RemoveCoordinatorNode(nodeID string)
+	ListCoordinatorNodes() ([]*DataNodeInfo, int64)
+	BootstrapCoordinatorNode() error
+}
+
 type NodeManager struct {
-	nodes    map[string]*DataNodeInfo
-	mu       sync.RWMutex
-	selector NodeSelector
+	coordinatorNodes map[string]*DataNodeInfo // coordinator nodes
+	nodes            map[string]*DataNodeInfo // data nodes
+	mu               sync.RWMutex
+	selector         NodeSelector
 
 	// Version control fields
 	currentVersion int64
@@ -21,13 +44,74 @@ type NodeManager struct {
 
 func NewNodeManager(selector NodeSelector) *NodeManager {
 	return &NodeManager{
-		nodes:          make(map[string]*DataNodeInfo),
-		selector:       selector,
-		currentVersion: 0,
-		updateHistory:  make([]NodeUpdate, 1000), // Keep last 1000 node updates in stash
-		maxHistorySize: 1000,
-		historyIndex:   0,
+		coordinatorNodes: make(map[string]*DataNodeInfo),
+		nodes:            make(map[string]*DataNodeInfo),
+		selector:         selector,
+		currentVersion:   0,
+		updateHistory:    make([]NodeUpdate, 1000), // Keep last 1000 node updates in stash
+		maxHistorySize:   1000,
+		historyIndex:     0,
 	}
+}
+
+func (m *NodeManager) BootstrapCoordinatorNode() error {
+	coordinatorHost := utils.GetEnvString("COORDINATOR_HOST", "coordinator")
+	coordinatorPort := utils.GetEnvInt("COORDINATOR_PORT", 8080)
+	coordinatorNode := &DataNodeInfo{
+		ID:     "coordinator", // TODO: change to coordinator ID when implemented, should be received from some service discovery/config storage system
+		Host:   coordinatorHost,
+		Port:   coordinatorPort,
+		Status: NodeHealthy,
+	}
+	m.AddCoordinatorNode(coordinatorNode)
+	return nil
+}
+
+func (m *NodeManager) AddCoordinatorNode(node *DataNodeInfo) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.coordinatorNodes[node.ID] = node
+}
+
+func (m *NodeManager) RemoveCoordinatorNode(nodeID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.coordinatorNodes, nodeID)
+}
+
+func (m *NodeManager) GetCoordinatorNode() (*DataNodeInfo, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.determineCoordinatorNode()
+}
+
+// TODO: implement coordinator node selection algorithm
+func (m *NodeManager) determineCoordinatorNode() (*DataNodeInfo, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if len(m.coordinatorNodes) == 0 {
+		return nil, false
+	}
+
+	// TODO: implement coordinator node selection algorithm
+	for _, node := range m.coordinatorNodes {
+		if node.Status == NodeHealthy {
+			return node, true
+		}
+	}
+
+	return nil, false
+}
+
+func (m *NodeManager) ListCoordinatorNodes() ([]*DataNodeInfo, int64) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	nodes := make([]*DataNodeInfo, 0, len(m.coordinatorNodes))
+	for _, node := range m.coordinatorNodes {
+		nodes = append(nodes, node)
+	}
+	return nodes, m.currentVersion
 }
 
 func (m *NodeManager) GetNode(nodeID string) (*DataNodeInfo, bool) {
@@ -219,7 +303,7 @@ func (m *NodeManager) ApplyHistory(updates []NodeUpdate) {
 	}
 }
 
-// Given an array of DataNodeInfo, initialize the no
+// Given an array of DataNodeInfo, initialize the nodes
 // Only used by data nodes
 func (m *NodeManager) InitializeNodes(nodes []*DataNodeInfo, currentVersion int64) {
 	m.mu.Lock()

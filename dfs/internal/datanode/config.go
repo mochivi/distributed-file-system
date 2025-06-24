@@ -1,6 +1,7 @@
 package datanode
 
 import (
+	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,6 +27,8 @@ type ReplicateManagerConfig struct {
 
 func DefaultDatanodeConfig() DataNodeConfig {
 	datanodeHost := utils.GetEnvString("DATANODE_HOST", "0.0.0.0")
+	baseDir := utils.GetEnvString("DISK_STORAGE_BASE_DIR", "/app")
+
 	return DataNodeConfig{
 		Info: common.DataNodeInfo{
 			ID:       uuid.NewString(),
@@ -43,6 +46,12 @@ func DefaultDatanodeConfig() DataNodeConfig {
 
 		Replication: ReplicateManagerConfig{
 			ReplicateTimeout: 10 * time.Minute,
+		},
+
+		DiskStorage: chunk.DiskStorageConfig{
+			Enabled: true,
+			Kind:    "block",
+			RootDir: filepath.Join(baseDir, "data"),
 		},
 	}
 }

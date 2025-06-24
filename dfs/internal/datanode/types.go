@@ -19,7 +19,7 @@ type DataNodeServer struct {
 	store              storage.ChunkStorage
 	replicationManager IReplicationManager
 	sessionManager     ISessionManager
-	nodeManager        *common.NodeManager
+	NodeManager        common.INodeManager
 
 	Config DataNodeConfig
 
@@ -34,7 +34,7 @@ type DataNodeClient struct {
 }
 
 type IReplicationManager interface {
-	paralellReplicate(nodes []*common.DataNodeInfo, chunkInfo common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error)
+	paralellReplicate(clients []*DataNodeClient, chunkInfo common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error)
 	replicate(ctx context.Context, client *DataNodeClient, req common.ChunkHeader, data []byte, clientLogger *slog.Logger) error
 }
 
@@ -47,22 +47,24 @@ type ISessionManager interface {
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
-	nodeManager *common.NodeManager, config DataNodeConfig, logger *slog.Logger) *DataNodeServer {
+	nodeManager common.INodeManager, config DataNodeConfig, logger *slog.Logger) *DataNodeServer {
 	datanodeLogger := logging.ExtendLogger(logger, slog.String("component", "datanode_server"))
 	return &DataNodeServer{
 		store:              store,
 		replicationManager: replicationManager,
 		sessionManager:     sessionManager,
-		nodeManager:        nodeManager,
+		NodeManager:        nodeManager,
 		Config:             config,
 		logger:             datanodeLogger,
 	}
 }
 
-func NewDataNodeClient(node *common.DataNodeInfo) (*DataNodeClient, error) {
+func NewDataNodeClient(node *common.DataNodeInfo, opts ...grpc.DialOption) (*DataNodeClient, error) {
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
 	conn, err := grpc.NewClient(
 		node.Endpoint(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // Update to TLS in prod
+		opts...,
 	)
 	if err != nil {
 		return nil, err

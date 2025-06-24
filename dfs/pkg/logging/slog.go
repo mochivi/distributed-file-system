@@ -2,60 +2,11 @@ package logging
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
-	"time"
 
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
-
-// SetupLogger configures slog with detailed output and node identification
-func SetupLogger(nodeID string, logLevel slog.Level) *slog.Logger {
-	// Create a custom handler options
-	opts := &slog.HandlerOptions{
-		Level:     logLevel,
-		AddSource: true, // This adds source file and line number
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			// Customize timestamp format
-			if a.Key == slog.TimeKey {
-				return slog.Attr{
-					Key:   "timestamp",
-					Value: slog.StringValue(a.Value.Time().Format(time.RFC3339Nano)),
-				}
-			}
-			// Customize level display
-			if a.Key == slog.LevelKey {
-				return slog.Attr{
-					Key:   "level",
-					Value: slog.StringValue(a.Value.String()),
-				}
-			}
-			// Customize source information for better readability
-			if a.Key == slog.SourceKey {
-				source := a.Value.Any().(*slog.Source)
-				return slog.Attr{
-					Key: "source",
-					Value: slog.StringValue(
-						fmt.Sprintf("%s:%d", source.File, source.Line),
-					),
-				}
-			}
-			return a
-		},
-	}
-
-	// Create JSON handler for structured logging
-	handler := slog.NewJSONHandler(os.Stdout, opts)
-
-	// Create logger with node ID as a persistent attribute
-	logger := slog.New(handler).With(
-		slog.String("node_id", nodeID),
-		slog.String("service", "your-service-name"), // Optional: add service name
-	)
-
-	return logger
-}
 
 // TextLogger can be used during development for more readable logs
 func SetupTextLogger(logLevel slog.Level) *slog.Logger {
@@ -79,21 +30,27 @@ func SetupTextLogger(logLevel slog.Level) *slog.Logger {
 	return slog.New(handler)
 }
 
+// NewTestLogger is a test logger that is used for testing
+func NewTestLogger(logLevel slog.Level) *slog.Logger {
+	return SetupTextLogger(logLevel)
+}
+
 // Initialize your service with configured logger
 func InitLogger() (*slog.Logger, error) {
-	logLevel := slog.LevelInfo
 	var logger *slog.Logger
 
-	environment := utils.GetEnvString("ENVIRONMENT", "development")
-	switch environment {
-	case "development":
-		logLevel = slog.LevelDebug
-		logger = SetupTextLogger(logLevel)
-	case "production":
-		logLevel = slog.LevelInfo
-		logger = SetupTextLogger(logLevel)
+	logLevelStr := utils.GetEnvString("LOG_LEVEL", "info")
+	switch logLevelStr {
+	case "debug":
+		logger = SetupTextLogger(slog.LevelDebug)
+	case "info":
+		logger = SetupTextLogger(slog.LevelInfo)
+	case "warn":
+		logger = SetupTextLogger(slog.LevelWarn)
+	case "error":
+		logger = SetupTextLogger(slog.LevelError)
 	default:
-		return nil, errors.New("invalid environment")
+		return nil, errors.New("invalid log level")
 	}
 
 	if logger == nil {

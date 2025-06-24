@@ -34,38 +34,26 @@ type ReplicationManager struct {
 	logger   *slog.Logger
 }
 
-func NewReplicationManager(config ReplicateManagerConfig, logger *slog.Logger) *ReplicationManager {
+func NewReplicationManager(config ReplicateManagerConfig, streamer *common.Streamer, logger *slog.Logger) *ReplicationManager {
 	logger = logging.ExtendLogger(logger, slog.String("component", "replication_manager"))
 	return &ReplicationManager{
 		Config:   config,
-		streamer: common.NewStreamer(common.DefaultStreamerConfig()),
+		streamer: streamer,
 		logger:   logger,
 	}
 }
 
 // paralellReplicate replicates the chunk to the given nodes in parallel
-func (rm *ReplicationManager) paralellReplicate(nodes []*common.DataNodeInfo, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error) {
+func (rm *ReplicationManager) paralellReplicate(clients []*DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error) {
 	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", chunkHeader.ID))
-
-	if len(nodes) == 0 {
-		return nil, fmt.Errorf("no node endpoints provided")
+	if len(clients) == 0 {
+		return nil, fmt.Errorf("no clients provided")
+	}
+	if requiredReplicas > len(clients) {
+		return nil, fmt.Errorf("required replicas (%d) is greater than the number of available clients (%d)", requiredReplicas, len(clients))
 	}
 
 	replicatedNodes := ReplicatedNodes{}
-
-	// Create clients
-	var clients []*DataNodeClient
-	for _, node := range nodes {
-		client, err := NewDataNodeClient(node)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create client for %s - [%s]  %v", node.ID, node.Endpoint(), err)
-		}
-		if client == nil {
-			return nil, fmt.Errorf("client for %v is nil", node)
-		}
-		clients = append(clients, client)
-	}
-	logger.Debug(fmt.Sprintf("Created connection to %d clients", len(clients)))
 
 	// Clean up all clients
 	defer func() {

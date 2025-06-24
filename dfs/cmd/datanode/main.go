@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -23,7 +22,6 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
-	"github.com/mochivi/distributed-file-system/pkg/utils"
 	"google.golang.org/grpc"
 )
 
@@ -121,17 +119,13 @@ func main() {
 	}()
 
 	// Register datanode with coordinator - if fails, should crash
-	coordinatorHost := utils.GetEnvString("COORDINATOR_HOST", "coordinator")
-	coordinatorPort := utils.GetEnvInt("COORDINATOR_PORT", 8080)
-	coordinatorNode := &common.DataNodeInfo{
-		ID:     "coordinator", // TODO: change to coordinator ID when implemented, should be received from some service discovery/config storage system
-		Host:   coordinatorHost,
-		Port:   coordinatorPort,
-		Status: common.NodeHealthy,
+	if err := server.NodeManager.BootstrapCoordinatorNode(); err != nil {
+		logger.Error("Failed to bootstrap coordinator node", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 
 	// Register datanode with coordinator
-	if err := server.RegisterWithCoordinator(ctx, coordinatorNode); err != nil {
+	if err := server.RegisterWithCoordinator(ctx); err != nil {
 		logger.Error("Failed to register with coordinator", slog.String("error", err.Error()))
 	}
 
@@ -150,7 +144,7 @@ func main() {
 		defer heartbeatCancel()
 
 		logger.Info("Starting heartbeat loop...")
-		if err := server.HeartbeatLoop(heartbeatCtx, coordinatorNode); err != nil {
+		if err := server.HeartbeatLoop(heartbeatCtx); err != nil {
 			// Only send error if it's not due to context cancellation
 			select {
 			case <-ctx.Done():
@@ -212,17 +206,9 @@ func main() {
 
 func initServer(nodeConfig datanode.DataNodeConfig, logger *slog.Logger) (*datanode.DataNodeServer, error) {
 	// ChunkStore implementation is chosen here
-	baseDir := utils.GetEnvString("DISK_STORAGE_BASE_DIR", "/app")
-	rootDir := filepath.Join(baseDir, "data")
-
-	diskStorageConfig := chunk.DiskStorageConfig{
-		Enabled: true,
-		Kind:    "block",
-		RootDir: rootDir,
-	}
 	chunkSerializer := encoding.NewProtoSerializer()
 
-	chunkStore, err := chunk.NewChunkDiskStorage(diskStorageConfig, chunkSerializer, logger)
+	chunkStore, err := chunk.NewChunkDiskStorage(nodeConfig.DiskStorage, chunkSerializer, logger)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -230,7 +216,8 @@ func initServer(nodeConfig datanode.DataNodeConfig, logger *slog.Logger) (*datan
 	// Datanode dependencies
 	nodeSelector := common.NewNodeSelector()
 	nodeManager := common.NewNodeManager(nodeSelector)
-	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, logger)
+	streamer := common.NewStreamer(common.DefaultStreamerConfig())
+	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, streamer, logger)
 	sessionManager := datanode.NewSessionManager()
 
 	return datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeConfig, logger), nil

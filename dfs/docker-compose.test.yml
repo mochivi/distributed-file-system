@@ -121,7 +121,8 @@ services:
       - TEST_FILES_DIR=/app/test-files
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
-      - ENVIRONMENT=production # TODO: reduces logging verbosity, add log level as env var
+      - ENVIRONMENT=development
+      - LOG_LEVEL=info
       - DEBUG=${DEBUG_INTEGRATION_TESTS:-false}
     depends_on:
       - coordinator
@@ -133,8 +134,8 @@ services:
       - datanode6
     networks:
       - dfs-network
-    # tmpfs: #Store test files in RAM to avoid disk I/O and SSD wear
-    #   - /app/test-files:size=2G
+    tmpfs: #Store test files in RAM to avoid disk I/O and SSD wear
+      - /app/test-files:size=2G
     ports:
       - "2345:2345"
 
