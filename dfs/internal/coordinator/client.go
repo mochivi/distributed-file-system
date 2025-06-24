@@ -9,11 +9,24 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+type ICoordinatorClient interface {
+	Close() error
+	UploadFile(ctx context.Context, req UploadRequest, opts ...grpc.CallOption) (UploadResponse, error)
+	DownloadFile(ctx context.Context, req DownloadRequest, opts ...grpc.CallOption) (DownloadResponse, error)
+	DeleteFile(ctx context.Context, req DeleteRequest, opts ...grpc.CallOption) (DeleteResponse, error)
+	ConfirmUpload(ctx context.Context, req ConfirmUploadRequest, opts ...grpc.CallOption) (ConfirmUploadResponse, error)
+	ListFiles(ctx context.Context, req ListRequest, opts ...grpc.CallOption) (ListResponse, error)
+	RegisterDataNode(ctx context.Context, req RegisterDataNodeRequest, opts ...grpc.CallOption) (RegisterDataNodeResponse, error)
+	DataNodeHeartbeat(ctx context.Context, req HeartbeatRequest, opts ...grpc.CallOption) (HeartbeatResponse, error)
+	ListNodes(ctx context.Context, rqe ListNodesRequest, opts ...grpc.CallOption) (ListNodesResponse, error)
+	Node() *common.DataNodeInfo
+}
+
 // Wrapper over the proto.CoordinatorServiceClient interface
 type CoordinatorClient struct {
 	client proto.CoordinatorServiceClient
 	conn   *grpc.ClientConn
-	Node   *common.DataNodeInfo
+	node   *common.DataNodeInfo
 }
 
 func NewCoordinatorClient(node *common.DataNodeInfo) (*CoordinatorClient, error) {
@@ -30,7 +43,7 @@ func NewCoordinatorClient(node *common.DataNodeInfo) (*CoordinatorClient, error)
 	return &CoordinatorClient{
 		client: client,
 		conn:   conn,
-		Node:   node,
+		node:   node,
 	}, nil
 }
 
@@ -101,4 +114,9 @@ func (c *CoordinatorClient) ListNodes(ctx context.Context, rqe ListNodesRequest,
 		return ListNodesResponse{}, err
 	}
 	return ListNodesResponseFromProto(resp), nil
+}
+
+// Other methods not related to the gRPC server
+func (c *CoordinatorClient) Node() *common.DataNodeInfo {
+	return c.node
 }

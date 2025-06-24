@@ -339,7 +339,12 @@ func (s *DataNodeServer) HealthCheck(ctx context.Context, pb *proto.HealthCheckR
 	return nil, nil
 }
 
-func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context, coordinatorNode *common.DataNodeInfo) error {
+func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context) error {
+	coordinatorNode, ok := s.NodeManager.GetCoordinatorNode()
+	if !ok {
+		return fmt.Errorf("no coordinator node found")
+	}
+
 	logger := logging.OperationLogger(s.logger, "register", slog.String("coordinator_address", coordinatorNode.Endpoint()))
 	logger.Info("Registering with coordinator")
 
@@ -362,7 +367,7 @@ func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context, coordinato
 	}
 
 	// Save information about all nodes
-	s.nodeManager.InitializeNodes(resp.FullNodeList, resp.CurrentVersion)
+	s.NodeManager.InitializeNodes(resp.FullNodeList, resp.CurrentVersion)
 
 	logger.Info("Datanode registered with coordinator successfully")
 	return nil
@@ -373,7 +378,7 @@ func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([
 	logger := logging.OperationLogger(s.logger, "replicate_chunk", slog.String("chunk_id", chunkInfo.ID))
 
 	// Select N_NODES possible nodes to replicate to, excluding the current node
-	nodes, err := s.nodeManager.SelectBestNodes(N_NODES, s.Config.Info.ID)
+	nodes, err := s.NodeManager.SelectBestNodes(N_NODES, s.Config.Info.ID)
 	if err != nil {
 		logger.Error("Failed to select nodes", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to select nodes: %v", err)

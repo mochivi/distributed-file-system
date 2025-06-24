@@ -17,13 +17,18 @@ var (
 )
 
 // TODO: datanode should be aware of coordinator rotations
-func (s *DataNodeServer) HeartbeatLoop(ctx context.Context, node *common.DataNodeInfo) error {
+func (s *DataNodeServer) HeartbeatLoop(ctx context.Context) error {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	errorCount := 0
 	for {
-		coordinatorClient, err := coordinator.NewCoordinatorClient(node)
+		coordinatorNode, ok := s.NodeManager.GetCoordinatorNode()
+		if !ok {
+			return fmt.Errorf("no coordinator node found")
+		}
+
+		coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorNode)
 		if err != nil {
 			return fmt.Errorf("failed to create coordinator client: %w", err)
 		}
@@ -47,8 +52,8 @@ func (s *DataNodeServer) HeartbeatLoop(ctx context.Context, node *common.DataNod
 	}
 }
 
-func (s *DataNodeServer) heartbeat(ctx context.Context, client *coordinator.CoordinatorClient) error {
-	logger := logging.OperationLogger(s.logger, "heartbeat", slog.String("coordinator_address", client.Node.Endpoint()))
+func (s *DataNodeServer) heartbeat(ctx context.Context, client coordinator.ICoordinatorClient) error {
+	logger := logging.OperationLogger(s.logger, "heartbeat", slog.String("coordinator_address", client.Node().Endpoint()))
 
 	req := coordinator.HeartbeatRequest{
 		NodeID: s.Config.Info.ID,
@@ -56,12 +61,18 @@ func (s *DataNodeServer) heartbeat(ctx context.Context, client *coordinator.Coor
 			Status:   s.Config.Info.Status,
 			LastSeen: time.Now(),
 		},
-		LastSeenVersion: s.nodeManager.GetCurrentVersion(),
+		LastSeenVersion: s.NodeManager.GetCurrentVersion(),
 	}
 
 	resp, err := client.DataNodeHeartbeat(ctx, req)
 	if err != nil {
 		return fmt.Errorf("heartbeat failed: %w", err)
+	}
+
+	// If parent context is cancelled, we don't need to return an error but return early
+	if ctx.Err() != nil {
+		logger.Debug("Heartbeat loop cancelled")
+		return nil
 	}
 
 	if !resp.Success {
@@ -78,7 +89,7 @@ func (s *DataNodeServer) heartbeat(ctx context.Context, client *coordinator.Coor
 	}
 
 	logger.Debug("Updating nodes", slog.Int("from_version", int(resp.FromVersion)), slog.Int("to_version", int(resp.ToVersion)))
-	s.nodeManager.ApplyHistory(resp.Updates)
+	s.NodeManager.ApplyHistory(resp.Updates)
 
 	return nil
 }

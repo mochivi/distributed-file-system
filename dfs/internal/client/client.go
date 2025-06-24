@@ -40,7 +40,7 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 	if err != nil {
 		return nil, fmt.Errorf("failed to submit upload request: %w", err)
 	}
-	metadataSessionLogger := logging.ExtendLogger(logger, slog.String("metadata_session_id", uploadResponse.SessionID), slog.String("coordinator_id", c.coordinatorClient.Node.ID))
+	metadataSessionLogger := logging.ExtendLogger(logger, slog.String("metadata_session_id", uploadResponse.SessionID), slog.String("coordinator_id", c.coordinatorClient.Node().ID))
 	metadataSessionLogger.Info("Received UploadResponse")
 
 	uploadCtx, cancel := context.WithCancel(ctx)

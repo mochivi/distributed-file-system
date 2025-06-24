@@ -19,7 +19,7 @@ type DataNodeServer struct {
 	store              storage.ChunkStorage
 	replicationManager IReplicationManager
 	sessionManager     ISessionManager
-	nodeManager        *common.NodeManager
+	NodeManager        common.INodeManager
 
 	Config DataNodeConfig
 
@@ -47,13 +47,13 @@ type ISessionManager interface {
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
-	nodeManager *common.NodeManager, config DataNodeConfig, logger *slog.Logger) *DataNodeServer {
+	nodeManager common.INodeManager, config DataNodeConfig, logger *slog.Logger) *DataNodeServer {
 	datanodeLogger := logging.ExtendLogger(logger, slog.String("component", "datanode_server"))
 	return &DataNodeServer{
 		store:              store,
 		replicationManager: replicationManager,
 		sessionManager:     sessionManager,
-		nodeManager:        nodeManager,
+		NodeManager:        nodeManager,
 		Config:             config,
 		logger:             datanodeLogger,
 	}
