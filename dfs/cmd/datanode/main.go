@@ -216,7 +216,8 @@ func initServer(nodeConfig datanode.DataNodeConfig, logger *slog.Logger) (*datan
 	// Datanode dependencies
 	nodeSelector := common.NewNodeSelector()
 	nodeManager := common.NewNodeManager(nodeSelector)
-	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, logger)
+	streamer := common.NewStreamer(common.DefaultStreamerConfig())
+	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, streamer, logger)
 	sessionManager := datanode.NewSessionManager()
 
 	return datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeConfig, logger), nil

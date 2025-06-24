@@ -10,13 +10,26 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
+	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestHeartbeat(t *testing.T) {
-	mockNodeManager := &common.MockNodeManager{}
-	mockCoordinatorClient := &coordinator.MockCoordinatorClient{}
+// Heartbeat stub server
+type stubCoordinatorHeartbeatServer struct {
+	proto.UnimplementedCoordinatorServiceServer
+	hbResp coordinator.HeartbeatResponse // pre-programmed response
+	hbErr  error
+}
 
+func (s *stubCoordinatorHeartbeatServer) DataNodeHeartbeat(ctx context.Context, req *proto.HeartbeatRequest) (*proto.HeartbeatResponse, error) {
+	if s.hbErr != nil {
+		return nil, s.hbErr
+	}
+	return s.hbResp.ToProto(), nil
+}
+
+func TestDataNodeServer_heartbeat(t *testing.T) {
+	mockNodeManager := &common.MockNodeManager{}
 	server := &DataNodeServer{
 		Config: DataNodeConfig{
 			Info: common.DataNodeInfo{ID: "node1", Status: common.NodeHealthy},
@@ -125,21 +138,23 @@ func TestHeartbeat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockCoordinatorClient.On("Node").Return(&common.DataNodeInfo{ID: "coordinator"}).Once()
-			mockNodeManager.On("GetCurrentVersion").Return(int64(1)).Once()
-			mockCoordinatorClient.On("DataNodeHeartbeat", tt.ctx, mock.AnythingOfType("coordinator.HeartbeatRequest")).Return(tt.heartbeatResponse, tt.expectedError).Once()
+			coordinatorClient, cleanup := NewTestCoordinatorClientWithStubServer(t, &stubCoordinatorHeartbeatServer{hbResp: tt.heartbeatResponse, hbErr: tt.expectedError})
+			defer cleanup()
 
+			// Setup the node manager mock on each test run
+			mockNodeManager.On("GetCurrentVersion").Return(int64(1)).Once()
 			if tt.expectedError == nil {
+				// If no error, we expect the node manager to apply the history
 				mockNodeManager.On("ApplyHistory", mock.AnythingOfType("[]common.NodeUpdate")).Once()
 			}
 
-			err := server.heartbeat(tt.ctx, mockCoordinatorClient)
+			// Coordinator client is injected into the heartbeat function
+			err := server.heartbeat(tt.ctx, coordinatorClient)
 			if err != nil && tt.expectedError == nil {
 				t.Errorf("heartbeat() error = %v, wantErr %v", err, tt.expectedError)
 			}
 
 			mockNodeManager.AssertExpectations(t)
-			mockCoordinatorClient.AssertExpectations(t)
 		})
 	}
 }

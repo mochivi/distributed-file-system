@@ -34,7 +34,7 @@ type DataNodeClient struct {
 }
 
 type IReplicationManager interface {
-	paralellReplicate(nodes []*common.DataNodeInfo, chunkInfo common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error)
+	paralellReplicate(clients []*DataNodeClient, chunkInfo common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error)
 	replicate(ctx context.Context, client *DataNodeClient, req common.ChunkHeader, data []byte, clientLogger *slog.Logger) error
 }
 
@@ -59,10 +59,12 @@ func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicati
 	}
 }
 
-func NewDataNodeClient(node *common.DataNodeInfo) (*DataNodeClient, error) {
+func NewDataNodeClient(node *common.DataNodeInfo, opts ...grpc.DialOption) (*DataNodeClient, error) {
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
 	conn, err := grpc.NewClient(
 		node.Endpoint(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // Update to TLS in prod
+		opts...,
 	)
 	if err != nil {
 		return nil, err

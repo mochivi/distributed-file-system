@@ -384,8 +384,21 @@ func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([
 		return nil, fmt.Errorf("failed to select nodes: %v", err)
 	}
 
+	// Create clients
+	var clients []*DataNodeClient
+	for _, node := range nodes {
+		client, err := NewDataNodeClient(node)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client for %s - [%s]  %v", node.ID, node.Endpoint(), err)
+		}
+		if client == nil {
+			return nil, fmt.Errorf("client for %v is nil", node)
+		}
+		clients = append(clients, client)
+	}
+
 	// Replicate to N_REPLICAS nodes
-	replicaNodes, err := s.replicationManager.paralellReplicate(nodes, chunkInfo, data, N_REPLICAS-1)
+	replicaNodes, err := s.replicationManager.paralellReplicate(clients, chunkInfo, data, N_REPLICAS-1)
 	if err != nil {
 		logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to replicate chunk: %v", err)

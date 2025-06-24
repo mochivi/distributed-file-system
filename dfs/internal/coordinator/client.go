@@ -29,10 +29,12 @@ type CoordinatorClient struct {
 	node   *common.DataNodeInfo
 }
 
-func NewCoordinatorClient(node *common.DataNodeInfo) (*CoordinatorClient, error) {
+func NewCoordinatorClient(node *common.DataNodeInfo, opts ...grpc.DialOption) (*CoordinatorClient, error) {
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
 	conn, err := grpc.NewClient(
 		node.Endpoint(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // Update to TLS in prod
+		opts...,
 	)
 	if err != nil {
 		return nil, err
