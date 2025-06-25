@@ -23,6 +23,31 @@ responsibilities of every component and how they interact at runtime.
 
 ---
 
+## Implemented Feature Summary
+
+This section provides a high-level summary of the features that are currently implemented and functional in the codebase.
+
+*   **Client-Facing Operations (via Coordinator):**
+    *   **File Upload:** A client can request to upload a file. The coordinator determines the chunking strategy and assigns data nodes for each chunk. The client then uploads the chunks directly to the specified data nodes.
+    *   **File Download:** A client can request to download a file. The coordinator provides the locations of the file's chunks, which the client can then download from the data nodes.
+    *   **Upload Confirmation:** After successfully uploading all chunks to their respective data nodes, the client must send a confirmation to the coordinator. This action commits the file's metadata, making it "officially" part of the filesystem.
+
+*   **Coordinator Functionality:**
+    *   **Node Management:** The coordinator maintains a list of active data nodes. Data nodes register themselves on startup and send periodic heartbeats to signal their liveness. The coordinator tracks node status and cluster topology changes.
+    *   **Chunk Placement Strategy:** For a file upload, the coordinator selects a primary data node and a set of replica nodes for each chunk.
+    *   **Metadata Management:** The coordinator manages all filesystem metadata (file-to-chunk mappings). This metadata is currently **stored in-memory** and is not persistent across coordinator restarts.
+
+*   **Data Node Functionality:**
+    *   **Chunk Storage:** Data nodes are responsible for storing chunk data on a local disk. The storage mechanism includes a simple, nested directory structure based on chunk IDs to avoid having too many files in a single directory.
+    *   **gRPC Service:** Each data node exposes a gRPC service for handling chunk operations (uploads, downloads).
+    *   **Chunk Replication:** When a data node receives a chunk from a client (acting as the "primary"), it is responsible for replicating that chunk in parallel to the other replica nodes assigned by the coordinator.
+
+*   **Stubbed or Incomplete Features:**
+    *   `DeleteFile` and `ListFiles` operations are defined in the gRPC API but are not implemented.
+    *   The `api/http` package exists but contains no functional code.
+
+---
+
 ## Coordinator endpoints
 
 | RPC | Description |

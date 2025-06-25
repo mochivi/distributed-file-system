@@ -16,6 +16,7 @@ import (
 	"io/fs"
 
 	"github.com/joho/godotenv"
+	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
@@ -215,7 +216,7 @@ func initServer(nodeConfig datanode.DataNodeConfig, logger *slog.Logger) (*datan
 
 	// Datanode dependencies
 	nodeSelector := common.NewNodeSelector()
-	nodeManager := common.NewNodeManager(nodeSelector)
+	nodeManager := cluster.NewNodeManager(nodeSelector)
 	streamer := common.NewStreamer(common.DefaultStreamerConfig())
 	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, streamer, logger)
 	sessionManager := datanode.NewSessionManager()

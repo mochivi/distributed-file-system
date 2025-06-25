@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
@@ -31,7 +32,7 @@ func main() {
 	metadataStore := metadata.NewMetadataLocalStorage()
 	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout, logger)
 	nodeSelector := common.NewNodeSelector()
-	nodeManager := common.NewNodeManager(nodeSelector)
+	nodeManager := cluster.NewNodeManager(nodeSelector)
 
 	// Create coordinator server
 	server := coordinator.NewCoordinator(cfg, metadataStore, metadataManager, nodeManager, logger)
