@@ -3,6 +3,7 @@ package coordinator
 import (
 	"log/slog"
 
+	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
@@ -14,7 +15,7 @@ type Coordinator struct {
 	proto.UnimplementedCoordinatorServiceServer // Embed
 
 	// Coordinates data nodes access
-	nodeManager *common.NodeManager
+	nodeManager cluster.INodeManager
 
 	// Coordinates metadata storage
 	metaStore       storage.MetadataStore
@@ -25,7 +26,7 @@ type Coordinator struct {
 }
 
 func NewCoordinator(cfg CoordinatorConfig, metaStore storage.MetadataStore, metadataManager *metadataManager,
-	nodeManager *common.NodeManager, logger *slog.Logger) *Coordinator {
+	nodeManager cluster.INodeManager, logger *slog.Logger) *Coordinator {
 	coordinatorLogger := logging.ExtendLogger(logger, slog.String("component", "coordinator_server"))
 	return &Coordinator{
 		metaStore:       metaStore,

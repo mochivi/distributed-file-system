@@ -1,4 +1,4 @@
-package common
+package cluster
 
 import (
 	"errors"
@@ -6,49 +6,50 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
 
 type INodeManager interface {
 	GetCurrentVersion() int64
-	GetNode(nodeID string) (*DataNodeInfo, bool)
-	AddNode(node *DataNodeInfo)
+	GetNode(nodeID string) (*common.DataNodeInfo, bool)
+	AddNode(node *common.DataNodeInfo)
 	RemoveNode(nodeID string) error
-	UpdateNode(node *DataNodeInfo) error
-	ListNodes() ([]*DataNodeInfo, int64)
-	GetUpdatesSince(sinceVersion int64) ([]NodeUpdate, int64, error)
+	UpdateNode(node *common.DataNodeInfo) error
+	ListNodes() ([]*common.DataNodeInfo, int64)
+	GetUpdatesSince(sinceVersion int64) ([]common.NodeUpdate, int64, error)
 	IsVersionTooOld(version int64) bool
-	SelectBestNodes(n int, self ...string) ([]*DataNodeInfo, error)
-	GetAvailableNodesForChunk(replicaIDs []*DataNodeInfo) ([]*DataNodeInfo, bool)
-	ApplyHistory(updates []NodeUpdate)
-	InitializeNodes(nodes []*DataNodeInfo, currentVersion int64)
-	GetCoordinatorNode() (*DataNodeInfo, bool)
-	AddCoordinatorNode(node *DataNodeInfo)
+	SelectBestNodes(n int, self ...string) ([]*common.DataNodeInfo, error)
+	GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool)
+	ApplyHistory(updates []common.NodeUpdate)
+	InitializeNodes(nodes []*common.DataNodeInfo, currentVersion int64)
+	GetCoordinatorNode() (*common.DataNodeInfo, bool)
+	AddCoordinatorNode(node *common.DataNodeInfo)
 	RemoveCoordinatorNode(nodeID string)
-	ListCoordinatorNodes() ([]*DataNodeInfo, int64)
+	ListCoordinatorNodes() ([]*common.DataNodeInfo, int64)
 	BootstrapCoordinatorNode() error
 }
 
 type NodeManager struct {
-	coordinatorNodes map[string]*DataNodeInfo // coordinator nodes
-	nodes            map[string]*DataNodeInfo // data nodes
+	coordinatorNodes map[string]*common.DataNodeInfo // coordinator nodes
+	nodes            map[string]*common.DataNodeInfo // data nodes
 	mu               sync.RWMutex
-	selector         NodeSelector
+	selector         common.NodeSelector
 
 	// Version control fields
 	currentVersion int64
-	updateHistory  []NodeUpdate // Circular buffer for recent updates
+	updateHistory  []common.NodeUpdate // Circular buffer for recent updates
 	maxHistorySize int
 	historyIndex   int // Current position in circular buffer
 }
 
-func NewNodeManager(selector NodeSelector) *NodeManager {
+func NewNodeManager(selector common.NodeSelector) *NodeManager {
 	return &NodeManager{
-		coordinatorNodes: make(map[string]*DataNodeInfo),
-		nodes:            make(map[string]*DataNodeInfo),
+		coordinatorNodes: make(map[string]*common.DataNodeInfo),
+		nodes:            make(map[string]*common.DataNodeInfo),
 		selector:         selector,
 		currentVersion:   0,
-		updateHistory:    make([]NodeUpdate, 1000), // Keep last 1000 node updates in stash
+		updateHistory:    make([]common.NodeUpdate, 1000), // Keep last 1000 node updates in stash
 		maxHistorySize:   1000,
 		historyIndex:     0,
 	}
@@ -57,17 +58,17 @@ func NewNodeManager(selector NodeSelector) *NodeManager {
 func (m *NodeManager) BootstrapCoordinatorNode() error {
 	coordinatorHost := utils.GetEnvString("COORDINATOR_HOST", "coordinator")
 	coordinatorPort := utils.GetEnvInt("COORDINATOR_PORT", 8080)
-	coordinatorNode := &DataNodeInfo{
+	coordinatorNode := &common.DataNodeInfo{
 		ID:     "coordinator", // TODO: change to coordinator ID when implemented, should be received from some service discovery/config storage system
 		Host:   coordinatorHost,
 		Port:   coordinatorPort,
-		Status: NodeHealthy,
+		Status: common.NodeHealthy,
 	}
 	m.AddCoordinatorNode(coordinatorNode)
 	return nil
 }
 
-func (m *NodeManager) AddCoordinatorNode(node *DataNodeInfo) {
+func (m *NodeManager) AddCoordinatorNode(node *common.DataNodeInfo) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.coordinatorNodes[node.ID] = node
@@ -79,14 +80,14 @@ func (m *NodeManager) RemoveCoordinatorNode(nodeID string) {
 	delete(m.coordinatorNodes, nodeID)
 }
 
-func (m *NodeManager) GetCoordinatorNode() (*DataNodeInfo, bool) {
+func (m *NodeManager) GetCoordinatorNode() (*common.DataNodeInfo, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.determineCoordinatorNode()
 }
 
 // TODO: implement coordinator node selection algorithm
-func (m *NodeManager) determineCoordinatorNode() (*DataNodeInfo, bool) {
+func (m *NodeManager) determineCoordinatorNode() (*common.DataNodeInfo, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -96,7 +97,7 @@ func (m *NodeManager) determineCoordinatorNode() (*DataNodeInfo, bool) {
 
 	// TODO: implement coordinator node selection algorithm
 	for _, node := range m.coordinatorNodes {
-		if node.Status == NodeHealthy {
+		if node.Status == common.NodeHealthy {
 			return node, true
 		}
 	}
@@ -104,17 +105,17 @@ func (m *NodeManager) determineCoordinatorNode() (*DataNodeInfo, bool) {
 	return nil, false
 }
 
-func (m *NodeManager) ListCoordinatorNodes() ([]*DataNodeInfo, int64) {
+func (m *NodeManager) ListCoordinatorNodes() ([]*common.DataNodeInfo, int64) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	nodes := make([]*DataNodeInfo, 0, len(m.coordinatorNodes))
+	nodes := make([]*common.DataNodeInfo, 0, len(m.coordinatorNodes))
 	for _, node := range m.coordinatorNodes {
 		nodes = append(nodes, node)
 	}
 	return nodes, m.currentVersion
 }
 
-func (m *NodeManager) GetNode(nodeID string) (*DataNodeInfo, bool) {
+func (m *NodeManager) GetNode(nodeID string) (*common.DataNodeInfo, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	node, ok := m.nodes[nodeID]
@@ -124,11 +125,11 @@ func (m *NodeManager) GetNode(nodeID string) (*DataNodeInfo, bool) {
 	return node, true
 }
 
-func (m *NodeManager) AddNode(node *DataNodeInfo) {
+func (m *NodeManager) AddNode(node *common.DataNodeInfo) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.nodes[node.ID] = node
-	m.addToHistory(NODE_ADDED, node)
+	m.addToHistory(common.NODE_ADDED, node)
 }
 
 func (m *NodeManager) RemoveNode(nodeID string) error {
@@ -139,11 +140,11 @@ func (m *NodeManager) RemoveNode(nodeID string) error {
 		return fmt.Errorf("node with ID %s not found", nodeID)
 	}
 	delete(m.nodes, nodeID)
-	m.addToHistory(NODE_REMOVED, node)
+	m.addToHistory(common.NODE_REMOVED, node)
 	return nil
 }
 
-func (m *NodeManager) UpdateNode(node *DataNodeInfo) error {
+func (m *NodeManager) UpdateNode(node *common.DataNodeInfo) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	node, ok := m.nodes[node.ID]
@@ -151,14 +152,14 @@ func (m *NodeManager) UpdateNode(node *DataNodeInfo) error {
 		return fmt.Errorf("node with ID %s not found", node.ID)
 	}
 	m.nodes[node.ID] = node
-	m.addToHistory(NODE_UPDATED, node)
+	m.addToHistory(common.NODE_UPDATED, node)
 	return nil
 }
 
-func (m *NodeManager) ListNodes() ([]*DataNodeInfo, int64) {
+func (m *NodeManager) ListNodes() ([]*common.DataNodeInfo, int64) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	nodes := make([]*DataNodeInfo, 0, len(m.nodes))
+	nodes := make([]*common.DataNodeInfo, 0, len(m.nodes))
 	for _, node := range m.nodes {
 		nodes = append(nodes, node)
 	}
@@ -166,7 +167,7 @@ func (m *NodeManager) ListNodes() ([]*DataNodeInfo, int64) {
 }
 
 // GetUpdatesSince returns all updates since the given version
-func (m *NodeManager) GetUpdatesSince(sinceVersion int64) ([]NodeUpdate, int64, error) {
+func (m *NodeManager) GetUpdatesSince(sinceVersion int64) ([]common.NodeUpdate, int64, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -178,11 +179,11 @@ func (m *NodeManager) GetUpdatesSince(sinceVersion int64) ([]NodeUpdate, int64, 
 
 	// If already up to date
 	if sinceVersion >= m.currentVersion {
-		return []NodeUpdate{}, m.currentVersion, nil
+		return []common.NodeUpdate{}, m.currentVersion, nil
 	}
 
 	// Collect updates since requested version
-	var updates []NodeUpdate
+	var updates []common.NodeUpdate
 	for i := 0; i < m.maxHistorySize; i++ {
 		update := m.updateHistory[i]
 		if update.Version > sinceVersion && update.Version <= m.currentVersion {
@@ -217,7 +218,7 @@ func (m *NodeManager) IsVersionTooOld(version int64) bool {
 
 // TODO: implement selection algorithm, right now, just picking the first healthy nodes
 // Selects n nodes that could receive some chunk for storage
-func (m *NodeManager) SelectBestNodes(n int, self ...string) ([]*DataNodeInfo, error) {
+func (m *NodeManager) SelectBestNodes(n int, self ...string) ([]*common.DataNodeInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -226,7 +227,7 @@ func (m *NodeManager) SelectBestNodes(n int, self ...string) ([]*DataNodeInfo, e
 		selfID = self[0]
 	}
 
-	nodes := make([]*DataNodeInfo, 0, len(m.nodes))
+	nodes := make([]*common.DataNodeInfo, 0, len(m.nodes))
 	for _, node := range m.nodes {
 		if node.ID == selfID {
 			continue // do not select the own node making the request if being used for replication
@@ -245,25 +246,31 @@ func (m *NodeManager) SelectBestNodes(n int, self ...string) ([]*DataNodeInfo, e
 
 // Retrieves which nodes have some chunk
 // TODO: implement a check with the data nodes to see if they have the chunk before adding
-func (m *NodeManager) GetAvailableNodesForChunk(replicaIDs []*DataNodeInfo) ([]*DataNodeInfo, bool) {
+func (m *NodeManager) GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	nodes := make([]*DataNodeInfo, 0, len(replicaIDs))
-	for _, replica := range replicaIDs {
-		if node, exists := m.nodes[replica.ID]; exists && node.Status == NodeHealthy {
+	var nodes []*common.DataNodeInfo
+	for _, replicaNode := range replicaIDs {
+		// Check if the node is still considered available
+		node, ok := m.nodes[replicaNode.ID]
+		if ok && node.Status == common.NodeHealthy {
 			nodes = append(nodes, node)
 		}
 	}
 
-	return nodes, len(nodes) > 0
+	if len(nodes) == 0 {
+		return nil, false
+	}
+
+	return nodes, true
 }
 
 // addToHistory adds an update to the circular buffer
-func (m *NodeManager) addToHistory(updateType NodeUpdateType, node *DataNodeInfo) {
+func (m *NodeManager) addToHistory(updateType common.NodeUpdateType, node *common.DataNodeInfo) {
 	m.currentVersion++
 
-	update := NodeUpdate{
+	update := common.NodeUpdate{
 		Version:   m.currentVersion,
 		Type:      updateType,
 		Node:      node,
@@ -276,20 +283,20 @@ func (m *NodeManager) addToHistory(updateType NodeUpdateType, node *DataNodeInfo
 
 // Given an array of NodeUpdate, apply changes to nodes in order
 // Only used by data nodes
-func (m *NodeManager) ApplyHistory(updates []NodeUpdate) {
+func (m *NodeManager) ApplyHistory(updates []common.NodeUpdate) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// Apply updates in order
 	for _, update := range updates {
 		switch update.Type {
-		case NODE_ADDED:
+		case common.NODE_ADDED:
 			m.nodes[update.Node.ID] = update.Node
 
-		case NODE_REMOVED:
+		case common.NODE_REMOVED:
 			delete(m.nodes, update.Node.ID)
 
-		case NODE_UPDATED:
+		case common.NODE_UPDATED:
 			// We should update regardless of whether it exists locally
 			// to stay in sync with the master
 			m.nodes[update.Node.ID] = update.Node
@@ -305,9 +312,10 @@ func (m *NodeManager) ApplyHistory(updates []NodeUpdate) {
 
 // Given an array of DataNodeInfo, initialize the nodes
 // Only used by data nodes
-func (m *NodeManager) InitializeNodes(nodes []*DataNodeInfo, currentVersion int64) {
+func (m *NodeManager) InitializeNodes(nodes []*common.DataNodeInfo, currentVersion int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.nodes = make(map[string]*common.DataNodeInfo)
 	for _, node := range nodes {
 		m.nodes[node.ID] = node
 	}
