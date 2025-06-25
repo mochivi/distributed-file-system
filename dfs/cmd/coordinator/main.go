@@ -32,7 +32,8 @@ func main() {
 	metadataStore := metadata.NewMetadataLocalStorage()
 	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout, logger)
 	nodeSelector := common.NewNodeSelector()
-	nodeManager := cluster.NewNodeManager(nodeSelector)
+	nodeManagerConfig := cluster.DefaultNodeManagerConfig()
+	nodeManager := cluster.NewNodeManager(nodeSelector, nodeManagerConfig)
 
 	// Create coordinator server
 	server := coordinator.NewCoordinator(cfg, metadataStore, metadataManager, nodeManager, logger)

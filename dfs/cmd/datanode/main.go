@@ -216,10 +216,32 @@ func initServer(nodeConfig datanode.DataNodeConfig, logger *slog.Logger) (*datan
 
 	// Datanode dependencies
 	nodeSelector := common.NewNodeSelector()
-	nodeManager := cluster.NewNodeManager(nodeSelector)
+	nodeManagerConfig := cluster.DefaultNodeManagerConfig()
+	nodeManager := cluster.NewNodeManager(nodeSelector, nodeManagerConfig)
 	streamer := common.NewStreamer(common.DefaultStreamerConfig())
 	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, streamer, logger)
 	sessionManager := datanode.NewSessionManager()
 
 	return datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeConfig, logger), nil
 }
+
+// Objective, reach this approach:
+// func main() {
+//     // 1. Load configuration
+//     cfg := config.Load()
+
+//     // 2. Create the datanode's specific service implementation
+//     datanodeService := datanode.NewService(cfg.StoragePath)
+
+//     // 3. Create the main cluster node object, injecting the service
+//     clusterNode, err := cluster.NewNode(cfg.Cluster, datanodeService)
+//     if err != nil {
+//         log.Fatal("Failed to create cluster node", err)
+//     }
+
+//     // 4. Start the node (this starts gRPC, heartbeating, etc.)
+//     // This call would block until the node is shut down.
+//     if err := clusterNode.Run(); err != nil {
+//         log.Fatal("Node runtime error", err)
+//     }
+// }

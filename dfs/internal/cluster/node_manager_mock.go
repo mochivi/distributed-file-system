@@ -62,9 +62,9 @@ func (m *MockNodeManager) ListNodes() ([]*common.DataNodeInfo, int64) {
 	return args.Get(0).([]*common.DataNodeInfo), args.Get(1).(int64)
 }
 
-func (m *MockNodeManager) GetUpdatesSince(sinceVersion int64) ([]common.NodeUpdate, int64, error) {
+func (m *MockNodeManager) GetUpdatesSince(sinceVersion int64) ([]NodeUpdate, int64, error) {
 	args := m.Called(sinceVersion)
-	return args.Get(0).([]common.NodeUpdate), args.Get(1).(int64), args.Error(2)
+	return args.Get(0).([]NodeUpdate), args.Get(1).(int64), args.Error(2)
 }
 
 func (m *MockNodeManager) IsVersionTooOld(version int64) bool {
@@ -82,7 +82,7 @@ func (m *MockNodeManager) GetAvailableNodesForChunk(replicaIDs []*common.DataNod
 	return args.Get(0).([]*common.DataNodeInfo), args.Bool(1)
 }
 
-func (m *MockNodeManager) ApplyHistory(updates []common.NodeUpdate) {
+func (m *MockNodeManager) ApplyHistory(updates []NodeUpdate) {
 	m.Called(updates)
 }
 

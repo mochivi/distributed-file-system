@@ -1,6 +1,7 @@
 package coordinator
 
 import (
+	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 )
@@ -274,16 +275,16 @@ func (hr HeartbeatRequest) ToProto() *proto.HeartbeatRequest {
 type HeartbeatResponse struct {
 	Success            bool
 	Message            string
-	Updates            []common.NodeUpdate
+	Updates            []cluster.NodeUpdate
 	FromVersion        int64
 	ToVersion          int64
 	RequiresFullResync bool
 }
 
 func HeartbeatResponseFromProto(pb *proto.HeartbeatResponse) HeartbeatResponse {
-	updates := make([]common.NodeUpdate, 0, len(pb.Updates))
+	updates := make([]cluster.NodeUpdate, 0, len(pb.Updates))
 	for _, update := range pb.Updates {
-		updates = append(updates, common.NodeUpdateFromProto(update))
+		updates = append(updates, cluster.NodeUpdateFromProto(update))
 	}
 
 	return HeartbeatResponse{

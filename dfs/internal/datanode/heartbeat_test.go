@@ -54,7 +54,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 				RequiresFullResync: false,
 				FromVersion:        1,
 				ToVersion:          2,
-				Updates: []common.NodeUpdate{
+				Updates: []cluster.NodeUpdate{
 					{
 						Node: &common.DataNodeInfo{
 							ID:       "node2",
@@ -62,7 +62,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 							LastSeen: time.Now(),
 						},
 						Version:   2,
-						Type:      common.NODE_ADDED,
+						Type:      cluster.NODE_ADDED,
 						Timestamp: time.Now(),
 					},
 				},
@@ -96,7 +96,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 				RequiresFullResync: false,
 				FromVersion:        1,
 				ToVersion:          2,
-				Updates:            []common.NodeUpdate{},
+				Updates:            []cluster.NodeUpdate{},
 			},
 		},
 		{
@@ -108,7 +108,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 				RequiresFullResync: false,
 				FromVersion:        1,
 				ToVersion:          1,
-				Updates: []common.NodeUpdate{
+				Updates: []cluster.NodeUpdate{
 					{
 						Node: &common.DataNodeInfo{
 							ID:       "node2",
@@ -116,7 +116,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 							LastSeen: time.Now(),
 						},
 						Version:   2,
-						Type:      common.NODE_ADDED,
+						Type:      cluster.NODE_ADDED,
 						Timestamp: time.Now(),
 					},
 				},
@@ -146,7 +146,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 			mockNodeManager.On("GetCurrentVersion").Return(int64(1)).Once()
 			if tt.expectedError == nil {
 				// If no error, we expect the node manager to apply the history
-				mockNodeManager.On("ApplyHistory", mock.AnythingOfType("[]common.NodeUpdate")).Once()
+				mockNodeManager.On("ApplyHistory", mock.AnythingOfType("[]cluster.NodeUpdate")).Once()
 			}
 
 			// Coordinator client is injected into the heartbeat function
