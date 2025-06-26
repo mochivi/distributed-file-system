@@ -9,8 +9,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/datanode"
 )
 
 type DownloaderConfig struct {
@@ -21,7 +21,7 @@ type DownloaderConfig struct {
 
 type DownloadWork struct {
 	chunkHeader common.ChunkHeader
-	client      *datanode.DataNodeClient
+	client      *clients.DataNodeClient
 	sessionID   string
 	logger      *slog.Logger
 }
@@ -180,7 +180,7 @@ func (d *Downloader) queueWork(session *downloadSession, sessionID string) error
 			return err
 		}
 
-		client, err := datanode.NewDataNodeClient(location.Nodes[0])
+		client, err := clients.NewDataNodeClient(location.Nodes[0])
 		if err != nil {
 			return fmt.Errorf("failed to create datanode client: %w", err)
 		}
