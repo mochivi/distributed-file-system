@@ -12,9 +12,8 @@ import (
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/client"
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
-	"github.com/mochivi/distributed-file-system/internal/datanode"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
@@ -33,7 +32,7 @@ func NewTestClient(t *testing.T, logger *slog.Logger) *client.Client {
 		Port:   coordinatorPort,
 		Status: common.NodeHealthy,
 	}
-	coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorNode)
+	coordinatorClient, err := clients.NewCoordinatorClient(coordinatorNode)
 	if err != nil {
 		t.Fatalf("failed to create coordinator client: %v", err)
 	}
@@ -105,7 +104,7 @@ func TestClientUpload(t *testing.T) {
 
 			for _, info := range chunkInfos {
 				for _, replica := range info.Replicas {
-					dnClient, _ := datanode.NewDataNodeClient(replica)
+					dnClient, _ := clients.NewDataNodeClient(replica)
 
 					resp, err := dnClient.PrepareChunkDownload(context.Background(), common.DownloadChunkRequest{ChunkID: info.Header.ID})
 					if err != nil {
@@ -178,7 +177,7 @@ func TestClientUpload(t *testing.T) {
 
 			for _, info := range chunkInfos {
 				for _, replica := range info.Replicas {
-					dnClient, _ := datanode.NewDataNodeClient(replica)
+					dnClient, _ := clients.NewDataNodeClient(replica)
 
 					resp, err := dnClient.PrepareChunkDownload(context.Background(), common.DownloadChunkRequest{ChunkID: info.Header.ID})
 					if err != nil {

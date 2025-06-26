@@ -40,11 +40,11 @@ type INodeManager interface {
 	RemoveNode(nodeID string) error
 	UpdateNode(node *common.DataNodeInfo) error
 	ListNodes() ([]*common.DataNodeInfo, int64)
-	GetUpdatesSince(sinceVersion int64) ([]NodeUpdate, int64, error)
+	GetUpdatesSince(sinceVersion int64) ([]common.NodeUpdate, int64, error)
 	IsVersionTooOld(version int64) bool
 	SelectBestNodes(n int, self ...string) ([]*common.DataNodeInfo, error)
 	GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool)
-	ApplyHistory(updates []NodeUpdate)
+	ApplyHistory(updates []common.NodeUpdate)
 	InitializeNodes(nodes []*common.DataNodeInfo, currentVersion int64)
 	GetCoordinatorNode() (*common.DataNodeInfo, bool)
 	AddCoordinatorNode(node *common.DataNodeInfo)
@@ -73,8 +73,8 @@ type NodeManager struct {
 
 	// Version control fields
 	currentVersion int64
-	updateHistory  []NodeUpdate // Circular buffer for recent updates
-	historyIndex   int          // Current position in circular buffer
+	updateHistory  []common.NodeUpdate // Circular buffer for recent updates
+	historyIndex   int                 // Current position in circular buffer
 }
 
 func NewNodeManager(selector common.NodeSelector, config NodeManagerConfig) *NodeManager {
@@ -84,7 +84,7 @@ func NewNodeManager(selector common.NodeSelector, config NodeManagerConfig) *Nod
 		selector:          selector,
 		NodeManagerConfig: config,
 		currentVersion:    0,
-		updateHistory:     make([]NodeUpdate, 1000), // Keep last 1000 node updates in stash
+		updateHistory:     make([]common.NodeUpdate, 1000), // Keep last 1000 node updates in stash
 		historyIndex:      0,
 	}
 }
@@ -164,7 +164,7 @@ func (m *NodeManager) AddNode(node *common.DataNodeInfo) {
 	m.nodesMutex.Lock()
 	defer m.nodesMutex.Unlock()
 	m.nodes[node.ID] = node
-	m.addToHistory(NODE_ADDED, node)
+	m.addToHistory(common.NODE_ADDED, node)
 }
 
 func (m *NodeManager) RemoveNode(nodeID string) error {
@@ -175,7 +175,7 @@ func (m *NodeManager) RemoveNode(nodeID string) error {
 		return fmt.Errorf("node with ID %s not found", nodeID)
 	}
 	delete(m.nodes, nodeID)
-	m.addToHistory(NODE_REMOVED, node)
+	m.addToHistory(common.NODE_REMOVED, node)
 	return nil
 }
 
@@ -187,7 +187,7 @@ func (m *NodeManager) UpdateNode(node *common.DataNodeInfo) error {
 		return fmt.Errorf("node with ID %s not found", node.ID)
 	}
 	m.nodes[node.ID] = node
-	m.addToHistory(NODE_UPDATED, node)
+	m.addToHistory(common.NODE_UPDATED, node)
 	return nil
 }
 
@@ -202,7 +202,7 @@ func (m *NodeManager) ListNodes() ([]*common.DataNodeInfo, int64) {
 }
 
 // GetUpdatesSince returns all updates since the given version
-func (m *NodeManager) GetUpdatesSince(sinceVersion int64) ([]NodeUpdate, int64, error) {
+func (m *NodeManager) GetUpdatesSince(sinceVersion int64) ([]common.NodeUpdate, int64, error) {
 	m.nodesMutex.RLock()
 	defer m.nodesMutex.RUnlock()
 
@@ -214,11 +214,11 @@ func (m *NodeManager) GetUpdatesSince(sinceVersion int64) ([]NodeUpdate, int64, 
 
 	// If already up to date
 	if sinceVersion >= m.currentVersion {
-		return []NodeUpdate{}, m.currentVersion, nil
+		return []common.NodeUpdate{}, m.currentVersion, nil
 	}
 
 	// Collect updates since requested version
-	var updates []NodeUpdate
+	var updates []common.NodeUpdate
 	for i := 0; i < m.NodeManagerConfig.MaxHistorySize; i++ {
 		update := m.updateHistory[i]
 		if update.Version > sinceVersion && update.Version <= m.currentVersion {
@@ -302,10 +302,10 @@ func (m *NodeManager) GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInf
 }
 
 // addToHistory adds an update to the circular buffer
-func (m *NodeManager) addToHistory(updateType NodeUpdateType, node *common.DataNodeInfo) {
+func (m *NodeManager) addToHistory(updateType common.NodeUpdateType, node *common.DataNodeInfo) {
 	m.currentVersion++
 
-	update := NodeUpdate{
+	update := common.NodeUpdate{
 		Version:   m.currentVersion,
 		Type:      updateType,
 		Node:      node,
@@ -318,20 +318,20 @@ func (m *NodeManager) addToHistory(updateType NodeUpdateType, node *common.DataN
 
 // Given an array of NodeUpdate, apply changes to nodes in order
 // Only used by data nodes
-func (m *NodeManager) ApplyHistory(updates []NodeUpdate) {
+func (m *NodeManager) ApplyHistory(updates []common.NodeUpdate) {
 	m.nodesMutex.Lock()
 	defer m.nodesMutex.Unlock()
 
 	// Apply updates in order
 	for _, update := range updates {
 		switch update.Type {
-		case NODE_ADDED:
+		case common.NODE_ADDED:
 			m.nodes[update.Node.ID] = update.Node
 
-		case NODE_REMOVED:
+		case common.NODE_REMOVED:
 			delete(m.nodes, update.Node.ID)
 
-		case NODE_UPDATED:
+		case common.NODE_UPDATED:
 			// We should update regardless of whether it exists locally
 			// to stay in sync with the master
 			m.nodes[update.Node.ID] = update.Node

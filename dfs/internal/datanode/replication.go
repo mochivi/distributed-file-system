@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
@@ -44,7 +45,7 @@ func NewReplicationManager(config ReplicateManagerConfig, streamer *common.Strea
 }
 
 // paralellReplicate replicates the chunk to the given nodes in parallel
-func (rm *ReplicationManager) paralellReplicate(clients []*DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error) {
+func (rm *ReplicationManager) paralellReplicate(clients []*clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error) {
 	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", chunkHeader.ID))
 	if len(clients) == 0 {
 		return nil, fmt.Errorf("no clients provided")
@@ -114,7 +115,7 @@ func (rm *ReplicationManager) paralellReplicate(clients []*DataNodeClient, chunk
 	return replicatedNodes.GetNodes(), nil
 }
 
-func (rm *ReplicationManager) replicate(ctx context.Context, client *DataNodeClient, chunkHeader common.ChunkHeader, data []byte, clientLogger *slog.Logger) error {
+func (rm *ReplicationManager) replicate(ctx context.Context, client *clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, clientLogger *slog.Logger) error {
 	// Request replication session
 	resp, err := client.ReplicateChunk(ctx, chunkHeader)
 	if err != nil {

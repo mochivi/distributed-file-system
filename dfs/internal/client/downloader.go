@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
 )
 
@@ -34,7 +33,7 @@ type Downloader struct {
 
 type downloadSession struct {
 	// Input params
-	chunkLocations []coordinator.ChunkLocation
+	chunkLocations []common.ChunkLocation
 
 	// Output params
 	tempFile     *os.File
@@ -56,7 +55,7 @@ func NewDownloader(streamer *common.Streamer, config DownloaderConfig) *Download
 	}
 }
 
-func (d *Downloader) DownloadFile(ctx context.Context, chunkLocations []coordinator.ChunkLocation, sessionID string,
+func (d *Downloader) DownloadFile(ctx context.Context, chunkLocations []common.ChunkLocation, sessionID string,
 	totalFileSize int, logger *slog.Logger) (string, error) {
 
 	// Create temporary file

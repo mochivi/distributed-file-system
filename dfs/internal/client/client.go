@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
@@ -28,7 +27,7 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 		return nil, fmt.Errorf("failed to calculate checksum")
 	}
 
-	uploadRequest := coordinator.UploadRequest{
+	uploadRequest := common.UploadRequest{
 		Path:      filepath.Join(path, fileInfo.Name()),
 		Size:      int(fileInfo.Size()),
 		ChunkSize: chunksize,
@@ -51,7 +50,7 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 	}
 
 	// Confirm upload to coordinator with chunk location information
-	confirmUploadRequest := coordinator.ConfirmUploadRequest{
+	confirmUploadRequest := common.ConfirmUploadRequest{
 		SessionID:  uploadResponse.SessionID, // metadata sessionID, NOT streaming sessionID
 		ChunkInfos: chunkInfos,
 	}
@@ -72,7 +71,7 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 func (c *Client) DownloadFile(ctx context.Context, path string) (string, error) {
 	logger := logging.ExtendLogger(c.logger, slog.String("operation", "download_file"), slog.String("path", path))
 
-	downloadResponse, err := c.coordinatorClient.DownloadFile(ctx, coordinator.DownloadRequest{Path: path})
+	downloadResponse, err := c.coordinatorClient.DownloadFile(ctx, common.DownloadRequest{Path: path})
 	if err != nil {
 		logger.Error("Failed to download file", slog.String("error", err.Error()))
 		return "", fmt.Errorf("failed to download file %s: %w", path, err)

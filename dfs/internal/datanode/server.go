@@ -9,8 +9,8 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
@@ -348,13 +348,13 @@ func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context) error {
 	logger := logging.OperationLogger(s.logger, "register", slog.String("coordinator_address", coordinatorNode.Endpoint()))
 	logger.Info("Registering with coordinator")
 
-	coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorNode)
+	coordinatorClient, err := clients.NewCoordinatorClient(coordinatorNode)
 	if err != nil {
 		logger.Error("Failed to create coordinator client", slog.String("error", err.Error()))
 		return fmt.Errorf("failed to create coordinator client: %v", err)
 	}
 
-	req := coordinator.RegisterDataNodeRequest{NodeInfo: s.Config.Info}
+	req := common.RegisterDataNodeRequest{NodeInfo: s.Config.Info}
 	resp, err := coordinatorClient.RegisterDataNode(ctx, req)
 	if err != nil {
 		logger.Error("Failed to register datanode with coordinator", slog.String("error", err.Error()))
@@ -385,20 +385,20 @@ func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([
 	}
 
 	// Create clients
-	var clients []*DataNodeClient
+	var replicationClients []*clients.DataNodeClient
 	for _, node := range nodes {
-		client, err := NewDataNodeClient(node)
+		client, err := clients.NewDataNodeClient(node)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create client for %s - [%s]  %v", node.ID, node.Endpoint(), err)
 		}
 		if client == nil {
 			return nil, fmt.Errorf("client for %v is nil", node)
 		}
-		clients = append(clients, client)
+		replicationClients = append(replicationClients, client)
 	}
 
 	// Replicate to N_REPLICAS nodes
-	replicaNodes, err := s.replicationManager.paralellReplicate(clients, chunkInfo, data, N_REPLICAS-1)
+	replicaNodes, err := s.replicationManager.paralellReplicate(replicationClients, chunkInfo, data, N_REPLICAS-1)
 	if err != nil {
 		logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to replicate chunk: %v", err)

@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
@@ -28,7 +28,7 @@ func (s *DataNodeServer) HeartbeatLoop(ctx context.Context) error {
 			return fmt.Errorf("no coordinator node found")
 		}
 
-		coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorNode)
+		coordinatorClient, err := clients.NewCoordinatorClient(coordinatorNode)
 		if err != nil {
 			return fmt.Errorf("failed to create coordinator client: %w", err)
 		}
@@ -52,10 +52,10 @@ func (s *DataNodeServer) HeartbeatLoop(ctx context.Context) error {
 	}
 }
 
-func (s *DataNodeServer) heartbeat(ctx context.Context, client coordinator.ICoordinatorClient) error {
+func (s *DataNodeServer) heartbeat(ctx context.Context, client clients.ICoordinatorClient) error {
 	logger := logging.OperationLogger(s.logger, "heartbeat", slog.String("coordinator_address", client.Node().Endpoint()))
 
-	req := coordinator.HeartbeatRequest{
+	req := common.HeartbeatRequest{
 		NodeID: s.Config.Info.ID,
 		Status: common.HealthStatus{
 			Status:   s.Config.Info.Status,

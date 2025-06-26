@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/mochivi/distributed-file-system/internal/cluster"
-	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -34,34 +33,5 @@ func NewCoordinator(cfg CoordinatorConfig, metaStore storage.MetadataStore, meta
 		config:          cfg,
 		metadataManager: metadataManager,
 		logger:          coordinatorLogger,
-	}
-}
-
-// ChunkLocation represents where some chunk should be stored (primary node + endpoint)
-type ChunkLocation struct {
-	ChunkID string
-	Nodes   []*common.DataNodeInfo
-}
-
-func ChunkLocationFromProto(pb *proto.ChunkLocation) ChunkLocation {
-	nodes := make([]*common.DataNodeInfo, 0, len(pb.Nodes))
-	for _, node := range pb.Nodes {
-		nodeInfo := common.DataNodeInfoFromProto(node)
-		nodes = append(nodes, &nodeInfo)
-	}
-	return ChunkLocation{
-		ChunkID: pb.ChunkId,
-		Nodes:   nodes,
-	}
-}
-
-func (cs *ChunkLocation) ToProto() *proto.ChunkLocation {
-	nodes := make([]*proto.DataNodeInfo, 0, len(cs.Nodes))
-	for _, node := range cs.Nodes {
-		nodes = append(nodes, node.ToProto())
-	}
-	return &proto.ChunkLocation{
-		ChunkId: cs.ChunkID,
-		Nodes:   nodes,
 	}
 }

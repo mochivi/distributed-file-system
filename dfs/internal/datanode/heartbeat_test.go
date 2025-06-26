@@ -9,7 +9,6 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"github.com/stretchr/testify/mock"
@@ -18,7 +17,7 @@ import (
 // Heartbeat stub server
 type stubCoordinatorHeartbeatServer struct {
 	proto.UnimplementedCoordinatorServiceServer
-	hbResp coordinator.HeartbeatResponse // pre-programmed response
+	hbResp common.HeartbeatResponse // pre-programmed response
 	hbErr  error
 }
 
@@ -43,18 +42,18 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 		name              string
 		expectedError     error
 		ctx               context.Context
-		heartbeatResponse coordinator.HeartbeatResponse
+		heartbeatResponse common.HeartbeatResponse
 	}{
 		{
 			name:          "success",
 			expectedError: nil,
 			ctx:           context.Background(),
-			heartbeatResponse: coordinator.HeartbeatResponse{
+			heartbeatResponse: common.HeartbeatResponse{
 				Success:            true,
 				RequiresFullResync: false,
 				FromVersion:        1,
 				ToVersion:          2,
-				Updates: []cluster.NodeUpdate{
+				Updates: []common.NodeUpdate{
 					{
 						Node: &common.DataNodeInfo{
 							ID:       "node2",
@@ -62,7 +61,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 							LastSeen: time.Now(),
 						},
 						Version:   2,
-						Type:      cluster.NODE_ADDED,
+						Type:      common.NODE_ADDED,
 						Timestamp: time.Now(),
 					},
 				},
@@ -72,7 +71,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 			name:          "error: heartbeat failed",
 			expectedError: errors.New("heartbeat failed"),
 			ctx:           context.Background(),
-			heartbeatResponse: coordinator.HeartbeatResponse{
+			heartbeatResponse: common.HeartbeatResponse{
 				Success: false,
 				Message: "heartbeat failed",
 			},
@@ -81,7 +80,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 			name:          "error: requires full resync",
 			expectedError: ErrRequireResync,
 			ctx:           context.Background(),
-			heartbeatResponse: coordinator.HeartbeatResponse{
+			heartbeatResponse: common.HeartbeatResponse{
 				Success:            true,
 				RequiresFullResync: true,
 				Message:            "requires full resync",
@@ -91,24 +90,24 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 			name:          "error: success but no updates sent",
 			expectedError: errors.New("no updates sent"),
 			ctx:           context.Background(),
-			heartbeatResponse: coordinator.HeartbeatResponse{
+			heartbeatResponse: common.HeartbeatResponse{
 				Success:            true,
 				RequiresFullResync: false,
 				FromVersion:        1,
 				ToVersion:          2,
-				Updates:            []cluster.NodeUpdate{},
+				Updates:            []common.NodeUpdate{},
 			},
 		},
 		{
 			name:          "error: same version",
 			expectedError: errors.New("no updates sent"),
 			ctx:           context.Background(),
-			heartbeatResponse: coordinator.HeartbeatResponse{
+			heartbeatResponse: common.HeartbeatResponse{
 				Success:            true,
 				RequiresFullResync: false,
 				FromVersion:        1,
 				ToVersion:          1,
-				Updates: []cluster.NodeUpdate{
+				Updates: []common.NodeUpdate{
 					{
 						Node: &common.DataNodeInfo{
 							ID:       "node2",
@@ -116,7 +115,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 							LastSeen: time.Now(),
 						},
 						Version:   2,
-						Type:      cluster.NODE_ADDED,
+						Type:      common.NODE_ADDED,
 						Timestamp: time.Now(),
 					},
 				},
@@ -130,7 +129,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 				cancel()
 				return ctx
 			}(),
-			heartbeatResponse: coordinator.HeartbeatResponse{
+			heartbeatResponse: common.HeartbeatResponse{
 				Success: false,
 				Message: "context canceled",
 			},
@@ -146,7 +145,7 @@ func TestDataNodeServer_heartbeat(t *testing.T) {
 			mockNodeManager.On("GetCurrentVersion").Return(int64(1)).Once()
 			if tt.expectedError == nil {
 				// If no error, we expect the node manager to apply the history
-				mockNodeManager.On("ApplyHistory", mock.AnythingOfType("[]cluster.NodeUpdate")).Once()
+				mockNodeManager.On("ApplyHistory", mock.AnythingOfType("[]common.NodeUpdate")).Once()
 			}
 
 			// Coordinator client is injected into the heartbeat function

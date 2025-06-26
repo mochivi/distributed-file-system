@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
@@ -188,7 +189,7 @@ func TestReplicationManager_paralellReplicate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test clients with stub servers
-			var testClients []*DataNodeClient
+			var testClients []*clients.DataNodeClient
 			var cleanups []func()
 			for i := 0; i < tt.nClients; i++ {
 				client, cleanup := NewTestDataNodeClientWithStubServer(t, &stubDataNodeServer{
