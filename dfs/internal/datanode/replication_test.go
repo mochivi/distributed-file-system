@@ -9,6 +9,7 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 )
@@ -84,7 +85,7 @@ func TestReplicationManager_replicate(t *testing.T) {
 	header, data := newRandomChunk(128)
 
 	// Common replication manager used across sub-tests.
-	cfg := ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
+	cfg := config.ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
 	streamer := common.NewStreamer(common.StreamerConfig{
 		MaxChunkRetries:  1,
 		ChunkStreamSize:  1024,
@@ -121,7 +122,7 @@ func TestReplicationManager_paralellReplicate(t *testing.T) {
 	header, data := newRandomChunk(128)
 
 	// Common replication manager used across sub-tests.
-	cfg := ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
+	cfg := config.ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
 	streamer := common.NewStreamer(common.StreamerConfig{
 		MaxChunkRetries:  1,
 		ChunkStreamSize:  1024,

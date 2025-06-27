@@ -10,6 +10,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
@@ -17,16 +18,11 @@ var (
 	ErrRequireResync = errors.New("require node resync")
 )
 
-type HeartbeatControllerConfig struct {
-	Interval time.Duration // how often to send heartbeats to the coordinator
-	Timeout  time.Duration // how long to wait for a heartbeat response from the coordinator
-}
-
 type HeartbeatController struct {
 	ctx    context.Context
 	cancel context.CancelCauseFunc
 
-	config *HeartbeatControllerConfig
+	config *config.HeartbeatControllerConfig
 	logger *slog.Logger
 }
 

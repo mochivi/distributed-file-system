@@ -8,6 +8,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -23,7 +24,7 @@ type DataNodeServer struct {
 	nodeManager        node_manager.IReadOnlyNodeManager
 	selector           cluster.NodeSelector
 
-	Config DataNodeConfig
+	Config config.DataNodeConfig
 
 	logger *slog.Logger
 }
@@ -42,7 +43,7 @@ type ISessionManager interface {
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
-	nodeManager node_manager.IReadOnlyNodeManager, selector cluster.NodeSelector, config DataNodeConfig, logger *slog.Logger) *DataNodeServer {
+	nodeManager node_manager.IReadOnlyNodeManager, selector cluster.NodeSelector, config config.DataNodeConfig, logger *slog.Logger) *DataNodeServer {
 	datanodeLogger := logging.ExtendLogger(logger, slog.String("component", "datanode_server"))
 	return &DataNodeServer{
 		store:              store,

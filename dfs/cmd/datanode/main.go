@@ -17,7 +17,9 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/mochivi/distributed-file-system/internal/cluster"
+	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
@@ -72,7 +74,7 @@ func main() {
 	var wg sync.WaitGroup
 
 	// Create node config
-	nodeConfig := datanode.DefaultDatanodeConfig()
+	nodeConfig := config.DefaultDatanodeConfig()
 
 	// Setup structured logging
 	rootLogger, err := logging.InitLogger()
@@ -82,10 +84,22 @@ func main() {
 	logger := logging.ExtendLogger(rootLogger, slog.String("node_id", nodeConfig.Info.ID))
 
 	// Datanode server
-	server, err := initServer(nodeConfig, logger)
+	// ChunkStore implementation is chosen here
+	chunkSerializer := encoding.NewProtoSerializer()
+
+	chunkStore, err := chunk.NewChunkDiskStorage(nodeConfig.DiskStorage, chunkSerializer, logger)
 	if err != nil {
-		log.Fatalf("failed to initialize datanode server: %v", err)
+		log.Fatal(err.Error())
 	}
+
+	nodeManagerConfig := config.DefaultNodeManagerConfig()
+	nodeManager := node_manager.NewNodeManager(nodeManagerConfig)
+	nodeSelector := cluster.NewNodeSelector(nodeManager)
+	streamer := common.NewStreamer(common.DefaultStreamerConfig())
+	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, streamer, logger)
+	sessionManager := datanode.NewSessionManager()
+
+	server := datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeSelector, nodeConfig, logger)
 
 	// gRPC initialization
 	grpcServer := grpc.NewServer()
@@ -119,40 +133,17 @@ func main() {
 		}
 	}()
 
-	// Register datanode with coordinator - if fails, should crash
-	if err := server.NodeManager.BootstrapCoordinatorNode(); err != nil {
-		logger.Error("Failed to bootstrap coordinator node", slog.String("error", err.Error()))
-		os.Exit(1)
-	}
+	// Cluster node setup
+	clusterNodeConfig := config.DefaultClusterNodeConfig()
+	clusterNodeConfig.Node = &nodeConfig.Info
+	clusterNode := cluster.NewNode(clusterNodeConfig, nodeManager, logger)
 
-	// Register datanode with coordinator
-	if err := server.RegisterWithCoordinator(ctx); err != nil {
-		logger.Error("Failed to register with coordinator", slog.String("error", err.Error()))
-	}
-
-	// Start heartbeat loop
+	// Run cluster node, which includes heartbeat loop
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				errChan <- fmt.Errorf("panic in heartbeat loop: %v", r)
-			}
-		}()
-
-		// Create a context with timeout for heartbeat operations
-		heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)
-		defer heartbeatCancel()
-
-		logger.Info("Starting heartbeat loop...")
-		if err := server.HeartbeatLoop(heartbeatCtx); err != nil {
-			// Only send error if it's not due to context cancellation
-			select {
-			case <-ctx.Done():
-				logger.Info("Heartbeat loop stopped due to context cancellation")
-			default:
-				errChan <- fmt.Errorf("heartbeat loop failed: %w", err)
-			}
+		if err := clusterNode.Run(); err != nil {
+			errChan <- fmt.Errorf("cluster node failed: %w", err)
 		}
 	}()
 
@@ -205,40 +196,20 @@ func main() {
 	log.Println("Server stopped, exiting...")
 }
 
-func initServer(nodeConfig datanode.DataNodeConfig, logger *slog.Logger) (*datanode.DataNodeServer, error) {
-	// ChunkStore implementation is chosen here
-	chunkSerializer := encoding.NewProtoSerializer()
-
-	chunkStore, err := chunk.NewChunkDiskStorage(nodeConfig.DiskStorage, chunkSerializer, logger)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	// Datanode dependencies
-	nodeSelector := common.NewNodeSelector()
-	nodeManagerConfig := cluster.DefaultNodeManagerConfig()
-	nodeManager := cluster.NewNodeManager(nodeSelector, nodeManagerConfig)
-	streamer := common.NewStreamer(common.DefaultStreamerConfig())
-	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, streamer, logger)
-	sessionManager := datanode.NewSessionManager()
-
-	return datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeConfig, logger), nil
-}
-
 // Objective, reach this approach:
 // func main() {
 //     // 1. Load configuration
 //     cfg := config.Load()
-
+//
 //     // 2. Create the datanode's specific service implementation
 //     datanodeService := datanode.NewService(cfg.StoragePath)
-
+//
 //     // 3. Create the main cluster node object, injecting the service
 //     clusterNode, err := cluster.NewNode(cfg.Cluster, datanodeService)
 //     if err != nil {
 //         log.Fatal("Failed to create cluster node", err)
 //     }
-
+//
 //     // 4. Start the node (this starts gRPC, heartbeating, etc.)
 //     // This call would block until the node is shut down.
 //     if err := clusterNode.Run(); err != nil {

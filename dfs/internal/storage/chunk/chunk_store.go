@@ -11,17 +11,18 @@ import (
 	"strings"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
 type ChunkDiskStorage struct {
-	config     DiskStorageConfig
+	config     config.DiskStorageConfig
 	logger     *slog.Logger
 	serializer encoding.ChunkSerializer
 }
 
-func NewChunkDiskStorage(config DiskStorageConfig, serializer encoding.ChunkSerializer, logger *slog.Logger) (*ChunkDiskStorage, error) {
+func NewChunkDiskStorage(config config.DiskStorageConfig, serializer encoding.ChunkSerializer, logger *slog.Logger) (*ChunkDiskStorage, error) {
 	storageLogger := logging.ExtendLogger(logger, slog.String("component", "chunk_storage"))
 	if err := os.MkdirAll(config.RootDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create rootDir for chunk disk storage: %w", err)

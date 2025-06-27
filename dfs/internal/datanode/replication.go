@@ -9,6 +9,7 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
@@ -30,12 +31,12 @@ func (r *ReplicatedNodes) GetNodes() []*common.DataNodeInfo {
 }
 
 type ReplicationManager struct {
-	Config   ReplicateManagerConfig
+	Config   config.ReplicateManagerConfig
 	streamer *common.Streamer
 	logger   *slog.Logger
 }
 
-func NewReplicationManager(config ReplicateManagerConfig, streamer *common.Streamer, logger *slog.Logger) *ReplicationManager {
+func NewReplicationManager(config config.ReplicateManagerConfig, streamer *common.Streamer, logger *slog.Logger) *ReplicationManager {
 	logger = logging.ExtendLogger(logger, slog.String("component", "replication_manager"))
 	return &ReplicationManager{
 		Config:   config,

@@ -10,7 +10,8 @@ import (
 	"syscall"
 
 	"github.com/mochivi/distributed-file-system/internal/cluster"
-	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
@@ -19,7 +20,7 @@ import (
 )
 
 func main() {
-	cfg := coordinator.DefaultCoordinatorConfig()
+	cfg := config.DefaultCoordinatorConfig()
 
 	// Coordinator dependencies
 
@@ -31,12 +32,12 @@ func main() {
 
 	metadataStore := metadata.NewMetadataLocalStorage()
 	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout, logger)
-	nodeSelector := common.NewNodeSelector()
-	nodeManagerConfig := cluster.DefaultNodeManagerConfig()
-	nodeManager := cluster.NewNodeManager(nodeSelector, nodeManagerConfig)
+	nodeManagerConfig := config.DefaultNodeManagerConfig()
+	nodeManager := node_manager.NewNodeManager(nodeManagerConfig)
+	nodeSelector := cluster.NewNodeSelector(nodeManager)
 
 	// Create coordinator server
-	server := coordinator.NewCoordinator(cfg, metadataStore, metadataManager, nodeManager, logger)
+	server := coordinator.NewCoordinator(cfg, metadataStore, metadataManager, nodeManager, nodeSelector, logger)
 
 	// gRPC server and register
 	grpcServer := grpc.NewServer()

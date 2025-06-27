@@ -7,6 +7,7 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
+	"github.com/mochivi/distributed-file-system/internal/config"
 )
 
 type ClusterNode struct {
@@ -16,7 +17,7 @@ type ClusterNode struct {
 	wg     sync.WaitGroup
 
 	// Dependencies
-	config            *ClusterNodeConfig
+	config            *config.ClusterNodeConfig
 	nodeManager       node_manager.INodeManager
 	coordinatorClient *clients.CoordinatorClient
 	logger            *slog.Logger
@@ -32,7 +33,7 @@ type ClusterNode struct {
 	}
 }
 
-func NewNode(config *ClusterNodeConfig, nodeManager node_manager.INodeManager, logger *slog.Logger) *ClusterNode {
+func NewNode(config *config.ClusterNodeConfig, nodeManager node_manager.INodeManager, logger *slog.Logger) *ClusterNode {
 	return &ClusterNode{
 		config:      config,
 		nodeManager: nodeManager,

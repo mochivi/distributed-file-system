@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 )
 
 type datanodeManager struct {
 	nodes      map[string]*common.DataNodeInfo // data nodes
 	nodesMutex sync.RWMutex
 
-	config DataNodeManagerConfig
+	config config.DataNodeManagerConfig
 
 	// Version control fields
 	currentVersion int64
@@ -20,7 +21,7 @@ type datanodeManager struct {
 	historyIndex   int                 // Current position in circular buffer
 }
 
-func newDatanodeManager(config DataNodeManagerConfig) *datanodeManager {
+func newDatanodeManager(config config.DataNodeManagerConfig) *datanodeManager {
 	return &datanodeManager{
 		nodes:          make(map[string]*common.DataNodeInfo),
 		config:         config,

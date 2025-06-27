@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
 
@@ -12,10 +13,10 @@ type coordinatorNodeManager struct {
 	coordinatorNodes map[string]*common.DataNodeInfo // coordinator nodes
 	nodesMutex       sync.RWMutex
 
-	config CoordinatorNodeManagerConfig
+	config config.CoordinatorNodeManagerConfig
 }
 
-func newCoordinatorNodeManager(config CoordinatorNodeManagerConfig) *coordinatorNodeManager {
+func newCoordinatorNodeManager(config config.CoordinatorNodeManagerConfig) *coordinatorNodeManager {
 	return &coordinatorNodeManager{
 		coordinatorNodes: make(map[string]*common.DataNodeInfo),
 		nodesMutex:       sync.RWMutex{},

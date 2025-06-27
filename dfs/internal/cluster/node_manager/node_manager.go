@@ -1,6 +1,9 @@
 package node_manager
 
-import "github.com/mochivi/distributed-file-system/internal/common"
+import (
+	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
+)
 
 // INodeManager defines the interface for managing the cluster's node information from the
 // perspective of a single node. It is designed to be used with dependency injection,
@@ -47,7 +50,7 @@ type INodeManager interface {
 	GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool)
 
 	// Coordinator node manager methods
-	GetCoordinatorNode() (*common.DataNodeInfo, bool)
+	GetCoordinatorNode(nodeID string) (*common.DataNodeInfo, bool)
 	AddCoordinatorNode(node *common.DataNodeInfo)
 	RemoveCoordinatorNode(nodeID string)
 	ListCoordinatorNodes() []*common.DataNodeInfo
@@ -59,9 +62,9 @@ type INodeManager interface {
 type IReadOnlyNodeManager interface {
 	GetNode(nodeID string) (*common.DataNodeInfo, bool)
 	GetLeaderCoordinatorNode() (*common.DataNodeInfo, bool)
-	ListNodes() ([]*common.DataNodeInfo, int64)
+	ListNodes(n ...int) ([]*common.DataNodeInfo, int64)
 	GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool)
-	GetCoordinatorNode() (*common.DataNodeInfo, bool)
+	GetCoordinatorNode(nodeID string) (*common.DataNodeInfo, bool)
 	ListCoordinatorNodes() []*common.DataNodeInfo
 }
 
@@ -70,7 +73,7 @@ type NodeManager struct {
 	nodeManager            *datanodeManager
 }
 
-func NewNodeManager(config NodeManagerConfig) *NodeManager {
+func NewNodeManager(config config.NodeManagerConfig) *NodeManager {
 	return &NodeManager{
 		coordinatorNodeManager: newCoordinatorNodeManager(config.CoordinatorNodeManagerConfig),
 		nodeManager:            newDatanodeManager(config.DataNodeManagerConfig),

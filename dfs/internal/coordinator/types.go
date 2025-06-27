@@ -5,6 +5,7 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -22,11 +23,11 @@ type Coordinator struct {
 	metaStore       storage.MetadataStore
 	metadataManager *metadataManager // Coordinates when to actually commit metadata
 
-	config CoordinatorConfig
+	config config.CoordinatorConfig
 	logger *slog.Logger
 }
 
-func NewCoordinator(cfg CoordinatorConfig, metaStore storage.MetadataStore, metadataManager *metadataManager,
+func NewCoordinator(cfg config.CoordinatorConfig, metaStore storage.MetadataStore, metadataManager *metadataManager,
 	nodeManager node_manager.INodeManager, selector cluster.NodeSelector, logger *slog.Logger) *Coordinator {
 	coordinatorLogger := logging.ExtendLogger(logger, slog.String("component", "coordinator_server"))
 	return &Coordinator{

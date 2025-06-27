@@ -11,20 +11,14 @@ func (c *ClusterNode) Run() error {
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		c.controllers.heartbeat.Run(c.config.node, c.nodeManager)
+		c.controllers.heartbeat.Run(c.config.Node, c.nodeManager)
 	}()
 
-	// c.wg.Add(1)
-	// go func() {
-	// 	defer c.wg.Done()
-	// 	c.controllers.gc.Run()
-	// }()
-
-	// c.wg.Add(1)
-	// go func() {
-	// 	defer c.wg.Done()
-	// 	c.controllers.register.Run()
-	// }()
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		c.services.register.RegisterWithCoordinator(c.ctx, c.config.Node, c.nodeManager)
+	}()
 
 	c.wg.Wait()
 

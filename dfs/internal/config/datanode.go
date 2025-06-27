@@ -1,4 +1,4 @@
-package datanode
+package config
 
 import (
 	"path/filepath"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
 
@@ -14,7 +13,7 @@ type DataNodeConfig struct {
 	Info        common.DataNodeInfo
 	Session     SessionManagerConfig
 	Replication ReplicateManagerConfig
-	DiskStorage chunk.DiskStorageConfig
+	DiskStorage DiskStorageConfig
 }
 
 type SessionManagerConfig struct {
@@ -23,6 +22,12 @@ type SessionManagerConfig struct {
 
 type ReplicateManagerConfig struct {
 	ReplicateTimeout time.Duration // timeout until replication to another node is considered failed
+}
+
+type DiskStorageConfig struct {
+	Enabled bool
+	Kind    string // block storage, etc..
+	RootDir string // full path must be used
 }
 
 func DefaultDatanodeConfig() DataNodeConfig {
@@ -48,7 +53,7 @@ func DefaultDatanodeConfig() DataNodeConfig {
 			ReplicateTimeout: 10 * time.Minute,
 		},
 
-		DiskStorage: chunk.DiskStorageConfig{
+		DiskStorage: DiskStorageConfig{
 			Enabled: true,
 			Kind:    "block",
 			RootDir: filepath.Join(baseDir, "data"),
