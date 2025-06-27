@@ -71,11 +71,15 @@ func (m *datanodeManager) updateNode(node *common.DataNodeInfo) error {
 	return nil
 }
 
-func (m *datanodeManager) listNodes() ([]*common.DataNodeInfo, int64) {
+func (m *datanodeManager) listNodes(n ...int) ([]*common.DataNodeInfo, int64) {
 	m.nodesMutex.RLock()
 	defer m.nodesMutex.RUnlock()
+
 	nodes := make([]*common.DataNodeInfo, 0, len(m.nodes))
 	for _, node := range m.nodes {
+		if len(n) > 0 && len(nodes) >= n[0] {
+			break
+		}
 		nodes = append(nodes, node)
 	}
 	return nodes, m.currentVersion
@@ -216,23 +220,23 @@ func (m *datanodeManager) initializeNodes(nodes []*common.DataNodeInfo, currentV
 // }
 
 // // Retrieves which nodes have some chunk
-// // TODO: implement a check with the data nodes to see if they have the chunk before adding
-// func (m *nodeManager) getAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool) {
-// 	m.nodesMutex.RLock()
-// 	defer m.nodesMutex.RUnlock()
+// TODO: implement a check with the data nodes to see if they have the chunk before adding
+func (m *datanodeManager) getAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool) {
+	m.nodesMutex.RLock()
+	defer m.nodesMutex.RUnlock()
 
-// 	var nodes []*common.DataNodeInfo
-// 	for _, replicaNode := range replicaIDs {
-// 		// Check if the node is still considered available
-// 		node, ok := m.nodes[replicaNode.ID]
-// 		if ok && node.Status == common.NodeHealthy {
-// 			nodes = append(nodes, node)
-// 		}
-// 	}
+	var nodes []*common.DataNodeInfo
+	for _, replicaNode := range replicaIDs {
+		// Check if the node is still considered available
+		node, ok := m.nodes[replicaNode.ID]
+		if ok && node.Status == common.NodeHealthy {
+			nodes = append(nodes, node)
+		}
+	}
 
-// 	if len(nodes) == 0 {
-// 		return nil, false
-// 	}
+	if len(nodes) == 0 {
+		return nil, false
+	}
 
-// 	return nodes, true
-// }
+	return nodes, true
+}

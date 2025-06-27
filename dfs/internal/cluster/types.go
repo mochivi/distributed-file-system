@@ -23,6 +23,7 @@ type ClusterNode struct {
 
 	// services provide some functionality to the cluster node
 	services struct {
+		register *RegisterService
 	}
 
 	// controllers implement some watch loop to manage the cluster node

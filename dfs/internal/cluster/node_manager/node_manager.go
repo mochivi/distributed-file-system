@@ -32,7 +32,7 @@ type INodeManager interface {
 	AddNode(node *common.DataNodeInfo)
 	RemoveNode(nodeID string) error
 	UpdateNode(node *common.DataNodeInfo) error
-	ListNodes() ([]*common.DataNodeInfo, int64)
+	ListNodes(n ...int) ([]*common.DataNodeInfo, int64)
 
 	// Version control methods
 	GetCurrentVersion() int64
@@ -43,9 +43,8 @@ type INodeManager interface {
 	ApplyHistory(updates []common.NodeUpdate)                           // Heartbeat controller
 	InitializeNodes(nodes []*common.DataNodeInfo, currentVersion int64) // Register service
 
-	// Read-only methods used by the datanode
-	// SelectBestNodes(n int, self ...string) ([]*common.DataNodeInfo, error)
-	// GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool)
+	// Read-only method used by the coordinator
+	GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool)
 
 	// Coordinator node manager methods
 	GetCoordinatorNode() (*common.DataNodeInfo, bool)
@@ -61,6 +60,7 @@ type IReadOnlyNodeManager interface {
 	GetNode(nodeID string) (*common.DataNodeInfo, bool)
 	GetLeaderCoordinatorNode() (*common.DataNodeInfo, bool)
 	ListNodes() ([]*common.DataNodeInfo, int64)
+	GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool)
 	GetCoordinatorNode() (*common.DataNodeInfo, bool)
 	ListCoordinatorNodes() []*common.DataNodeInfo
 }
@@ -94,8 +94,8 @@ func (m *NodeManager) UpdateNode(node *common.DataNodeInfo) error {
 	return m.nodeManager.updateNode(node)
 }
 
-func (m *NodeManager) ListNodes() ([]*common.DataNodeInfo, int64) {
-	return m.nodeManager.listNodes()
+func (m *NodeManager) ListNodes(n ...int) ([]*common.DataNodeInfo, int64) {
+	return m.nodeManager.listNodes(n...)
 }
 
 func (m *NodeManager) GetCurrentVersion() int64 {
@@ -116,6 +116,10 @@ func (m *NodeManager) ApplyHistory(updates []common.NodeUpdate) {
 
 func (m *NodeManager) InitializeNodes(nodes []*common.DataNodeInfo, currentVersion int64) {
 	m.nodeManager.initializeNodes(nodes, currentVersion)
+}
+
+func (m *NodeManager) GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool) {
+	return m.nodeManager.getAvailableNodesForChunk(replicaIDs)
 }
 
 func (m *NodeManager) GetCoordinatorNode(nodeID string) (*common.DataNodeInfo, bool) {

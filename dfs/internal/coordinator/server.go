@@ -31,9 +31,9 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 	c.logger.Debug(fmt.Sprintf("File will be split into %d chunks of %dMB", numChunks, chunkSize/(1024*1024)))
 
 	// Get a list of the best nodes to upload to
-	nodes, err := c.nodeManager.SelectBestNodes(numChunks)
-	if err != nil {
-		c.logger.Error("Failed to select best nodes", slog.String("error", err.Error()))
+	nodes, ok := c.selector.SelectBestNodes(numChunks)
+	if !ok {
+		c.logger.Error("Not enough nodes to upload to")
 		return nil, status.Error(codes.NotFound, "no available nodes")
 	}
 	c.logger.Debug("Selected nodes for chunk distribution", slog.Int("num_nodes", len(nodes)))

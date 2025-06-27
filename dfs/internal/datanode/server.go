@@ -339,49 +339,15 @@ func (s *DataNodeServer) HealthCheck(ctx context.Context, pb *proto.HealthCheckR
 	return nil, nil
 }
 
-func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context) error {
-	coordinatorNode, ok := s.NodeManager.GetCoordinatorNode()
-	if !ok {
-		return fmt.Errorf("no coordinator node found")
-	}
-
-	logger := logging.OperationLogger(s.logger, "register", slog.String("coordinator_address", coordinatorNode.Endpoint()))
-	logger.Info("Registering with coordinator")
-
-	coordinatorClient, err := clients.NewCoordinatorClient(coordinatorNode)
-	if err != nil {
-		logger.Error("Failed to create coordinator client", slog.String("error", err.Error()))
-		return fmt.Errorf("failed to create coordinator client: %v", err)
-	}
-
-	req := common.RegisterDataNodeRequest{NodeInfo: s.Config.Info}
-	resp, err := coordinatorClient.RegisterDataNode(ctx, req)
-	if err != nil {
-		logger.Error("Failed to register datanode with coordinator", slog.String("error", err.Error()))
-		return fmt.Errorf("failed to register datanode with coordinator: %v", err)
-	}
-
-	if !resp.Success {
-		logger.Error("Failed to register datanode with coordinator", slog.String("error", resp.Message))
-		return fmt.Errorf("failed to register datanode with coordinator: %s", resp.Message)
-	}
-
-	// Save information about all nodes
-	s.NodeManager.InitializeNodes(resp.FullNodeList, resp.CurrentVersion)
-
-	logger.Info("Datanode registered with coordinator successfully")
-	return nil
-}
-
 // Actually replicates the chunk to the given nodes in parallel
 func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([]*common.DataNodeInfo, error) {
 	logger := logging.OperationLogger(s.logger, "replicate_chunk", slog.String("chunk_id", chunkInfo.ID))
 
 	// Select N_NODES possible nodes to replicate to, excluding the current node
-	nodes, err := s.NodeManager.SelectBestNodes(N_NODES, s.Config.Info.ID)
-	if err != nil {
-		logger.Error("Failed to select nodes", slog.String("error", err.Error()))
-		return nil, fmt.Errorf("failed to select nodes: %v", err)
+	nodes, ok := s.selector.SelectBestNodes(N_NODES)
+	if !ok {
+		logger.Error("Not enough nodes to replicate to")
+		return nil, fmt.Errorf("not enough nodes to replicate to")
 	}
 
 	// Create clients
