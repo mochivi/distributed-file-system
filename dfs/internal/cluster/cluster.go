@@ -1,33 +1,32 @@
 package cluster
 
-// import (
-// 	"github.com/mochivi/distributed-file-system/internal/datanode"
-// )
+import "fmt"
 
-// type ClusterNode struct {
-// 	server      *datanode.DataNodeServer
-// 	nodeManager *NodeManager
-// 	services    struct {
-// 		heartbeat *HeartbeatService
-// 		// register  *RegisterService
-// 	}
-// }
+func (c *ClusterNode) Run() error {
+	// TODO: implement service discovery -- right now, reading from environment variables
+	if err := c.nodeManager.BootstrapCoordinatorNode(); err != nil {
+		return fmt.Errorf("failed to bootstrap coordinator node: %w", err)
+	}
 
-// type HeartbeatService struct {
-// 	cluster *ClusterNode
-// }
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		c.controllers.heartbeat.Run(c.config.node, c.nodeManager)
+	}()
 
-// func NewHeartbeatService(cluster *ClusterNode) *HeartbeatService {
-// 	return &HeartbeatService{cluster: cluster}
-// }
+	// c.wg.Add(1)
+	// go func() {
+	// 	defer c.wg.Done()
+	// 	c.controllers.gc.Run()
+	// }()
 
-// func NewNode(server *datanode.DataNodeServer, nodeManager *NodeManager) *ClusterNode {
-// 	return &ClusterNode{
-// 		server:      server,
-// 		nodeManager: nodeManager,
-// 	}
-// }
+	// c.wg.Add(1)
+	// go func() {
+	// 	defer c.wg.Done()
+	// 	c.controllers.register.Run()
+	// }()
 
-// func (c *ClusterNode) Run() error {
-// 	return nil
-// }
+	c.wg.Wait()
+
+	return nil
+}

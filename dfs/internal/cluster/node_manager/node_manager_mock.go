@@ -1,4 +1,4 @@
-package cluster
+package node_manager
 
 import (
 	"github.com/mochivi/distributed-file-system/internal/common"

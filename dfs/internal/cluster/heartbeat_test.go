@@ -1,4 +1,4 @@
-package datanode
+package cluster
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -29,9 +28,9 @@ func (s *stubCoordinatorHeartbeatServer) DataNodeHeartbeat(ctx context.Context, 
 }
 
 func TestDataNodeServer_heartbeat(t *testing.T) {
-	mockNodeManager := &cluster.MockNodeManager{}
-	server := &DataNodeServer{
-		Config: DataNodeConfig{
+	mockNodeManager := &MockNodeManager{}
+	server := &ClusterNode{
+		Config: ClusterNodeConfig{
 			Info: common.DataNodeInfo{ID: "node1", Status: common.NodeHealthy},
 		},
 		NodeManager: mockNodeManager,
