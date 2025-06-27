@@ -20,7 +20,12 @@ import (
 )
 
 func main() {
-	cfg := config.DefaultCoordinatorConfig()
+	// Load configuration
+	appConfig, err := config.LoadCoordinatorConfig(".")
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+	cfg := appConfig.Coordinator
 
 	// Coordinator dependencies
 

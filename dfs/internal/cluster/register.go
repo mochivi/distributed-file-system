@@ -20,7 +20,7 @@ func NewRegisterService() *RegisterService {
 }
 
 func (s *RegisterService) RegisterWithCoordinator(ctx context.Context, nodeInfo *common.DataNodeInfo, nodeManager node_manager.INodeManager) error {
-	coordinatorNode, ok := nodeManager.GetCoordinatorNode()
+	coordinatorNode, ok := nodeManager.GetLeaderCoordinatorNode()
 	if !ok {
 		return fmt.Errorf("no coordinator node found")
 	}

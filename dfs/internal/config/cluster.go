@@ -2,35 +2,24 @@ package config
 
 import (
 	"time"
-
-	"github.com/mochivi/distributed-file-system/internal/common"
-)
-
-type ClusterNodeRole string
-
-const (
-	ClusterNodeRoleCoordinator ClusterNodeRole = "coordinator"
-	ClusterNodeRoleDataNode    ClusterNodeRole = "datanode"
 )
 
 // Control loops configuration
 type ClusterNodeConfig struct {
-	Role      ClusterNodeRole
-	Node      *common.DataNodeInfo // Only the gRPC server information
-	Heartbeat *HeartbeatControllerConfig
+	Heartbeat   *HeartbeatControllerConfig `mapstructure:"heartbeat" validate:"required"`
+	NodeManager NodeManagerConfig          `mapstructure:"node_manager" validate:"required"`
 }
 
 func DefaultClusterNodeConfig() *ClusterNodeConfig {
 	return &ClusterNodeConfig{
-		Role:      ClusterNodeRoleDataNode,
-		Node:      nil,
-		Heartbeat: DefaultHeartbeatControllerConfig(),
+		Heartbeat:   DefaultHeartbeatControllerConfig(),
+		NodeManager: DefaultNodeManagerConfig(),
 	}
 }
 
 type HeartbeatControllerConfig struct {
-	Interval time.Duration // how often to send heartbeats to the coordinator
-	Timeout  time.Duration // how long to wait for a heartbeat response from the coordinator
+	Interval time.Duration `mapstructure:"interval" validate:"required,gt=0"` // how often to send heartbeats to the coordinator
+	Timeout  time.Duration `mapstructure:"timeout" validate:"required,gt=0"`  // how long to wait for a heartbeat response from the coordinator
 }
 
 func DefaultHeartbeatControllerConfig() *HeartbeatControllerConfig {
@@ -41,15 +30,15 @@ func DefaultHeartbeatControllerConfig() *HeartbeatControllerConfig {
 }
 
 type NodeManagerConfig struct {
-	CoordinatorNodeManagerConfig CoordinatorNodeManagerConfig
-	DataNodeManagerConfig        DataNodeManagerConfig
+	CoordinatorNodeManagerConfig CoordinatorNodeManagerConfig `mapstructure:"coordinator_node_manager"`
+	DataNodeManagerConfig        DataNodeManagerConfig        `mapstructure:"data_node_manager"`
 }
 
 type CoordinatorNodeManagerConfig struct {
 }
 
 type DataNodeManagerConfig struct {
-	MaxHistorySize int // max number of updates to keep in history
+	MaxHistorySize int `mapstructure:"max_history_size" validate:"required,gt=0"` // max number of updates to keep in history
 }
 
 func DefaultDataNodeManagerConfig() DataNodeManagerConfig {

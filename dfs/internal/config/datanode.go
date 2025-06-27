@@ -4,59 +4,84 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
 
+// DatanodeAppConfig is the root configuration for the Datanode service.
+type DatanodeAppConfig struct {
+	Node    DataNodeConfig    `mapstructure:"node" validate:"required"`
+	Cluster ClusterNodeConfig `mapstructure:"cluster" validate:"required"`
+}
+
 type DataNodeConfig struct {
-	Info        common.DataNodeInfo
-	Session     SessionManagerConfig
-	Replication ReplicateManagerConfig
-	DiskStorage DiskStorageConfig
+	Session     SessionManagerConfig   `mapstructure:"session" validate:"required"`
+	Replication ReplicateManagerConfig `mapstructure:"replication" validate:"required"`
+	DiskStorage DiskStorageConfig      `mapstructure:"disk_storage" validate:"required"`
+	Streamer    StreamerConfig         `mapstructure:"streamer" validate:"required"`
 }
 
 type SessionManagerConfig struct {
-	SessionTimeout time.Duration // timeout until chunk upload session times out
+	SessionTimeout time.Duration `mapstructure:"session_timeout" validate:"required,gt=0"` // timeout until chunk upload session times out
+}
+
+func DefaultSessionManagerConfig() SessionManagerConfig {
+	return SessionManagerConfig{
+		SessionTimeout: 1 * time.Minute,
+	}
 }
 
 type ReplicateManagerConfig struct {
-	ReplicateTimeout time.Duration // timeout until replication to another node is considered failed
+	ReplicateTimeout time.Duration `mapstructure:"replicate_timeout" validate:"required,gt=0"` // timeout until replication to another node is considered failed
+}
+
+func DefaultReplicateManagerConfig() ReplicateManagerConfig {
+	return ReplicateManagerConfig{
+		ReplicateTimeout: 10 * time.Minute,
+	}
 }
 
 type DiskStorageConfig struct {
-	Enabled bool
-	Kind    string // block storage, etc..
-	RootDir string // full path must be used
+	Enabled bool   `mapstructure:"enabled"`
+	Kind    string `mapstructure:"kind" validate:"required"`     // block storage, etc..
+	RootDir string `mapstructure:"root_dir" validate:"required"` // full path must be used
 }
 
-func DefaultDatanodeConfig() DataNodeConfig {
-	datanodeHost := utils.GetEnvString("DATANODE_HOST", "0.0.0.0")
+func DefaultDiskStorageConfig() DiskStorageConfig {
 	baseDir := utils.GetEnvString("DISK_STORAGE_BASE_DIR", "/app")
 
-	return DataNodeConfig{
-		Info: common.DataNodeInfo{
-			ID:       uuid.NewString(),
-			Host:     datanodeHost,
-			Port:     8081,
-			Capacity: 10 * 1024 * 1024 * 1024, // gB
-			Used:     0,
-			Status:   common.NodeHealthy,
-			LastSeen: time.Now(),
-		},
+	return DiskStorageConfig{
+		Enabled: true,
+		Kind:    "block",
+		RootDir: filepath.Join(baseDir, "data"),
+	}
+}
 
-		Session: SessionManagerConfig{
-			SessionTimeout: 1 * time.Minute,
-		},
+type StreamerConfig struct {
+	MaxChunkRetries  int
+	ChunkStreamSize  int
+	BackpressureTime time.Duration
+	WaitReplicas     bool // Only used by client, waits for the final stream with the replicas information, default is false when used by datanodes
+}
 
-		Replication: ReplicateManagerConfig{
-			ReplicateTimeout: 10 * time.Minute,
-		},
+func DefaultStreamerConfig() StreamerConfig {
+	return StreamerConfig{
+		MaxChunkRetries: 3,
+		ChunkStreamSize: 256 * 1024,
+		WaitReplicas:    false,
+	}
+}
 
-		DiskStorage: DiskStorageConfig{
-			Enabled: true,
-			Kind:    "block",
-			RootDir: filepath.Join(baseDir, "data"),
+func DefaultDatanodeAppConfig() DatanodeAppConfig {
+	return DatanodeAppConfig{
+		Node: DataNodeConfig{
+			Session:     DefaultSessionManagerConfig(),
+			Replication: DefaultReplicateManagerConfig(),
+			DiskStorage: DefaultDiskStorageConfig(),
+			Streamer:    DefaultStreamerConfig(),
+		},
+		Cluster: ClusterNodeConfig{
+			Heartbeat:   DefaultHeartbeatControllerConfig(),
+			NodeManager: DefaultNodeManagerConfig(),
 		},
 	}
 }

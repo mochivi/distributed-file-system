@@ -6,21 +6,26 @@ import (
 	"github.com/google/uuid"
 )
 
+// CoordinatorAppConfig is the root configuration for the Coordinator service.
+type CoordinatorAppConfig struct {
+	Coordinator CoordinatorConfig `mapstructure:"coordinator" validate:"required"`
+}
+
 type CoordinatorConfig struct {
-	ID          string
-	Host        string
-	Port        int
-	ChunkSize   int
-	Replication ReplicationConfig
-	Metadata    MetadataConfig
+	ID          string            `mapstructure:"id"`
+	Host        string            `mapstructure:"host" validate:"required,hostname_rfc1123"`
+	Port        int               `mapstructure:"port" validate:"required,gt=0,lt=65536"`
+	ChunkSize   int               `mapstructure:"chunk_size" validate:"required,gt=0"`
+	Replication ReplicationConfig `mapstructure:"replication" validate:"required"`
+	Metadata    MetadataConfig    `mapstructure:"metadata" validate:"required"`
 }
 
 type MetadataConfig struct {
-	CommitTimeout time.Duration
+	CommitTimeout time.Duration `mapstructure:"commit_timeout" validate:"required,gt=0"`
 }
 
 type ReplicationConfig struct {
-	Factor int
+	Factor int `mapstructure:"factor" validate:"required,gte=1"`
 }
 
 func DefaultCoordinatorConfig() CoordinatorConfig {

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
@@ -29,7 +30,7 @@ func (s *stubCoordinatorHeartbeatServer) DataNodeHeartbeat(ctx context.Context, 
 }
 
 func TestDataNodeServer_heartbeat(t *testing.T) {
-	mockNodeManager := &MockNodeManager{}
+	mockNodeManager := &node_manager.MockNodeManager{}
 	server := &ClusterNode{
 		config: &config.ClusterNodeConfig{
 			Node: &common.DataNodeInfo{ID: "node1", Status: common.NodeHealthy},

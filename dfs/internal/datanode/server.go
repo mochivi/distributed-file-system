@@ -369,7 +369,7 @@ func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([
 		logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to replicate chunk: %v", err)
 	}
-	replicaNodes = append(replicaNodes, &s.Config.Info) // Add self to the list of replica nodes
+	replicaNodes = append(replicaNodes, s.info) // Add self to the list of replica nodes
 
 	return replicaNodes, nil
 }

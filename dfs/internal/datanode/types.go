@@ -24,7 +24,8 @@ type DataNodeServer struct {
 	nodeManager        node_manager.IReadOnlyNodeManager
 	selector           cluster.NodeSelector
 
-	Config config.DataNodeConfig
+	info   *common.DataNodeInfo
+	config config.DataNodeConfig
 
 	logger *slog.Logger
 }
@@ -43,7 +44,7 @@ type ISessionManager interface {
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
-	nodeManager node_manager.IReadOnlyNodeManager, selector cluster.NodeSelector, config config.DataNodeConfig, logger *slog.Logger) *DataNodeServer {
+	nodeManager node_manager.IReadOnlyNodeManager, selector cluster.NodeSelector, info *common.DataNodeInfo, config config.DataNodeConfig, logger *slog.Logger) *DataNodeServer {
 	datanodeLogger := logging.ExtendLogger(logger, slog.String("component", "datanode_server"))
 	return &DataNodeServer{
 		store:              store,
@@ -51,7 +52,8 @@ func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicati
 		sessionManager:     sessionManager,
 		nodeManager:        nodeManager,
 		selector:           selector,
-		Config:             config,
+		info:               info,
+		config:             config,
 		logger:             datanodeLogger,
 	}
 }

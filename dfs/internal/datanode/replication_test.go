@@ -86,7 +86,7 @@ func TestReplicationManager_replicate(t *testing.T) {
 
 	// Common replication manager used across sub-tests.
 	cfg := config.ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
-	streamer := common.NewStreamer(common.StreamerConfig{
+	streamer := common.NewStreamer(config.StreamerConfig{
 		MaxChunkRetries:  1,
 		ChunkStreamSize:  1024,
 		BackpressureTime: time.Millisecond * 10,
@@ -123,7 +123,7 @@ func TestReplicationManager_paralellReplicate(t *testing.T) {
 
 	// Common replication manager used across sub-tests.
 	cfg := config.ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
-	streamer := common.NewStreamer(common.StreamerConfig{
+	streamer := common.NewStreamer(config.StreamerConfig{
 		MaxChunkRetries:  1,
 		ChunkStreamSize:  1024,
 		BackpressureTime: time.Millisecond * 10,

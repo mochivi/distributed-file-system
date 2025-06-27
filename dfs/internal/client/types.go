@@ -5,6 +5,7 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
@@ -19,7 +20,7 @@ type Client struct {
 
 func NewClient(coordinatorClient *clients.CoordinatorClient, uploader *Uploader, downloader *Downloader, logger *slog.Logger) *Client {
 	clientLogger := logging.ExtendLogger(logger, slog.String("component", "client"))
-	streamer := common.NewStreamer(common.DefaultStreamerConfig())
+	streamer := common.NewStreamer(config.DefaultStreamerConfig())
 	streamer.Config.WaitReplicas = true
 	return &Client{coordinatorClient: coordinatorClient, streamer: streamer, logger: clientLogger, uploader: uploader, downloader: downloader}
 }

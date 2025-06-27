@@ -15,6 +15,7 @@ import (
 
 	"io/fs"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
@@ -25,6 +26,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"github.com/mochivi/distributed-file-system/pkg/utils"
 	"google.golang.org/grpc"
 )
 
@@ -67,46 +69,61 @@ func main() {
 		}
 	}
 
+	// Load configuration
+	appConfig, err := config.LoadDatanodeConfig(".") // Load datanode-specific config
+	if err != nil {
+		log.Fatalf("failed to load configuration: %v", err)
+	}
+
+	// Load datanode info
+	datanodeHost := utils.GetEnvString("DATANODE_HOST", "0.0.0.0")
+	datanodePort := utils.GetEnvInt("DATANODE_PORT", 8081)
+	datanodeInfo := common.DataNodeInfo{
+		ID:       uuid.NewString(),
+		Host:     datanodeHost,
+		Port:     8081,
+		Capacity: 10 * 1024 * 1024 * 1024, // gB
+		Used:     0,
+		Status:   common.NodeHealthy,
+		LastSeen: time.Now(),
+	}
+
 	// Shutdown coordination
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	errChan := make(chan error, 2)
 	var wg sync.WaitGroup
 
-	// Create node config
-	nodeConfig := config.DefaultDatanodeConfig()
-
 	// Setup structured logging
 	rootLogger, err := logging.InitLogger()
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	logger := logging.ExtendLogger(rootLogger, slog.String("node_id", nodeConfig.Info.ID))
+	logger := logging.ExtendLogger(rootLogger, slog.String("node_id", datanodeInfo.ID))
 
 	// Datanode server
 	// ChunkStore implementation is chosen here
 	chunkSerializer := encoding.NewProtoSerializer()
 
-	chunkStore, err := chunk.NewChunkDiskStorage(nodeConfig.DiskStorage, chunkSerializer, logger)
+	chunkStore, err := chunk.NewChunkDiskStorage(appConfig.Node.DiskStorage, chunkSerializer, logger)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	nodeManagerConfig := config.DefaultNodeManagerConfig()
-	nodeManager := node_manager.NewNodeManager(nodeManagerConfig)
+	nodeManager := node_manager.NewNodeManager(appConfig.Cluster.NodeManager)
 	nodeSelector := cluster.NewNodeSelector(nodeManager)
-	streamer := common.NewStreamer(common.DefaultStreamerConfig())
-	replicationManager := datanode.NewReplicationManager(nodeConfig.Replication, streamer, logger)
+	streamer := common.NewStreamer(appConfig.Node.Streamer)
+	replicationManager := datanode.NewReplicationManager(appConfig.Node.Replication, streamer, logger)
 	sessionManager := datanode.NewSessionManager()
 
-	server := datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeSelector, nodeConfig, logger)
+	server := datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeSelector, &datanodeInfo, appConfig.Node, logger)
 
 	// gRPC initialization
 	grpcServer := grpc.NewServer()
 	proto.RegisterDataNodeServiceServer(grpcServer, server)
 
 	// Setup listener for gRPC server
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", server.Config.Info.Port))
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", datanodePort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
@@ -122,7 +139,7 @@ func main() {
 			}
 		}()
 
-		logger.Info(fmt.Sprintf("Starting datanode gRPC server on :%d", server.Config.Info.Port))
+		logger.Info(fmt.Sprintf("Starting datanode gRPC server on :%d", datanodePort))
 		if err := grpcServer.Serve(listener); err != nil {
 			select {
 			case <-ctx.Done():
@@ -134,9 +151,7 @@ func main() {
 	}()
 
 	// Cluster node setup
-	clusterNodeConfig := config.DefaultClusterNodeConfig()
-	clusterNodeConfig.Node = &nodeConfig.Info
-	clusterNode := cluster.NewNode(clusterNodeConfig, nodeManager, logger)
+	clusterNode := cluster.NewNode(&appConfig.Cluster, &datanodeInfo, nodeManager, logger)
 
 	// Run cluster node, which includes heartbeat loop
 	wg.Add(1)

@@ -92,9 +92,9 @@ func DownloadStreamRequestFromProto(pb *proto.DownloadStreamRequest) (DownloadSt
 		return DownloadStreamRequest{}, fmt.Errorf("chunk stream size is too large")
 	}
 
-	if req.ChunkStreamSize <= 0 {
-		pb.ChunkStreamSize = int32(DefaultStreamerConfig().ChunkStreamSize)
-	}
+	// if req.ChunkStreamSize <= 0 {
+	// 	pb.ChunkStreamSize = int32(config.DefaultStreamerConfig().ChunkStreamSize)
+	// }
 	return req, nil
 }
 
