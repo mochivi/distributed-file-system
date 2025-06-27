@@ -9,8 +9,8 @@ import (
 
 // DatanodeAppConfig is the root configuration for the Datanode service.
 type DatanodeAppConfig struct {
-	Node    DataNodeConfig    `mapstructure:"node" validate:"required"`
-	Cluster ClusterNodeConfig `mapstructure:"cluster" validate:"required"`
+	Node  DataNodeConfig  `mapstructure:"node" validate:"required"`
+	Agent NodeAgentConfig `mapstructure:"cluster" validate:"required"`
 }
 
 type DataNodeConfig struct {
@@ -79,9 +79,8 @@ func DefaultDatanodeAppConfig() DatanodeAppConfig {
 			DiskStorage: DefaultDiskStorageConfig(),
 			Streamer:    DefaultStreamerConfig(),
 		},
-		Cluster: ClusterNodeConfig{
-			Heartbeat:   DefaultHeartbeatControllerConfig(),
-			NodeManager: DefaultNodeManagerConfig(),
+		Agent: NodeAgentConfig{
+			Heartbeat: DefaultHeartbeatControllerConfig(),
 		},
 	}
 }

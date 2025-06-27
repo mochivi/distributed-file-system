@@ -5,15 +5,13 @@ import (
 )
 
 // Control loops configuration
-type ClusterNodeConfig struct {
-	Heartbeat   *HeartbeatControllerConfig `mapstructure:"heartbeat" validate:"required"`
-	NodeManager NodeManagerConfig          `mapstructure:"node_manager" validate:"required"`
+type NodeAgentConfig struct {
+	Heartbeat *HeartbeatControllerConfig `mapstructure:"heartbeat" validate:"required"`
 }
 
-func DefaultClusterNodeConfig() *ClusterNodeConfig {
-	return &ClusterNodeConfig{
-		Heartbeat:   DefaultHeartbeatControllerConfig(),
-		NodeManager: DefaultNodeManagerConfig(),
+func DefaultNodeAgentConfig() *NodeAgentConfig {
+	return &NodeAgentConfig{
+		Heartbeat: DefaultHeartbeatControllerConfig(),
 	}
 }
 
@@ -29,27 +27,12 @@ func DefaultHeartbeatControllerConfig() *HeartbeatControllerConfig {
 	}
 }
 
-type NodeManagerConfig struct {
-	CoordinatorNodeManagerConfig CoordinatorNodeManagerConfig `mapstructure:"coordinator_node_manager"`
-	DataNodeManagerConfig        DataNodeManagerConfig        `mapstructure:"data_node_manager"`
+type ClusterStateHistoryManagerConfig struct {
+	MaxHistorySize int
 }
 
-type CoordinatorNodeManagerConfig struct {
-}
-
-type DataNodeManagerConfig struct {
-	MaxHistorySize int `mapstructure:"max_history_size" validate:"required,gt=0"` // max number of updates to keep in history
-}
-
-func DefaultDataNodeManagerConfig() DataNodeManagerConfig {
-	return DataNodeManagerConfig{
+func DefaultClusterStateHistoryManagerConfig() ClusterStateHistoryManagerConfig {
+	return ClusterStateHistoryManagerConfig{
 		MaxHistorySize: 1000,
-	}
-}
-
-func DefaultNodeManagerConfig() NodeManagerConfig {
-	return NodeManagerConfig{
-		CoordinatorNodeManagerConfig: CoordinatorNodeManagerConfig{},
-		DataNodeManagerConfig:        DefaultDataNodeManagerConfig(),
 	}
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
-	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
+	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
@@ -26,13 +26,25 @@ type HeartbeatController struct {
 	logger *slog.Logger
 }
 
-func (h *HeartbeatController) Run(info *common.DataNodeInfo, nodeManager node_manager.INodeManager) error {
+func NewHeartbeatController(ctx context.Context, config *config.HeartbeatControllerConfig, info *common.DataNodeInfo,
+	clusterStateManager state.ClusterStateManager, coordinatorFinder state.CoordinatorFinder, logger *slog.Logger) *HeartbeatController {
+	ctx, cancel := context.WithCancelCause(ctx)
+
+	return &HeartbeatController{
+		ctx:    ctx,
+		cancel: cancel,
+		config: config,
+		logger: logger,
+	}
+}
+
+func (h *HeartbeatController) Run(info *common.DataNodeInfo, clusterStateManager state.ClusterStateManager, coordinatorFinder state.CoordinatorFinder) error {
 	ticker := time.NewTicker(h.config.Interval)
 	defer ticker.Stop()
 
 	errorCount := 0
 	for {
-		coordinatorNode, ok := nodeManager.GetLeaderCoordinatorNode()
+		coordinatorNode, ok := coordinatorFinder.GetLeaderCoordinatorNode()
 		if !ok {
 			return fmt.Errorf("no coordinator node found")
 		}
@@ -49,7 +61,7 @@ func (h *HeartbeatController) Run(info *common.DataNodeInfo, nodeManager node_ma
 				Status:   info.Status,
 				LastSeen: time.Now(),
 			},
-			LastSeenVersion: nodeManager.GetCurrentVersion(),
+			LastSeenVersion: clusterStateManager.GetCurrentVersion(),
 		}
 
 		updates, err := h.heartbeat(h.ctx, req, coordinatorClient)
@@ -62,7 +74,7 @@ func (h *HeartbeatController) Run(info *common.DataNodeInfo, nodeManager node_ma
 			ticker.Reset(30 * time.Duration(errorCount) * time.Second)
 			continue
 		}
-		nodeManager.ApplyHistory(updates)
+		clusterStateManager.ApplyUpdates(updates)
 		coordinatorClient.Close()
 
 		select {

@@ -31,8 +31,8 @@ func (s *stubCoordinatorHeartbeatServer) DataNodeHeartbeat(ctx context.Context, 
 
 func TestDataNodeServer_heartbeat(t *testing.T) {
 	mockNodeManager := &node_manager.MockNodeManager{}
-	server := &ClusterNode{
-		config: &config.ClusterNodeConfig{
+	server := &NodeAgent{
+		config: &config.NodeAgentConfig{
 			Node: &common.DataNodeInfo{ID: "node1", Status: common.NodeHealthy},
 		},
 		nodeManager: mockNodeManager,

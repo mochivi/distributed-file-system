@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
+	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 )
 
@@ -10,18 +10,18 @@ type NodeSelector interface {
 }
 
 type nodeSelector struct {
-	nodeManager node_manager.INodeManager
+	clusterViewer state.ClusterStateViewer
 }
 
-func NewNodeSelector(nodeManager node_manager.INodeManager) *nodeSelector {
+func NewNodeSelector(clusterViewer state.ClusterStateViewer) *nodeSelector {
 	return &nodeSelector{
-		nodeManager: nodeManager,
+		clusterViewer: clusterViewer,
 	}
 }
 
 func (s *nodeSelector) SelectBestNodes(n int) ([]*common.DataNodeInfo, bool) {
 	var healthyNodes []*common.DataNodeInfo
-	nodes, _ := s.nodeManager.ListNodes()
+	nodes, _ := s.clusterViewer.ListNodes()
 	for _, node := range nodes {
 		if node.Status == common.NodeHealthy {
 			healthyNodes = append(healthyNodes, node)

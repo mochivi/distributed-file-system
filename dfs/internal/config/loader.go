@@ -13,7 +13,7 @@ func LoadDatanodeConfig(path string) (*DatanodeAppConfig, error) {
 
 	// Set defaults
 	v.SetDefault("node", DefaultDatanodeAppConfig())
-	v.SetDefault("cluster", DefaultClusterNodeConfig())
+	v.SetDefault("agent", DefaultNodeAgentConfig())
 
 	// Configure file reading
 	v.SetConfigName("datanode") // a file named `datanode.yaml` can be used

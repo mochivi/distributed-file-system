@@ -27,3 +27,10 @@ logs/*
 # docs -- not yet ready for public release
 docs/deployment.md
 docs/contributing.md
+
+# IDE settings
+.idea/
+.cursor/
+
+# Review documents
+/ideas

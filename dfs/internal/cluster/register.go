@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
-	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
+	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
@@ -19,8 +19,9 @@ func NewRegisterService() *RegisterService {
 	return &RegisterService{}
 }
 
-func (s *RegisterService) RegisterWithCoordinator(ctx context.Context, nodeInfo *common.DataNodeInfo, nodeManager node_manager.INodeManager) error {
-	coordinatorNode, ok := nodeManager.GetLeaderCoordinatorNode()
+func (s *RegisterService) RegisterWithCoordinator(ctx context.Context, nodeInfo *common.DataNodeInfo,
+	clusterStateManager state.ClusterStateManager, coordinatorFinder state.CoordinatorFinder) error {
+	coordinatorNode, ok := coordinatorFinder.GetCoordinatorNode(nodeInfo.ID)
 	if !ok {
 		return fmt.Errorf("no coordinator node found")
 	}
@@ -47,7 +48,7 @@ func (s *RegisterService) RegisterWithCoordinator(ctx context.Context, nodeInfo 
 	}
 
 	// Save information about all nodes
-	nodeManager.InitializeNodes(resp.FullNodeList, resp.CurrentVersion)
+	clusterStateManager.InitializeNodes(resp.FullNodeList, resp.CurrentVersion)
 
 	logger.Info("Datanode registered with coordinator successfully")
 	return nil

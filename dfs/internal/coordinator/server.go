@@ -85,7 +85,7 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 
 	// Find available nodes to download from for this chunk
 	for i, chunk := range fileInfo.Chunks {
-		nodes, ok := c.nodeManager.GetAvailableNodesForChunk(chunk.Replicas)
+		nodes, ok := c.clusterStateHistoryManager.GetAvailableNodesForChunk(chunk.Replicas)
 		if !ok {
 			c.logger.Error("Failed to get available node for chunk", slog.String("chunk_id", chunk.Header.ID), slog.String("file_path", req.Path))
 			return nil, status.Error(codes.NotFound, "no available nodes")
@@ -139,8 +139,8 @@ func (c *Coordinator) RegisterDataNode(ctx context.Context, pb *proto.RegisterDa
 	nodeInfo := common.DataNodeInfoFromProto(pb.NodeInfo)
 	c.logger.Debug("Received RegisterDataNodeRequest from data node", slog.String("node_id", nodeInfo.ID))
 
-	c.nodeManager.AddNode(&nodeInfo)
-	nodes, version := c.nodeManager.ListNodes()
+	c.clusterStateHistoryManager.AddNode(&nodeInfo)
+	nodes, version := c.clusterStateHistoryManager.ListNodes()
 
 	c.logger.Debug("Registered datanode, replying with current node list and version", slog.Int("num_nodes", len(nodes)), slog.Int("version", int(version)))
 	return common.RegisterDataNodeResponse{
@@ -156,7 +156,7 @@ func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, pb *proto.Heartbeat
 	req := common.HeartbeatRequestFromProto(pb)
 	c.logger.Debug("Received HeartbeatRequest from data node", slog.String("node_id", req.NodeID))
 
-	node, exists := c.nodeManager.GetNode(req.NodeID)
+	node, exists := c.clusterStateHistoryManager.GetNode(req.NodeID)
 	if !exists {
 		c.logger.Error("Data node not found", slog.String("node_id", req.NodeID))
 		return common.HeartbeatResponse{
@@ -168,7 +168,7 @@ func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, pb *proto.Heartbeat
 	node.Status = req.Status.Status
 	node.LastSeen = req.Status.LastSeen
 
-	updates, currentVersion, err := c.nodeManager.GetUpdatesSince(req.LastSeenVersion)
+	updates, currentVersion, err := c.clusterStateHistoryManager.GetUpdatesSince(req.LastSeenVersion)
 	if err != nil {
 		c.logger.Error("Failed to get updates since provided", slog.String("error", err.Error()))
 		return common.HeartbeatResponse{
@@ -194,7 +194,7 @@ func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, pb *proto.Heartbeat
 
 // ListNodes returns a list of all registered data nodes
 func (c *Coordinator) ListNodes(ctx context.Context, req *proto.ListNodesRequest) (*proto.ListNodesResponse, error) {
-	nodes, version := c.nodeManager.ListNodes()
+	nodes, version := c.clusterStateHistoryManager.ListNodes()
 	return common.ListNodesResponse{
 		Nodes:          nodes,
 		CurrentVersion: version,

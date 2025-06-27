@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/mochivi/distributed-file-system/internal/cluster"
-	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
+	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
@@ -37,12 +37,16 @@ func main() {
 
 	metadataStore := metadata.NewMetadataLocalStorage()
 	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout, logger)
-	nodeManagerConfig := config.DefaultNodeManagerConfig()
-	nodeManager := node_manager.NewNodeManager(nodeManagerConfig)
-	nodeSelector := cluster.NewNodeSelector(nodeManager)
+
+	// TODO: FIX THIS GODAMNNNN
+	clusterStateHistoryManagerConfig := state.ClusterStateHistoryManagerConfig{
+		MaxHistorySize: 100,
+	}
+	clusterStateHistoryManager := state.NewClusterStateHistoryManager(clusterStateHistoryManagerConfig)
+	nodeSelector := cluster.NewNodeSelector(clusterStateHistoryManager)
 
 	// Create coordinator server
-	server := coordinator.NewCoordinator(cfg, metadataStore, metadataManager, nodeManager, nodeSelector, logger)
+	server := coordinator.NewCoordinator(cfg, metadataStore, metadataManager, clusterStateHistoryManager, nodeSelector, logger)
 
 	// gRPC server and register
 	grpcServer := grpc.NewServer()

@@ -18,7 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/mochivi/distributed-file-system/internal/cluster"
-	"github.com/mochivi/distributed-file-system/internal/cluster/node_manager"
+	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
@@ -110,13 +110,14 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
-	nodeManager := node_manager.NewNodeManager(appConfig.Cluster.NodeManager)
-	nodeSelector := cluster.NewNodeSelector(nodeManager)
+	clusterStateManager := state.NewClusterStateManager()
+	nodeSelector := cluster.NewNodeSelector(clusterStateManager)
 	streamer := common.NewStreamer(appConfig.Node.Streamer)
 	replicationManager := datanode.NewReplicationManager(appConfig.Node.Replication, streamer, logger)
 	sessionManager := datanode.NewSessionManager()
+	coordinatorFinder := state.NewCoordinatorFinder()
 
-	server := datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, nodeManager, nodeSelector, &datanodeInfo, appConfig.Node, logger)
+	server := datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, clusterStateManager, coordinatorFinder, nodeSelector, &datanodeInfo, appConfig.Node, logger)
 
 	// gRPC initialization
 	grpcServer := grpc.NewServer()
@@ -151,13 +152,13 @@ func main() {
 	}()
 
 	// Cluster node setup
-	clusterNode := cluster.NewNode(&appConfig.Cluster, &datanodeInfo, nodeManager, logger)
+	nodeAgent := cluster.NewNodeAgent(&appConfig.Agent, &datanodeInfo, clusterStateManager, coordinatorFinder, logger)
 
-	// Run cluster node, which includes heartbeat loop
+	// Run node agent, which includes heartbeat loop
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := clusterNode.Run(); err != nil {
+		if err := nodeAgent.Run(); err != nil {
 			errChan <- fmt.Errorf("cluster node failed: %w", err)
 		}
 	}()
