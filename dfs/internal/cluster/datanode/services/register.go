@@ -1,4 +1,4 @@
-package cluster
+package datanode_services
 
 import (
 	"context"
@@ -15,8 +15,11 @@ type RegisterService struct {
 	logger *slog.Logger
 }
 
-func NewRegisterService() *RegisterService {
-	return &RegisterService{}
+func NewRegisterService(logger *slog.Logger) *RegisterService {
+	logger = logging.ServiceLogger(logger, "register")
+	return &RegisterService{
+		logger: logger,
+	}
 }
 
 func (s *RegisterService) RegisterWithCoordinator(ctx context.Context, nodeInfo *common.DataNodeInfo,

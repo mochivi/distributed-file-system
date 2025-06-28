@@ -73,3 +73,8 @@ func OperationLogger(logger *slog.Logger, operation string, kvs ...any) *slog.Lo
 	attrs := append(kvs, slog.String("operation", operation))
 	return ExtendLogger(logger, attrs...)
 }
+
+func ServiceLogger(logger *slog.Logger, service string, kvs ...any) *slog.Logger {
+	attrs := append(kvs, slog.String("service", service))
+	return ExtendLogger(logger, attrs...)
+}

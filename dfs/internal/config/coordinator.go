@@ -28,6 +28,10 @@ type ReplicationConfig struct {
 	Factor int `mapstructure:"factor" validate:"required,gte=1"`
 }
 
+type GarbageCollectionControllerConfig struct {
+	Interval time.Duration `mapstructure:"interval" validate:"required,gt=0"`
+}
+
 func DefaultCoordinatorConfig() CoordinatorConfig {
 	return CoordinatorConfig{
 		ID:        uuid.NewString(),
