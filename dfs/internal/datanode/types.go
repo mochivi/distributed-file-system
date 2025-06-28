@@ -4,12 +4,14 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/mochivi/distributed-file-system/internal/clients"
+	"github.com/mochivi/distributed-file-system/internal/cluster"
+	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Implements the proto.DataNodeServiceServer interface
@@ -19,23 +21,19 @@ type DataNodeServer struct {
 	store              storage.ChunkStorage
 	replicationManager IReplicationManager
 	sessionManager     ISessionManager
-	NodeManager        common.INodeManager
+	clusterViewer      state.ClusterStateViewer
+	coordinatorFinder  state.CoordinatorFinder
+	selector           cluster.NodeSelector
 
-	Config DataNodeConfig
+	info   *common.DataNodeInfo
+	config config.DataNodeConfig
 
 	logger *slog.Logger
 }
 
-// Wrapper over the proto.DataNodeServiceClient interface
-type DataNodeClient struct {
-	client proto.DataNodeServiceClient
-	conn   *grpc.ClientConn
-	Node   *common.DataNodeInfo
-}
-
 type IReplicationManager interface {
-	paralellReplicate(clients []*DataNodeClient, chunkInfo common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error)
-	replicate(ctx context.Context, client *DataNodeClient, req common.ChunkHeader, data []byte, clientLogger *slog.Logger) error
+	paralellReplicate(clients []*clients.DataNodeClient, chunkInfo common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error)
+	replicate(ctx context.Context, client *clients.DataNodeClient, req common.ChunkHeader, data []byte, clientLogger *slog.Logger) error
 }
 
 type ISessionManager interface {
@@ -47,34 +45,17 @@ type ISessionManager interface {
 }
 
 func NewDataNodeServer(store storage.ChunkStorage, replicationManager IReplicationManager, sessionManager ISessionManager,
-	nodeManager common.INodeManager, config DataNodeConfig, logger *slog.Logger) *DataNodeServer {
+	clusterViewer state.ClusterStateViewer, coordinatorFinder state.CoordinatorFinder, selector cluster.NodeSelector, info *common.DataNodeInfo, config config.DataNodeConfig, logger *slog.Logger) *DataNodeServer {
 	datanodeLogger := logging.ExtendLogger(logger, slog.String("component", "datanode_server"))
 	return &DataNodeServer{
 		store:              store,
 		replicationManager: replicationManager,
 		sessionManager:     sessionManager,
-		NodeManager:        nodeManager,
-		Config:             config,
+		clusterViewer:      clusterViewer,
+		coordinatorFinder:  coordinatorFinder,
+		selector:           selector,
+		info:               info,
+		config:             config,
 		logger:             datanodeLogger,
 	}
-}
-
-func NewDataNodeClient(node *common.DataNodeInfo, opts ...grpc.DialOption) (*DataNodeClient, error) {
-	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-
-	conn, err := grpc.NewClient(
-		node.Endpoint(),
-		opts...,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	client := proto.NewDataNodeServiceClient(conn)
-
-	return &DataNodeClient{
-		client: client,
-		conn:   conn,
-		Node:   node,
-	}, nil
 }

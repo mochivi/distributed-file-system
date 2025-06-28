@@ -9,7 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/cluster"
+	"github.com/mochivi/distributed-file-system/internal/cluster/state"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
@@ -18,7 +20,12 @@ import (
 )
 
 func main() {
-	cfg := coordinator.DefaultCoordinatorConfig()
+	// Load configuration
+	appConfig, err := config.LoadCoordinatorConfig(".")
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+	cfg := appConfig.Coordinator
 
 	// Coordinator dependencies
 
@@ -30,11 +37,16 @@ func main() {
 
 	metadataStore := metadata.NewMetadataLocalStorage()
 	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout, logger)
-	nodeSelector := common.NewNodeSelector()
-	nodeManager := common.NewNodeManager(nodeSelector)
+
+	// TODO: FIX THIS GODAMNNNN
+	clusterStateHistoryManagerConfig := state.ClusterStateHistoryManagerConfig{
+		MaxHistorySize: 100,
+	}
+	clusterStateHistoryManager := state.NewClusterStateHistoryManager(clusterStateHistoryManagerConfig)
+	nodeSelector := cluster.NewNodeSelector(clusterStateHistoryManager)
 
 	// Create coordinator server
-	server := coordinator.NewCoordinator(cfg, metadataStore, metadataManager, nodeManager, logger)
+	server := coordinator.NewCoordinator(cfg, metadataStore, metadataManager, clusterStateHistoryManager, nodeSelector, logger)
 
 	// gRPC server and register
 	grpcServer := grpc.NewServer()

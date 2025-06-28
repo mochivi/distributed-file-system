@@ -9,9 +9,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
-	"github.com/mochivi/distributed-file-system/internal/datanode"
 )
 
 type DownloaderConfig struct {
@@ -22,7 +21,7 @@ type DownloaderConfig struct {
 
 type DownloadWork struct {
 	chunkHeader common.ChunkHeader
-	client      *datanode.DataNodeClient
+	client      *clients.DataNodeClient
 	sessionID   string
 	logger      *slog.Logger
 }
@@ -34,7 +33,7 @@ type Downloader struct {
 
 type downloadSession struct {
 	// Input params
-	chunkLocations []coordinator.ChunkLocation
+	chunkLocations []common.ChunkLocation
 
 	// Output params
 	tempFile     *os.File
@@ -56,7 +55,7 @@ func NewDownloader(streamer *common.Streamer, config DownloaderConfig) *Download
 	}
 }
 
-func (d *Downloader) DownloadFile(ctx context.Context, chunkLocations []coordinator.ChunkLocation, sessionID string,
+func (d *Downloader) DownloadFile(ctx context.Context, chunkLocations []common.ChunkLocation, sessionID string,
 	totalFileSize int, logger *slog.Logger) (string, error) {
 
 	// Create temporary file
@@ -181,7 +180,7 @@ func (d *Downloader) queueWork(session *downloadSession, sessionID string) error
 			return err
 		}
 
-		client, err := datanode.NewDataNodeClient(location.Nodes[0])
+		client, err := clients.NewDataNodeClient(location.Nodes[0])
 		if err != nil {
 			return fmt.Errorf("failed to create datanode client: %w", err)
 		}

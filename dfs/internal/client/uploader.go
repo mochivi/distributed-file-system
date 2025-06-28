@@ -9,9 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
-	"github.com/mochivi/distributed-file-system/internal/datanode"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
@@ -45,7 +44,7 @@ type UploaderWork struct {
 	clientPool  *ClientPool
 }
 
-func (w *UploaderWork) GetClient() (*datanode.DataNodeClient, error) {
+func (w *UploaderWork) GetClient() (*clients.DataNodeClient, error) {
 	client, sessionID, err := w.clientPool.GetClient(w.chunkHeader)
 	if err != nil {
 		return nil, err
@@ -56,17 +55,17 @@ func (w *UploaderWork) GetClient() (*datanode.DataNodeClient, error) {
 
 type ClientPool struct {
 	index   int
-	clients []*datanode.DataNodeClient
+	clients []*clients.DataNodeClient
 	mu      sync.Mutex
 }
 
-func NewClientPool(clients []*datanode.DataNodeClient) *ClientPool {
+func NewClientPool(clients []*clients.DataNodeClient) *ClientPool {
 	return &ClientPool{
 		clients: clients,
 	}
 }
 
-func (c *ClientPool) GetClient(chunkHeader common.ChunkHeader) (*datanode.DataNodeClient, string, error) {
+func (c *ClientPool) GetClient(chunkHeader common.ChunkHeader) (*clients.DataNodeClient, string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -102,7 +101,7 @@ func (c *ClientPool) RotateClient() {
 	c.mu.Unlock()
 }
 
-func (c *ClientPool) AddClient(client *datanode.DataNodeClient) {
+func (c *ClientPool) AddClient(client *clients.DataNodeClient) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.clients = append(c.clients, client)
@@ -115,7 +114,7 @@ type UploaderConfig struct {
 
 type uploadSession struct {
 	// Input params
-	chunkLocations []coordinator.ChunkLocation
+	chunkLocations []common.ChunkLocation
 	chunksize      int
 
 	// Internal state
@@ -140,7 +139,7 @@ func NewUploader(streamer *common.Streamer, logger *slog.Logger, config Uploader
 	}
 }
 
-func (u *Uploader) UploadFile(ctx context.Context, file *os.File, chunkLocations []coordinator.ChunkLocation, logger *slog.Logger, chunksize int) ([]common.ChunkInfo, error) {
+func (u *Uploader) UploadFile(ctx context.Context, file *os.File, chunkLocations []common.ChunkLocation, logger *slog.Logger, chunksize int) ([]common.ChunkInfo, error) {
 	session := &uploadSession{
 		ctx:            ctx,
 		chunkLocations: chunkLocations,
@@ -217,9 +216,9 @@ func (u *Uploader) QueueWork(ctx context.Context, session *uploadSession, file *
 			Checksum: checksum,
 		}
 
-		clientPool := NewClientPool(make([]*datanode.DataNodeClient, 0, len(chunkUploadLocation.Nodes)))
+		clientPool := NewClientPool(make([]*clients.DataNodeClient, 0, len(chunkUploadLocation.Nodes)))
 		for _, node := range chunkUploadLocation.Nodes {
-			client, err := datanode.NewDataNodeClient(node)
+			client, err := clients.NewDataNodeClient(node)
 			if err != nil {
 				session.logger.Error("Failed to create connection to datanode client", slog.String("error", err.Error()))
 				return fmt.Errorf("failed to create connection to datanode client: %w", err)

@@ -1,4 +1,4 @@
-package datanode
+package clients
 
 import (
 	"context"
@@ -6,7 +6,35 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
+
+// Wrapper over the proto.DataNodeServiceClient interface
+type DataNodeClient struct {
+	client proto.DataNodeServiceClient
+	conn   *grpc.ClientConn
+	Node   *common.DataNodeInfo
+}
+
+func NewDataNodeClient(node *common.DataNodeInfo, opts ...grpc.DialOption) (*DataNodeClient, error) {
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	conn, err := grpc.NewClient(
+		node.Endpoint(),
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client := proto.NewDataNodeServiceClient(conn)
+
+	return &DataNodeClient{
+		client: client,
+		conn:   conn,
+		Node:   node,
+	}, nil
+}
 
 // client -> node
 // This is the primary node that is receiving the chunk

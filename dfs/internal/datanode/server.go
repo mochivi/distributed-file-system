@@ -9,8 +9,8 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
@@ -339,71 +339,37 @@ func (s *DataNodeServer) HealthCheck(ctx context.Context, pb *proto.HealthCheckR
 	return nil, nil
 }
 
-func (s *DataNodeServer) RegisterWithCoordinator(ctx context.Context) error {
-	coordinatorNode, ok := s.NodeManager.GetCoordinatorNode()
-	if !ok {
-		return fmt.Errorf("no coordinator node found")
-	}
-
-	logger := logging.OperationLogger(s.logger, "register", slog.String("coordinator_address", coordinatorNode.Endpoint()))
-	logger.Info("Registering with coordinator")
-
-	coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorNode)
-	if err != nil {
-		logger.Error("Failed to create coordinator client", slog.String("error", err.Error()))
-		return fmt.Errorf("failed to create coordinator client: %v", err)
-	}
-
-	req := coordinator.RegisterDataNodeRequest{NodeInfo: s.Config.Info}
-	resp, err := coordinatorClient.RegisterDataNode(ctx, req)
-	if err != nil {
-		logger.Error("Failed to register datanode with coordinator", slog.String("error", err.Error()))
-		return fmt.Errorf("failed to register datanode with coordinator: %v", err)
-	}
-
-	if !resp.Success {
-		logger.Error("Failed to register datanode with coordinator", slog.String("error", resp.Message))
-		return fmt.Errorf("failed to register datanode with coordinator: %s", resp.Message)
-	}
-
-	// Save information about all nodes
-	s.NodeManager.InitializeNodes(resp.FullNodeList, resp.CurrentVersion)
-
-	logger.Info("Datanode registered with coordinator successfully")
-	return nil
-}
-
 // Actually replicates the chunk to the given nodes in parallel
 func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([]*common.DataNodeInfo, error) {
 	logger := logging.OperationLogger(s.logger, "replicate_chunk", slog.String("chunk_id", chunkInfo.ID))
 
 	// Select N_NODES possible nodes to replicate to, excluding the current node
-	nodes, err := s.NodeManager.SelectBestNodes(N_NODES, s.Config.Info.ID)
-	if err != nil {
-		logger.Error("Failed to select nodes", slog.String("error", err.Error()))
-		return nil, fmt.Errorf("failed to select nodes: %v", err)
+	nodes, ok := s.selector.SelectBestNodes(N_NODES)
+	if !ok {
+		logger.Error("Not enough nodes to replicate to")
+		return nil, fmt.Errorf("not enough nodes to replicate to")
 	}
 
 	// Create clients
-	var clients []*DataNodeClient
+	var replicationClients []*clients.DataNodeClient
 	for _, node := range nodes {
-		client, err := NewDataNodeClient(node)
+		client, err := clients.NewDataNodeClient(node)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create client for %s - [%s]  %v", node.ID, node.Endpoint(), err)
 		}
 		if client == nil {
 			return nil, fmt.Errorf("client for %v is nil", node)
 		}
-		clients = append(clients, client)
+		replicationClients = append(replicationClients, client)
 	}
 
 	// Replicate to N_REPLICAS nodes
-	replicaNodes, err := s.replicationManager.paralellReplicate(clients, chunkInfo, data, N_REPLICAS-1)
+	replicaNodes, err := s.replicationManager.paralellReplicate(replicationClients, chunkInfo, data, N_REPLICAS-1)
 	if err != nil {
 		logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to replicate chunk: %v", err)
 	}
-	replicaNodes = append(replicaNodes, &s.Config.Info) // Add self to the list of replica nodes
+	replicaNodes = append(replicaNodes, s.info) // Add self to the list of replica nodes
 
 	return replicaNodes, nil
 }

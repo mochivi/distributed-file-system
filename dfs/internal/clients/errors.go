@@ -1,4 +1,4 @@
-package datanode
+package clients
 
 import (
 	"fmt"

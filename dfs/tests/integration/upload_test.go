@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/client"
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
-	"github.com/mochivi/distributed-file-system/internal/datanode"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
@@ -33,12 +33,12 @@ func NewTestClient(t *testing.T, logger *slog.Logger) *client.Client {
 		Port:   coordinatorPort,
 		Status: common.NodeHealthy,
 	}
-	coordinatorClient, err := coordinator.NewCoordinatorClient(coordinatorNode)
+	coordinatorClient, err := clients.NewCoordinatorClient(coordinatorNode)
 	if err != nil {
 		t.Fatalf("failed to create coordinator client: %v", err)
 	}
 
-	streamer := common.NewStreamer(common.DefaultStreamerConfig())
+	streamer := common.NewStreamer(config.DefaultStreamerConfig())
 	streamer.Config.WaitReplicas = true
 	uploader := client.NewUploader(streamer, logger, client.UploaderConfig{
 		NumWorkers:      10,
@@ -98,14 +98,14 @@ func TestClientUpload(t *testing.T) {
 			file.Close()
 
 			// Validate if the chunks were replicated to the provided nodes and their checksum matches the expectation
-			streamer := common.NewStreamer(common.StreamerConfig{
+			streamer := common.NewStreamer(config.StreamerConfig{
 				ChunkStreamSize: defaultChunkSize,
 			})
 			streamer.Config.WaitReplicas = true // Wait for the final stream with the replicas information
 
 			for _, info := range chunkInfos {
 				for _, replica := range info.Replicas {
-					dnClient, _ := datanode.NewDataNodeClient(replica)
+					dnClient, _ := clients.NewDataNodeClient(replica)
 
 					resp, err := dnClient.PrepareChunkDownload(context.Background(), common.DownloadChunkRequest{ChunkID: info.Header.ID})
 					if err != nil {
@@ -118,7 +118,7 @@ func TestClientUpload(t *testing.T) {
 
 					stream, err := dnClient.DownloadChunkStream(context.Background(), common.DownloadStreamRequest{
 						SessionID:       resp.SessionID,
-						ChunkStreamSize: int32(common.DefaultStreamerConfig().ChunkStreamSize), // Follows the default chunk stream size -- 256KB
+						ChunkStreamSize: int32(config.DefaultStreamerConfig().ChunkStreamSize), // Follows the default chunk stream size -- 256KB
 					})
 					if err != nil {
 						t.Fatalf("failed to create download stream: %v", err)
@@ -171,14 +171,14 @@ func TestClientUpload(t *testing.T) {
 			file.Close()
 
 			// Validate if the chunks were replicated to the provided nodes and their checksum matches the expectation
-			streamer := common.NewStreamer(common.StreamerConfig{
+			streamer := common.NewStreamer(config.StreamerConfig{
 				ChunkStreamSize: tt.chunkSize,
 			})
 			streamer.Config.WaitReplicas = true // Wait for the final stream with the replicas information
 
 			for _, info := range chunkInfos {
 				for _, replica := range info.Replicas {
-					dnClient, _ := datanode.NewDataNodeClient(replica)
+					dnClient, _ := clients.NewDataNodeClient(replica)
 
 					resp, err := dnClient.PrepareChunkDownload(context.Background(), common.DownloadChunkRequest{ChunkID: info.Header.ID})
 					if err != nil {
@@ -191,7 +191,7 @@ func TestClientUpload(t *testing.T) {
 
 					stream, err := dnClient.DownloadChunkStream(context.Background(), common.DownloadStreamRequest{
 						SessionID:       resp.SessionID,
-						ChunkStreamSize: int32(common.DefaultStreamerConfig().ChunkStreamSize), // Follows the default chunk stream size -- 256KB
+						ChunkStreamSize: int32(config.DefaultStreamerConfig().ChunkStreamSize), // Follows the default chunk stream size -- 256KB
 					})
 					if err != nil {
 						t.Fatalf("failed to create download stream: %v", err)

@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 )
@@ -83,8 +85,8 @@ func TestReplicationManager_replicate(t *testing.T) {
 	header, data := newRandomChunk(128)
 
 	// Common replication manager used across sub-tests.
-	cfg := ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
-	streamer := common.NewStreamer(common.StreamerConfig{
+	cfg := config.ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
+	streamer := common.NewStreamer(config.StreamerConfig{
 		MaxChunkRetries:  1,
 		ChunkStreamSize:  1024,
 		BackpressureTime: time.Millisecond * 10,
@@ -120,8 +122,8 @@ func TestReplicationManager_paralellReplicate(t *testing.T) {
 	header, data := newRandomChunk(128)
 
 	// Common replication manager used across sub-tests.
-	cfg := ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
-	streamer := common.NewStreamer(common.StreamerConfig{
+	cfg := config.ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
+	streamer := common.NewStreamer(config.StreamerConfig{
 		MaxChunkRetries:  1,
 		ChunkStreamSize:  1024,
 		BackpressureTime: time.Millisecond * 10,
@@ -188,7 +190,7 @@ func TestReplicationManager_paralellReplicate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test clients with stub servers
-			var testClients []*DataNodeClient
+			var testClients []*clients.DataNodeClient
 			var cleanups []func()
 			for i := 0; i < tt.nClients; i++ {
 				client, cleanup := NewTestDataNodeClientWithStubServer(t, &stubDataNodeServer{

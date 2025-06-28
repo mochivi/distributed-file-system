@@ -9,31 +9,17 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 )
 
-type StreamerConfig struct {
-	MaxChunkRetries  int
-	ChunkStreamSize  int
-	BackpressureTime time.Duration
-	WaitReplicas     bool // Only used by client, waits for the final stream with the replicas information, default is false when used by datanodes
-}
-
-func DefaultStreamerConfig() StreamerConfig {
-	return StreamerConfig{
-		MaxChunkRetries: 3,
-		ChunkStreamSize: 256 * 1024,
-		WaitReplicas:    false,
-	}
-}
-
 type Streamer struct {
-	Config StreamerConfig
+	Config config.StreamerConfig
 }
 
-func NewStreamer(config StreamerConfig) *Streamer {
+func NewStreamer(config config.StreamerConfig) *Streamer {
 	return &Streamer{Config: config}
 }
 

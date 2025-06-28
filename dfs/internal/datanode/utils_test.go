@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -16,7 +16,7 @@ import (
 
 // NewTestCoordinatorClientWithStubServer starts a stubCoordinatorServer listening on a free TCP port and
 // returns the coordinator client and a cleanup function.
-func NewTestCoordinatorClientWithStubServer(t *testing.T, server proto.CoordinatorServiceServer) (*coordinator.CoordinatorClient, func()) {
+func NewTestCoordinatorClientWithStubServer(t *testing.T, server proto.CoordinatorServiceServer) (*clients.CoordinatorClient, func()) {
 	t.Helper()
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
@@ -43,7 +43,7 @@ func NewTestCoordinatorClientWithStubServer(t *testing.T, server proto.Coordinat
 		Status: common.NodeHealthy,
 	}
 
-	coordinatorClient, err := coordinator.NewCoordinatorClient(nodeInfo, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	coordinatorClient, err := clients.NewCoordinatorClient(nodeInfo, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("failed to create coordinator client: %v", err)
 	}
@@ -57,7 +57,7 @@ func NewTestCoordinatorClientWithStubServer(t *testing.T, server proto.Coordinat
 
 // NewTestDataNodeClientWithStubServer starts a stubDataNodeServer listening on a free TCP port and
 // returns the data node client and a cleanup function.
-func NewTestDataNodeClientWithStubServer(t *testing.T, server proto.DataNodeServiceServer) (*DataNodeClient, func()) {
+func NewTestDataNodeClientWithStubServer(t *testing.T, server proto.DataNodeServiceServer) (*clients.DataNodeClient, func()) {
 	t.Helper()
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
@@ -84,7 +84,7 @@ func NewTestDataNodeClientWithStubServer(t *testing.T, server proto.DataNodeServ
 		Status: common.NodeHealthy,
 	}
 
-	dataNodeClient, err := NewDataNodeClient(nodeInfo)
+	dataNodeClient, err := clients.NewDataNodeClient(nodeInfo)
 	if err != nil {
 		t.Fatalf("failed to create data node client: %v", err)
 	}

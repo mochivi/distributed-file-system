@@ -41,7 +41,7 @@ func newMetadataUploadSession(sessionID string, exp time.Duration, fileInfo *com
 	}
 }
 
-func (m *metadataManager) trackUpload(sessionID string, req UploadRequest, numChunks int) {
+func (m *metadataManager) trackUpload(sessionID string, req common.UploadRequest, numChunks int) {
 	// Create chunk info array
 	chunkInfos := make([]common.ChunkInfo, numChunks)
 	for i := 0; i < numChunks; i++ {
