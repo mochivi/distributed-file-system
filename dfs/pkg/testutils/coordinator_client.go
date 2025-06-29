@@ -1,4 +1,4 @@
-package datanode
+package testutils
 
 import (
 	"crypto/rand"
