@@ -38,8 +38,7 @@ func NewTestClient(t *testing.T, logger *slog.Logger) *client.Client {
 		t.Fatalf("failed to create coordinator client: %v", err)
 	}
 
-	streamer := common.NewStreamer(config.DefaultStreamerConfig())
-	streamer.Config.WaitReplicas = true
+	streamer := common.NewStreamer(config.DefaultStreamerConfig(true))
 	uploader := client.NewUploader(streamer, logger, client.UploaderConfig{
 		NumWorkers:      10,
 		ChunkRetryCount: 3,
@@ -49,7 +48,7 @@ func NewTestClient(t *testing.T, logger *slog.Logger) *client.Client {
 		ChunkRetryCount: 3,
 		TempDir:         "/tmp",
 	})
-	return client.NewClient(coordinatorClient, uploader, downloader, logger)
+	return client.NewClient(coordinatorClient, uploader, downloader, streamer, logger)
 }
 
 func TestClientUpload(t *testing.T) {
@@ -118,7 +117,7 @@ func TestClientUpload(t *testing.T) {
 
 					stream, err := dnClient.DownloadChunkStream(context.Background(), common.DownloadStreamRequest{
 						SessionID:       resp.SessionID,
-						ChunkStreamSize: int32(config.DefaultStreamerConfig().ChunkStreamSize), // Follows the default chunk stream size -- 256KB
+						ChunkStreamSize: int32(config.DefaultStreamerConfig(true).ChunkStreamSize), // Follows the default chunk stream size -- 256KB
 					})
 					if err != nil {
 						t.Fatalf("failed to create download stream: %v", err)
@@ -191,7 +190,7 @@ func TestClientUpload(t *testing.T) {
 
 					stream, err := dnClient.DownloadChunkStream(context.Background(), common.DownloadStreamRequest{
 						SessionID:       resp.SessionID,
-						ChunkStreamSize: int32(config.DefaultStreamerConfig().ChunkStreamSize), // Follows the default chunk stream size -- 256KB
+						ChunkStreamSize: int32(config.DefaultStreamerConfig(true).ChunkStreamSize), // Follows the default chunk stream size -- 256KB
 					})
 					if err != nil {
 						t.Fatalf("failed to create download stream: %v", err)

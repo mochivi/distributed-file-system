@@ -63,11 +63,11 @@ type StreamerConfig struct {
 	WaitReplicas     bool // Only used by client, waits for the final stream with the replicas information, default is false when used by datanodes
 }
 
-func DefaultStreamerConfig() StreamerConfig {
+func DefaultStreamerConfig(waitReplicas bool) StreamerConfig {
 	return StreamerConfig{
 		MaxChunkRetries: 3,
 		ChunkStreamSize: 256 * 1024,
-		WaitReplicas:    false,
+		WaitReplicas:    waitReplicas,
 	}
 }
 
@@ -77,7 +77,7 @@ func DefaultDatanodeAppConfig() DatanodeAppConfig {
 			Session:     DefaultSessionManagerConfig(),
 			Replication: DefaultReplicateManagerConfig(),
 			DiskStorage: DefaultDiskStorageConfig(),
-			Streamer:    DefaultStreamerConfig(),
+			Streamer:    DefaultStreamerConfig(false),
 		},
 		Agent: NodeAgentConfig{
 			Heartbeat: DefaultHeartbeatControllerConfig(),

@@ -15,6 +15,13 @@ import (
 	"google.golang.org/grpc"
 )
 
+type IStreamer interface {
+	SendChunkStream(ctx context.Context, stream grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck],
+		logger *slog.Logger, params UploadChunkStreamParams) ([]*DataNodeInfo, error)
+	ReceiveChunkStream(ctx context.Context, stream grpc.ServerStreamingClient[proto.ChunkDataStream],
+		buffer *bytes.Buffer, logger *slog.Logger, params DownloadChunkStreamParams) error
+}
+
 type Streamer struct {
 	Config config.StreamerConfig
 }
@@ -192,15 +199,12 @@ func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamin
 				}
 				return nil, fmt.Errorf("failed to receive replicas response: %w", err)
 			}
-			finalReplicasAck = ChunkDataAckFromProto(finalReplicasResp)
 
+			finalReplicasAck = ChunkDataAckFromProto(finalReplicasResp)
 			if !finalReplicasAck.Success {
 				return nil, fmt.Errorf("datanode failed to replicate chunk: %s", finalReplicasAck.Message)
 			}
-		}
-
-		if !finalReplicasAck.Success {
-			return nil, fmt.Errorf("datanode failed to replicate chunk: %s", finalReplicasAck.Message)
+			break
 		}
 
 		logger.Info("Replicas received", slog.Any("replicas", finalReplicasAck.Replicas))

@@ -114,7 +114,7 @@ func main() {
 	nodeSelector := cluster.NewNodeSelector(clusterStateManager)
 	streamer := common.NewStreamer(appConfig.Node.Streamer)
 	replicationManager := datanode.NewReplicationManager(appConfig.Node.Replication, streamer, logger)
-	sessionManager := datanode.NewSessionManager()
+	sessionManager := datanode.NewStreamingSessionManager()
 	coordinatorFinder := state.NewCoordinatorFinder()
 
 	server := datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, clusterStateManager, coordinatorFinder, nodeSelector, &datanodeInfo, appConfig.Node, logger)
