@@ -1,6 +1,7 @@
 package common_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -40,7 +41,18 @@ func (s *MockBidiStream) CloseSend() error {
 	return args.Error(0)
 }
 
-var _ grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck] = (*MockBidiStream)(nil)
+type MockServerStream struct {
+	grpc.ServerStreamingClient[proto.ChunkDataStream]
+	mock.Mock
+}
+
+func (s *MockServerStream) Recv() (*proto.ChunkDataStream, error) {
+	args := s.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*proto.ChunkDataStream), args.Error(1)
+}
 
 func TestStreamer_SendChunkStream(t *testing.T) {
 	data := []byte("this is some test data")
@@ -182,7 +194,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup
 			streamer := common.NewStreamer(tc.config)
-			logger := logging.NewTestLogger(slog.LevelDebug)
+			logger := logging.NewTestLogger(slog.LevelError)
 			mockStream := &MockBidiStream{}
 			tc.setupMocks(mockStream)
 
@@ -196,6 +208,86 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 				assert.NoError(t, err)
 			}
 			assert.Equal(t, tc.expectedReplicas, returnedReplicas)
+			mockStream.AssertExpectations(t)
+		})
+	}
+}
+
+func TestStreamer_ReceiveChunkStream(t *testing.T) {
+	testCases := []struct {
+		name         string
+		config       config.StreamerConfig
+		params       common.DownloadChunkStreamParams
+		setupMocks   func(*MockServerStream)
+		expectErr    bool
+		expectedData []byte
+	}{
+		{
+			name:   "Success",
+			config: config.DefaultStreamerConfig(false),
+			params: common.DownloadChunkStreamParams{
+				SessionID: "test_session",
+				ChunkHeader: common.ChunkHeader{
+					ID:       "test_chunk",
+					Checksum: "test_checksum",
+				},
+			},
+			setupMocks: func(s *MockServerStream) {
+				s.On("Recv").Return(&proto.ChunkDataStream{
+					Data:    []byte("first stream frame for chunk"),
+					IsFinal: true,
+					ChunkId: "test_chunk",
+				}, nil).Once()
+			},
+			expectErr: false,
+		},
+		{
+			name:   "Success, multiple stream frames",
+			config: config.DefaultStreamerConfig(true),
+			params: common.DownloadChunkStreamParams{
+				SessionID: "test_session",
+			},
+			setupMocks: func(s *MockServerStream) {
+				s.On("Recv").Return(&proto.ChunkDataStream{
+					Data:    []byte("first stream frame for chunk"),
+					IsFinal: false,
+					ChunkId: "test_chunk",
+				}, nil).Once()
+				s.On("Recv").Return(&proto.ChunkDataStream{
+					Data:    []byte("second stream frame for chunk"),
+					IsFinal: false,
+					ChunkId: "test_chunk",
+				}, nil).Once()
+				s.On("Recv").Return(&proto.ChunkDataStream{
+					Data:    []byte("third and final stream frame for chunk"),
+					IsFinal: true,
+					ChunkId: "test_chunk",
+				}, nil).Once()
+			},
+			expectErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup
+			streamer := common.NewStreamer(tc.config)
+			logger := logging.NewTestLogger(slog.LevelError)
+			mockStream := &MockServerStream{}
+			tc.setupMocks(mockStream)
+
+			buffer := bytes.NewBuffer(nil)
+
+			// Execute
+			err := streamer.ReceiveChunkStream(context.Background(), mockStream, buffer, logger, tc.params)
+
+			// Assert
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
 			mockStream.AssertExpectations(t)
 		})
 	}
