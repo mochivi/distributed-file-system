@@ -75,7 +75,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 		expectedReplicas []*common.DataNodeInfo
 	}{
 		{
-			name:   "Success",
+			name:   "success",
 			config: config.DefaultStreamerConfig(true),
 			params: defaultParams,
 			setupMocks: func(s *MockBidiStream) {
@@ -104,7 +104,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 			},
 		},
 		{
-			name:   "Success: No Replicas Expected",
+			name:   "success: no replicas expected",
 			config: config.DefaultStreamerConfig(false), // WaitReplicas is false
 			params: defaultParams,
 			setupMocks: func(s *MockBidiStream) {
@@ -120,7 +120,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 			expectedReplicas: nil,
 		},
 		{
-			name:   "Send Error",
+			name:   "error: send error",
 			config: config.DefaultStreamerConfig(true),
 			params: defaultParams,
 			setupMocks: func(s *MockBidiStream) {
@@ -129,7 +129,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "Unsucessful Response",
+			name: "error: unsuccessful response",
 			config: config.StreamerConfig{ // Override retries to prevent more mock calls
 				MaxChunkRetries: 1,
 				ChunkStreamSize: 256 * 1024,
@@ -147,7 +147,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 			expectedReplicas: nil,
 		},
 		{
-			name:   "Checksum Mismatch",
+			name:   "error: checksum mismatch",
 			config: config.DefaultStreamerConfig(true),
 			params: common.UploadChunkStreamParams{
 				SessionID: "test_session",
@@ -170,7 +170,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "Incorrect amount of bytes received",
+			name: "error: incorrect amount of bytes received",
 			config: config.StreamerConfig{ // Override retries to prevent more mock calls
 				MaxChunkRetries: 1,
 				ChunkStreamSize: 256 * 1024,
@@ -223,7 +223,7 @@ func TestStreamer_ReceiveChunkStream(t *testing.T) {
 		expectedData []byte
 	}{
 		{
-			name:   "Success",
+			name:   "success",
 			config: config.DefaultStreamerConfig(false),
 			params: common.DownloadChunkStreamParams{
 				SessionID: "test_session",
@@ -242,7 +242,7 @@ func TestStreamer_ReceiveChunkStream(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name:   "Success, multiple stream frames",
+			name:   "success, multiple stream frames",
 			config: config.DefaultStreamerConfig(true),
 			params: common.DownloadChunkStreamParams{
 				SessionID: "test_session",
