@@ -11,13 +11,14 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"github.com/mochivi/distributed-file-system/pkg/testutils"
 	"google.golang.org/grpc"
 )
 
-// stubDataNodeServer is a lightweight gRPC server implementation that mimics
+// stubDataNodeReplicationServer is a lightweight gRPC server implementation that mimics
 // only the behaviour required by the ReplicationManager unit tests.
 // The behaviour can be tweaked through the exported fields.
-type stubDataNodeServer struct {
+type stubDataNodeReplicationServer struct {
 	proto.UnimplementedDataNodeServiceServer
 
 	// Determines whether the server should accept or reject the replication
@@ -29,7 +30,7 @@ type stubDataNodeServer struct {
 	ackSuccess bool
 }
 
-func (s *stubDataNodeServer) PrepareChunkUpload(ctx context.Context, req *proto.UploadChunkRequest) (*proto.NodeReady, error) {
+func (s *stubDataNodeReplicationServer) PrepareChunkUpload(ctx context.Context, req *proto.UploadChunkRequest) (*proto.NodeReady, error) {
 	return &proto.NodeReady{
 		Accept:    s.accept,
 		Message:   "stub server response",
@@ -42,7 +43,7 @@ func (s *stubDataNodeServer) PrepareChunkUpload(ctx context.Context, req *proto.
 // bytes received and sends back an acknowledgement for every message. When the
 // client signals the end of the stream (io.EOF), a final acknowledgement is
 // sent and the call returns nil.
-func (s *stubDataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
+func (s *stubDataNodeReplicationServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
 	var total int64
 
 	for {
@@ -82,7 +83,7 @@ func (s *stubDataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[p
 // replicate test
 // aimed at another datanode, should replicate the chunk
 func TestReplicationManager_replicate(t *testing.T) {
-	header, data := newRandomChunk(128)
+	header, data := testutils.NewRandomChunk(128)
 
 	// Common replication manager used across sub-tests.
 	cfg := config.ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
@@ -107,7 +108,7 @@ func TestReplicationManager_replicate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			datanodeClient, cleanup := NewTestDataNodeClientWithStubServer(t, &stubDataNodeServer{accept: tt.accept, ackSuccess: tt.ackSuccess})
+			datanodeClient, cleanup := testutils.NewTestDataNodeClientWithStubServer(t, &stubDataNodeReplicationServer{accept: tt.accept, ackSuccess: tt.ackSuccess})
 			defer cleanup()
 
 			err := rm.replicate(context.Background(), datanodeClient, header, data, rm.logger)
@@ -119,7 +120,7 @@ func TestReplicationManager_replicate(t *testing.T) {
 }
 
 func TestReplicationManager_paralellReplicate(t *testing.T) {
-	header, data := newRandomChunk(128)
+	header, data := testutils.NewRandomChunk(128)
 
 	// Common replication manager used across sub-tests.
 	cfg := config.ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
@@ -193,7 +194,7 @@ func TestReplicationManager_paralellReplicate(t *testing.T) {
 			var testClients []*clients.DataNodeClient
 			var cleanups []func()
 			for i := 0; i < tt.nClients; i++ {
-				client, cleanup := NewTestDataNodeClientWithStubServer(t, &stubDataNodeServer{
+				client, cleanup := testutils.NewTestDataNodeClientWithStubServer(t, &stubDataNodeReplicationServer{
 					accept:     tt.accept,
 					ackSuccess: tt.ackSuccess,
 				})

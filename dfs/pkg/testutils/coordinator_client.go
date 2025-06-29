@@ -99,7 +99,7 @@ func NewTestDataNodeClientWithStubServer(t *testing.T, server proto.DataNodeServ
 // Helper functions for testing
 
 // newRandomChunk creates chunk header + data for unit testing.
-func newRandomChunk(size int) (common.ChunkHeader, []byte) {
+func NewRandomChunk(size int) (common.ChunkHeader, []byte) {
 	data := make([]byte, size)
 	_, _ = rand.Read(data)
 	checksum := common.CalculateChecksum(data)

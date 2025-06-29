@@ -56,7 +56,7 @@ func NewNodeAgent(config *config.NodeAgentConfig, info *common.DataNodeInfo, clu
 			coordinator: coordinatorFinder,
 		},
 		controllers: NodeAgentControllers{
-			heartbeat: datanode_controllers.NewHeartbeatController(ctx, config.Heartbeat, info, clusterStateManager, coordinatorFinder, logger),
+			heartbeat: datanode_controllers.NewHeartbeatController(ctx, config.Heartbeat, logger),
 		},
 	}
 }
