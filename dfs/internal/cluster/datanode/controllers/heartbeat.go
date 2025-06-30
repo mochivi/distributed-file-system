@@ -20,6 +20,10 @@ var (
 	ErrSameVersion   = errors.New("same version")
 )
 
+type HeartbeatProvider interface {
+	Run(info *common.DataNodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error
+}
+
 type heartbeatFunc func(ctx context.Context, req common.HeartbeatRequest, client clients.ICoordinatorClient) ([]common.NodeUpdate, error)
 
 type HeartbeatController struct {

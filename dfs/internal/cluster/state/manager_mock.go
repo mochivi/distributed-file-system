@@ -9,6 +9,12 @@ type MockClusterStateManager struct {
 	mock.Mock
 }
 
+func NewMockClusterStateManager() *MockClusterStateManager {
+	return &MockClusterStateManager{
+		Mock: mock.Mock{},
+	}
+}
+
 func (m *MockClusterStateManager) GetNode(nodeID string) (*common.DataNodeInfo, bool) {
 	args := m.Called(nodeID)
 	return args.Get(0).(*common.DataNodeInfo), args.Get(1).(bool)

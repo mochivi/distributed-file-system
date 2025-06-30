@@ -20,6 +20,10 @@ func NewNodeSelector(clusterViewer state.ClusterStateViewer) *nodeSelector {
 }
 
 func (s *nodeSelector) SelectBestNodes(n int) ([]*common.DataNodeInfo, bool) {
+	if n <= 0 {
+		return nil, false
+	}
+
 	var healthyNodes []*common.DataNodeInfo
 	nodes, _ := s.clusterViewer.ListNodes()
 	for _, node := range nodes {

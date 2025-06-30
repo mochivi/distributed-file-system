@@ -11,6 +11,10 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
+type RegisterProvider interface {
+	RegisterWithCoordinator(ctx context.Context, info *common.DataNodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error
+}
+
 type RegisterService struct {
 	logger *slog.Logger
 }

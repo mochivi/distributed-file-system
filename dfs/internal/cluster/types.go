@@ -12,15 +12,6 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/config"
 )
 
-type NodeAgentServices struct {
-	register    *datanode_services.RegisterService
-	coordinator state.CoordinatorFinder
-}
-
-type NodeAgentControllers struct {
-	heartbeat *datanode_controllers.HeartbeatController
-}
-
 type NodeAgent struct {
 	// Internal state and lifecycle management
 	ctx    context.Context
@@ -34,14 +25,14 @@ type NodeAgent struct {
 	logger              *slog.Logger
 
 	// services provide some functionality to the cluster node
-	services NodeAgentServices
+	services datanode_services.NodeAgentServices
 
 	// controllers implement some watch loop to manage the cluster node
-	controllers NodeAgentControllers
+	controllers datanode_controllers.NodeAgentControllers
 }
 
 func NewNodeAgent(config *config.NodeAgentConfig, info *common.DataNodeInfo, clusterStateManager state.ClusterStateManager,
-	coordinatorFinder state.CoordinatorFinder, logger *slog.Logger) *NodeAgent {
+	coordinatorFinder state.CoordinatorFinder, services datanode_services.NodeAgentServices, controllers datanode_controllers.NodeAgentControllers, logger *slog.Logger) *NodeAgent {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &NodeAgent{
@@ -51,13 +42,8 @@ func NewNodeAgent(config *config.NodeAgentConfig, info *common.DataNodeInfo, clu
 		clusterStateManager: clusterStateManager,
 		logger:              logger,
 		info:                info,
-		services: NodeAgentServices{
-			register:    datanode_services.NewRegisterService(logger),
-			coordinator: coordinatorFinder,
-		},
-		controllers: NodeAgentControllers{
-			heartbeat: datanode_controllers.NewHeartbeatController(ctx, config.Heartbeat, logger),
-		},
+		services:            services,
+		controllers:         controllers,
 	}
 }
 

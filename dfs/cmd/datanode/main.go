@@ -18,6 +18,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/mochivi/distributed-file-system/internal/cluster"
+	datanode_controllers "github.com/mochivi/distributed-file-system/internal/cluster/datanode/controllers"
+	datanode_services "github.com/mochivi/distributed-file-system/internal/cluster/datanode/services"
 	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
@@ -152,7 +154,9 @@ func main() {
 	}()
 
 	// Cluster node setup
-	nodeAgent := cluster.NewNodeAgent(&appConfig.Agent, &datanodeInfo, clusterStateManager, coordinatorFinder, logger)
+	nodeServices := datanode_services.NewNodeAgentServices(coordinatorFinder, datanode_services.NewRegisterService(logger))
+	nodeControllers := datanode_controllers.NewNodeAgentControllers(datanode_controllers.NewHeartbeatController(ctx, appConfig.Agent.Heartbeat, logger))
+	nodeAgent := cluster.NewNodeAgent(&appConfig.Agent, &datanodeInfo, clusterStateManager, coordinatorFinder, nodeServices, nodeControllers, logger)
 
 	// Run node agent, which includes heartbeat loop
 	wg.Add(1)
