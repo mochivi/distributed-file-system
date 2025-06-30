@@ -10,7 +10,6 @@ import (
 )
 
 type ICoordinatorClient interface {
-	Close() error
 	UploadFile(ctx context.Context, req common.UploadRequest, opts ...grpc.CallOption) (common.UploadResponse, error)
 	DownloadFile(ctx context.Context, req common.DownloadRequest, opts ...grpc.CallOption) (common.DownloadResponse, error)
 	DeleteFile(ctx context.Context, req common.DeleteRequest, opts ...grpc.CallOption) (common.DeleteResponse, error)
@@ -20,6 +19,7 @@ type ICoordinatorClient interface {
 	DataNodeHeartbeat(ctx context.Context, req common.HeartbeatRequest, opts ...grpc.CallOption) (common.HeartbeatResponse, error)
 	ListNodes(ctx context.Context, rqe common.ListNodesRequest, opts ...grpc.CallOption) (common.ListNodesResponse, error)
 	Node() *common.DataNodeInfo
+	Close() error
 }
 
 // Wrapper over the proto.CoordinatorServiceClient interface
@@ -29,7 +29,7 @@ type CoordinatorClient struct {
 	node   *common.DataNodeInfo
 }
 
-func NewCoordinatorClient(node *common.DataNodeInfo, opts ...grpc.DialOption) (*CoordinatorClient, error) {
+func NewCoordinatorClient(node *common.DataNodeInfo, opts ...grpc.DialOption) (ICoordinatorClient, error) {
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	conn, err := grpc.NewClient(

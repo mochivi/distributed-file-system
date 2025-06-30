@@ -16,7 +16,7 @@ import (
 
 // NewTestCoordinatorClientWithStubServer starts a stubCoordinatorServer listening on a free TCP port and
 // returns the coordinator client and a cleanup function.
-func NewTestCoordinatorClientWithStubServer(t *testing.T, server proto.CoordinatorServiceServer) (*clients.CoordinatorClient, func()) {
+func NewTestCoordinatorClientWithStubServer(t *testing.T, server proto.CoordinatorServiceServer) (clients.ICoordinatorClient, func()) {
 	t.Helper()
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")

@@ -10,14 +10,14 @@ import (
 
 // Client performs operations to reach coordinator or data nodes
 type Client struct {
-	coordinatorClient *clients.CoordinatorClient
+	coordinatorClient clients.ICoordinatorClient
 	uploader          *Uploader
 	downloader        *Downloader
 	streamer          common.IStreamer
 	logger            *slog.Logger
 }
 
-func NewClient(coordinatorClient *clients.CoordinatorClient, uploader *Uploader, downloader *Downloader,
+func NewClient(coordinatorClient clients.ICoordinatorClient, uploader *Uploader, downloader *Downloader,
 	streamer common.IStreamer, logger *slog.Logger) *Client {
 	clientLogger := logging.ExtendLogger(logger, slog.String("component", "client"))
 

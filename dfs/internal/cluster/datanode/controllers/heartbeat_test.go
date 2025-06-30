@@ -38,14 +38,14 @@ func TestHeartbeatController_RunLoop(t *testing.T) {
 		LastSeen: time.Now(),
 	}
 
-	// Create a coordinator finder
+	// Create a coordinator finder - the returned client is not actually used, so this just has to exist while not doing anything
 	coordinatorNodeInfo := &common.DataNodeInfo{
 		ID:       "coordinator",
 		Status:   common.NodeHealthy,
 		LastSeen: time.Now(),
 	}
 	coordinatorFinder := state.NewCoordinatorFinder()
-	coordinatorFinder.AddCoordinatorNode(coordinatorNodeInfo)
+	coordinatorFinder.AddCoordinator(coordinatorNodeInfo)
 
 	tests := []struct {
 		name              string
@@ -72,6 +72,20 @@ func TestHeartbeatController_RunLoop(t *testing.T) {
 			},
 			heartbeatError: nil,
 			expectedError:  nil,
+		},
+		{
+			name: "error: context cancelled",
+			setupCtx: func(t *testing.T) context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			},
+			setupMocks: func(mockClusterStateManager *state.MockClusterStateManager) {},
+			heartbeatResponse: common.HeartbeatResponse{
+				Success: true,
+			},
+			heartbeatError: nil,
+			expectedError:  context.Canceled,
 		},
 		{
 			name: "error: heartbeat failed",
@@ -134,14 +148,14 @@ func TestHeartbeatController_RunLoop(t *testing.T) {
 				Timeout:  10 * time.Second,
 			}, logging.NewTestLogger(slog.LevelError))
 
-			// Mock heartbeat
+			// Mock heartbeat function
 			controller.heartbeatFunc = func(ctx context.Context, req common.HeartbeatRequest, client clients.ICoordinatorClient) ([]common.NodeUpdate, error) {
 				return tc.heartbeatResponse.Updates, tc.heartbeatError
 			}
 
 			// Mock cluster state manager
-			clusterStateManager := &state.MockClusterStateManager{}
-			tc.setupMocks(clusterStateManager)
+			mockClusterStateManager := &state.MockClusterStateManager{}
+			tc.setupMocks(mockClusterStateManager)
 
 			// Automate cancelling the loop
 			go func() {
@@ -150,7 +164,7 @@ func TestHeartbeatController_RunLoop(t *testing.T) {
 			}()
 
 			// Run the loop
-			err := controller.Run(nodeInfo, clusterStateManager, coordinatorFinder)
+			err := controller.Run(nodeInfo, mockClusterStateManager, coordinatorFinder)
 
 			if err != nil && tc.expectedError == nil {
 				if errors.Is(err, context.Canceled) && tc.name != "error: context canceled" {
@@ -164,7 +178,7 @@ func TestHeartbeatController_RunLoop(t *testing.T) {
 				t.Errorf("controller.Run() error = %v, wantErr %v", err, tc.expectedError)
 			}
 
-			clusterStateManager.AssertExpectations(t)
+			mockClusterStateManager.AssertExpectations(t)
 		})
 	}
 }

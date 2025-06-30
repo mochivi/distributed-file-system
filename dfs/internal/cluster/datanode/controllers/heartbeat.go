@@ -55,17 +55,11 @@ func (h *HeartbeatController) Run(info *common.DataNodeInfo, clusterStateManager
 			return h.ctx.Err()
 		}
 
-		coordinatorNode, ok := coordinatorFinder.GetLeaderCoordinatorNode()
+		coordinatorClient, ok := coordinatorFinder.GetLeaderCoordinator()
 		if !ok {
 			return fmt.Errorf("no coordinator node found")
 		}
 
-		coordinatorClient, err := clients.NewCoordinatorClient(coordinatorNode)
-		if err != nil {
-			return fmt.Errorf("failed to create coordinator client: %w", err)
-		}
-
-		// TODO: figure out how to get the node info
 		req := common.HeartbeatRequest{
 			NodeID: info.ID,
 			Status: common.HealthStatus{
