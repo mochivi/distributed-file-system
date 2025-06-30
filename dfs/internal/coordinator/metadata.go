@@ -11,7 +11,7 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
-type metadataManager struct {
+type metadataSessionManager struct {
 	sessions      map[string]metadataUploadSession
 	commitTimeout time.Duration
 	logger        *slog.Logger
@@ -23,9 +23,9 @@ type metadataUploadSession struct {
 	fileInfo *common.FileInfo
 }
 
-func NewMetadataManager(commitTimeout time.Duration, logger *slog.Logger) *metadataManager {
+func NewMetadataSessionManager(commitTimeout time.Duration, logger *slog.Logger) *metadataSessionManager {
 	metadataLogger := logging.ExtendLogger(logger, slog.String("component", "metadata_manager"))
-	manager := &metadataManager{
+	manager := &metadataSessionManager{
 		sessions:      make(map[string]metadataUploadSession),
 		commitTimeout: commitTimeout,
 		logger:        metadataLogger,
@@ -41,7 +41,7 @@ func newMetadataUploadSession(sessionID string, exp time.Duration, fileInfo *com
 	}
 }
 
-func (m *metadataManager) trackUpload(sessionID string, req common.UploadRequest, numChunks int) {
+func (m *metadataSessionManager) trackUpload(sessionID string, req common.UploadRequest, numChunks int) {
 	// Create chunk info array
 	chunkInfos := make([]common.ChunkInfo, numChunks)
 	for i := 0; i < numChunks; i++ {
@@ -68,7 +68,7 @@ func (m *metadataManager) trackUpload(sessionID string, req common.UploadRequest
 	m.sessions[sessionID] = newMetadataUploadSession(sessionID, m.commitTimeout, fileInfo)
 }
 
-func (m *metadataManager) commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore storage.MetadataStore) error {
+func (m *metadataSessionManager) commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore storage.MetadataStore) error {
 	session, ok := m.sessions[sessionID]
 	if !ok {
 		return errors.New("session not found")
