@@ -38,7 +38,7 @@ func (m *nodeStore) removeNode(nodeID string) error {
 }
 
 func (m *nodeStore) updateNode(node *common.DataNodeInfo) error {
-	node, ok := m.nodes[node.ID]
+	_, ok := m.nodes[node.ID]
 	if !ok {
 		return fmt.Errorf("node with ID %s not found", node.ID)
 	}
