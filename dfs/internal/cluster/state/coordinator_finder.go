@@ -93,7 +93,8 @@ func (m *coordinatorFinder) GetLeaderCoordinator() (clients.ICoordinatorClient, 
 		if node.Status == common.NodeHealthy {
 			coordinatorClient, err := m.clientConnectionFunc(node)
 			if err != nil {
-				return nil, false
+				// Couldn't connect, try the next one
+				continue
 			}
 			return coordinatorClient, true
 		}
