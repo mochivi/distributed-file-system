@@ -59,8 +59,10 @@ func (sm *StreamingSessionManager) Store(sessionID string, session *StreamingSes
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	if sm.ExistsForChunk(session.ChunkHeader.ID) {
-		return fmt.Errorf("session for chunk %s already exists", session.ChunkHeader.ID)
+	for _, s := range sm.sessions {
+		if s.ChunkHeader.ID == session.ChunkHeader.ID && s.Status == SessionActive {
+			return fmt.Errorf("session for chunk %s already exists", session.ChunkHeader.ID)
+		}
 	}
 
 	sm.sessions[sessionID] = session
@@ -85,6 +87,8 @@ func (sm *StreamingSessionManager) Delete(sessionID string) {
 
 // Temporary solution to check if a chunk is already being streamed, stops duplicate requests
 func (sm *StreamingSessionManager) ExistsForChunk(chunkID string) bool {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
 	for _, session := range sm.sessions {
 		if session.ChunkHeader.ID == chunkID && session.Status == SessionActive {
 			return true
