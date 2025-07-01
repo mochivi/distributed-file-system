@@ -9,6 +9,7 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -102,7 +103,7 @@ func NewTestDataNodeClientWithStubServer(t *testing.T, server proto.DataNodeServ
 func NewRandomChunk(size int) (common.ChunkHeader, []byte) {
 	data := make([]byte, size)
 	_, _ = rand.Read(data)
-	checksum := common.CalculateChecksum(data)
+	checksum := chunk.CalculateChecksum(data)
 
 	header := common.ChunkHeader{
 		ID:       "chunk-" + hex.EncodeToString(data[:4]),

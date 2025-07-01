@@ -1,4 +1,4 @@
-package common_test
+package streamer
 
 import (
 	"bytes"
@@ -57,7 +57,7 @@ func (s *MockServerStream) Recv() (*proto.ChunkDataStream, error) {
 func TestStreamer_SendChunkStream(t *testing.T) {
 	data := []byte("this is some test data")
 	checksum := fmt.Sprintf("%x", sha256.Sum256(data))
-	defaultParams := common.UploadChunkStreamParams{
+	defaultParams := UploadChunkStreamParams{
 		SessionID: "test_session",
 		ChunkHeader: common.ChunkHeader{
 			ID:       "test_chunk",
@@ -69,7 +69,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 	testCases := []struct {
 		name             string
 		config           config.StreamerConfig
-		params           common.UploadChunkStreamParams
+		params           UploadChunkStreamParams
 		setupMocks       func(*MockBidiStream)
 		expectErr        bool
 		expectedReplicas []*common.DataNodeInfo
@@ -149,7 +149,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 		{
 			name:   "error: checksum mismatch",
 			config: config.DefaultStreamerConfig(true),
-			params: common.UploadChunkStreamParams{
+			params: UploadChunkStreamParams{
 				SessionID: "test_session",
 				ChunkHeader: common.ChunkHeader{
 					ID:       "test_chunk",
@@ -193,7 +193,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup
-			streamer := common.NewStreamer(tc.config)
+			streamer := NewStreamer(tc.config)
 			logger := logging.NewTestLogger(slog.LevelError)
 			mockStream := &MockBidiStream{}
 			tc.setupMocks(mockStream)
@@ -217,7 +217,7 @@ func TestStreamer_ReceiveChunkStream(t *testing.T) {
 	testCases := []struct {
 		name         string
 		config       config.StreamerConfig
-		params       common.DownloadChunkStreamParams
+		params       DownloadChunkStreamParams
 		setupMocks   func(*MockServerStream)
 		expectErr    bool
 		expectedData []byte
@@ -225,7 +225,7 @@ func TestStreamer_ReceiveChunkStream(t *testing.T) {
 		{
 			name:   "success",
 			config: config.DefaultStreamerConfig(false),
-			params: common.DownloadChunkStreamParams{
+			params: DownloadChunkStreamParams{
 				SessionID: "test_session",
 				ChunkHeader: common.ChunkHeader{
 					ID:       "test_chunk",
@@ -244,7 +244,7 @@ func TestStreamer_ReceiveChunkStream(t *testing.T) {
 		{
 			name:   "success, multiple stream frames",
 			config: config.DefaultStreamerConfig(true),
-			params: common.DownloadChunkStreamParams{
+			params: DownloadChunkStreamParams{
 				SessionID: "test_session",
 			},
 			setupMocks: func(s *MockServerStream) {
@@ -271,7 +271,7 @@ func TestStreamer_ReceiveChunkStream(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup
-			streamer := common.NewStreamer(tc.config)
+			streamer := NewStreamer(tc.config)
 			logger := logging.NewTestLogger(slog.LevelError)
 			mockStream := &MockServerStream{}
 			tc.setupMocks(mockStream)

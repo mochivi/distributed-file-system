@@ -16,6 +16,9 @@ func (m *MockMetadataStore) PutFile(path string, info *common.FileInfo) error {
 
 func (m *MockMetadataStore) GetFile(path string) (*common.FileInfo, error) {
 	args := m.Called(path)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*common.FileInfo), args.Error(1)
 }
 

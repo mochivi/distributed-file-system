@@ -28,6 +28,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"github.com/mochivi/distributed-file-system/pkg/streamer"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 	"google.golang.org/grpc"
 )
@@ -114,7 +115,7 @@ func main() {
 
 	clusterStateManager := state.NewClusterStateManager()
 	nodeSelector := cluster.NewNodeSelector(clusterStateManager)
-	streamer := common.NewStreamer(appConfig.Node.Streamer)
+	streamer := streamer.NewStreamer(appConfig.Node.Streamer)
 	replicationManager := datanode.NewReplicationManager(appConfig.Node.Replication, streamer, logger)
 	sessionManager := datanode.NewStreamingSessionManager()
 	coordinatorFinder := state.NewCoordinatorFinder()

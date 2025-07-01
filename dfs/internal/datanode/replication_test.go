@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
-	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"github.com/mochivi/distributed-file-system/pkg/streamer"
 	"github.com/mochivi/distributed-file-system/pkg/testutils"
 	"google.golang.org/grpc"
 )
@@ -87,7 +87,7 @@ func TestReplicationManager_replicate(t *testing.T) {
 
 	// Common replication manager used across sub-tests.
 	cfg := config.ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
-	streamer := common.NewStreamer(config.StreamerConfig{
+	streamer := streamer.NewStreamer(config.StreamerConfig{
 		MaxChunkRetries:  1,
 		ChunkStreamSize:  1024,
 		BackpressureTime: time.Millisecond * 10,
@@ -124,7 +124,7 @@ func TestReplicationManager_paralellReplicate(t *testing.T) {
 
 	// Common replication manager used across sub-tests.
 	cfg := config.ReplicateManagerConfig{ReplicateTimeout: time.Second * 2}
-	streamer := common.NewStreamer(config.StreamerConfig{
+	streamer := streamer.NewStreamer(config.StreamerConfig{
 		MaxChunkRetries:  1,
 		ChunkStreamSize:  1024,
 		BackpressureTime: time.Millisecond * 10,

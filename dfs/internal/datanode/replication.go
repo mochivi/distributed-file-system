@@ -11,6 +11,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
+	"github.com/mochivi/distributed-file-system/pkg/streamer"
 )
 
 type ReplicatedNodes struct {
@@ -32,11 +33,11 @@ func (r *ReplicatedNodes) GetNodes() []*common.DataNodeInfo {
 
 type ReplicationManager struct {
 	Config   config.ReplicateManagerConfig
-	streamer *common.Streamer
+	streamer *streamer.Streamer
 	logger   *slog.Logger
 }
 
-func NewReplicationManager(config config.ReplicateManagerConfig, streamer *common.Streamer, logger *slog.Logger) *ReplicationManager {
+func NewReplicationManager(config config.ReplicateManagerConfig, streamer *streamer.Streamer, logger *slog.Logger) *ReplicationManager {
 	logger = logging.ExtendLogger(logger, slog.String("component", "replication_manager"))
 	return &ReplicationManager{
 		Config:   config,
@@ -134,7 +135,7 @@ func (rm *ReplicationManager) replicate(ctx context.Context, client *clients.Dat
 		return fmt.Errorf("failed to create stream for chunk %s: %v", chunkHeader.ID, err)
 	}
 
-	_, err = rm.streamer.SendChunkStream(ctx, stream, clientLogger, common.UploadChunkStreamParams{
+	_, err = rm.streamer.SendChunkStream(ctx, stream, clientLogger, streamer.UploadChunkStreamParams{
 		SessionID:   resp.SessionID,
 		ChunkHeader: chunkHeader,
 		Data:        data,

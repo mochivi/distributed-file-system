@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -40,7 +42,7 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 
 	assignments := make([]common.ChunkLocation, numChunks)
 	for i := 0; i < numChunks; i++ {
-		chunkID := common.FormatChunkID(req.Path, i)
+		chunkID := chunk.FormatChunkID(req.Path, i)
 
 		// Randomly select a node from the available nodes
 		selectedNodes := make([]*common.DataNodeInfo, 0, 3)
@@ -81,7 +83,7 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 	}
 
 	// Build chunk sources
-	chunkLocations := make([]common.ChunkLocation, 0, len(fileInfo.Chunks))
+	chunkLocations := make([]common.ChunkLocation, len(fileInfo.Chunks))
 
 	// Find available nodes to download from for this chunk
 	for i, chunk := range fileInfo.Chunks {
@@ -138,6 +140,7 @@ func (c *Coordinator) ConfirmUpload(ctx context.Context, pb *proto.ConfirmUpload
 func (c *Coordinator) RegisterDataNode(ctx context.Context, pb *proto.RegisterDataNodeRequest) (*proto.RegisterDataNodeResponse, error) {
 	nodeInfo := common.DataNodeInfoFromProto(pb.NodeInfo)
 	c.logger.Debug("Received RegisterDataNodeRequest from data node", slog.String("node_id", nodeInfo.ID))
+	nodeInfo.LastSeen = time.Now()
 
 	c.clusterStateHistoryManager.AddNode(&nodeInfo)
 	nodes, version := c.clusterStateHistoryManager.ListNodes()

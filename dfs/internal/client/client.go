@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
@@ -21,7 +22,7 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 		return nil, fmt.Errorf("failed to stat file: %w", err)
 	}
 
-	checksum, err := common.CalculateFileChecksum(file)
+	checksum, err := chunk.CalculateFileChecksum(file)
 	if err != nil {
 		logger.Error("Failed to calculate checksum", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to calculate checksum")

@@ -15,7 +15,9 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
+	"github.com/mochivi/distributed-file-system/pkg/streamer"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
 
@@ -38,7 +40,7 @@ func NewTestClient(t *testing.T, logger *slog.Logger) *client.Client {
 		t.Fatalf("failed to create coordinator client: %v", err)
 	}
 
-	streamer := common.NewStreamer(config.DefaultStreamerConfig(true))
+	streamer := streamer.NewStreamer(config.DefaultStreamerConfig(true))
 	uploader := client.NewUploader(streamer, logger, client.UploaderConfig{
 		NumWorkers:      10,
 		ChunkRetryCount: 3,
@@ -97,10 +99,10 @@ func TestClientUpload(t *testing.T) {
 			file.Close()
 
 			// Validate if the chunks were replicated to the provided nodes and their checksum matches the expectation
-			streamer := common.NewStreamer(config.StreamerConfig{
+			streamerInstance := streamer.NewStreamer(config.StreamerConfig{
 				ChunkStreamSize: defaultChunkSize,
 			})
-			streamer.Config.WaitReplicas = true // Wait for the final stream with the replicas information
+			streamerInstance.Config.WaitReplicas = true // Wait for the final stream with the replicas information
 
 			for _, info := range chunkInfos {
 				for _, replica := range info.Replicas {
@@ -125,14 +127,14 @@ func TestClientUpload(t *testing.T) {
 
 					buffer := bytes.NewBuffer(make([]byte, 0, info.Header.Size))
 
-					if err := streamer.ReceiveChunkStream(context.Background(), stream, buffer, logger, common.DownloadChunkStreamParams{
+					if err := streamerInstance.ReceiveChunkStream(context.Background(), stream, buffer, logger, streamer.DownloadChunkStreamParams{
 						SessionID:   resp.SessionID,
 						ChunkHeader: info.Header,
 					}); err != nil {
 						t.Errorf("failed to receive chunk stream: %v", err)
 					}
 
-					if checksum := common.CalculateChecksum(buffer.Bytes()); checksum != info.Header.Checksum {
+					if checksum := chunk.CalculateChecksum(buffer.Bytes()); checksum != info.Header.Checksum {
 						t.Errorf("checksum mismatch for %s", info.Header.ID)
 					}
 				}
@@ -170,10 +172,10 @@ func TestClientUpload(t *testing.T) {
 			file.Close()
 
 			// Validate if the chunks were replicated to the provided nodes and their checksum matches the expectation
-			streamer := common.NewStreamer(config.StreamerConfig{
+			streamerInstance := streamer.NewStreamer(config.StreamerConfig{
 				ChunkStreamSize: tt.chunkSize,
 			})
-			streamer.Config.WaitReplicas = true // Wait for the final stream with the replicas information
+			streamerInstance.Config.WaitReplicas = true // Wait for the final stream with the replicas information
 
 			for _, info := range chunkInfos {
 				for _, replica := range info.Replicas {
@@ -198,14 +200,14 @@ func TestClientUpload(t *testing.T) {
 
 					buffer := bytes.NewBuffer(make([]byte, 0, info.Header.Size))
 
-					if err := streamer.ReceiveChunkStream(context.Background(), stream, buffer, logger, common.DownloadChunkStreamParams{
+					if err := streamerInstance.ReceiveChunkStream(context.Background(), stream, buffer, logger, streamer.DownloadChunkStreamParams{
 						SessionID:   resp.SessionID,
 						ChunkHeader: info.Header,
 					}); err != nil {
 						t.Errorf("failed to receive chunk stream: %v", err)
 					}
 
-					if checksum := common.CalculateChecksum(buffer.Bytes()); checksum != info.Header.Checksum {
+					if checksum := chunk.CalculateChecksum(buffer.Bytes()); checksum != info.Header.Checksum {
 						t.Errorf("checksum mismatch for %s", info.Header.ID)
 					}
 				}

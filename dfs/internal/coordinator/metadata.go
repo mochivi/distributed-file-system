@@ -8,8 +8,14 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
+
+type MetadataSessionManager interface {
+	trackUpload(sessionID string, req common.UploadRequest, numChunks int)
+	commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore storage.MetadataStore) error
+}
 
 type metadataSessionManager struct {
 	sessions      map[string]metadataUploadSession
@@ -45,7 +51,7 @@ func (m *metadataSessionManager) trackUpload(sessionID string, req common.Upload
 	// Create chunk info array
 	chunkInfos := make([]common.ChunkInfo, numChunks)
 	for i := 0; i < numChunks; i++ {
-		chunkID := common.FormatChunkID(req.Path, i)
+		chunkID := chunk.FormatChunkID(req.Path, i)
 		chunkInfos[i] = common.ChunkInfo{
 			Header: common.ChunkHeader{
 				ID:       chunkID,
