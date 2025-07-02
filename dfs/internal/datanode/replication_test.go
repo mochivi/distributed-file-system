@@ -93,7 +93,7 @@ func TestReplicationManager_replicate(t *testing.T) {
 		BackpressureTime: time.Millisecond * 10,
 		WaitReplicas:     false, // If true, node will attempt to replicate the chunk.
 	})
-	rm := NewReplicationManager(cfg, streamer, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	rm := NewParalellReplicationService(cfg, streamer, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	tests := []struct {
 		name        string
@@ -130,7 +130,7 @@ func TestReplicationManager_paralellReplicate(t *testing.T) {
 		BackpressureTime: time.Millisecond * 10,
 		WaitReplicas:     false,
 	})
-	rm := NewReplicationManager(cfg, streamer, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	rm := NewParalellReplicationService(cfg, streamer, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	tests := []struct {
 		name             string
@@ -210,7 +210,7 @@ func TestReplicationManager_paralellReplicate(t *testing.T) {
 			}()
 
 			// Test parallel replication
-			replicatedNodes, err := rm.paralellReplicate(testClients, header, data, tt.requiredReplicas)
+			replicatedNodes, err := rm.Replicate(testClients, header, data, tt.requiredReplicas)
 
 			// Check error expectation
 			if (err != nil) != tt.expectError {

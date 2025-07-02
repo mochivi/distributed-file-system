@@ -12,47 +12,10 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"github.com/mochivi/distributed-file-system/pkg/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"google.golang.org/grpc"
 )
-
-// MockBidiStream is a mock for the grpc.BidiStreamingClient interface.
-type MockBidiStream struct {
-	grpc.ClientStream
-	mock.Mock
-}
-
-func (s *MockBidiStream) Send(m *proto.ChunkDataStream) error {
-	args := s.Called(m)
-	return args.Error(0)
-}
-
-func (s *MockBidiStream) Recv() (*proto.ChunkDataAck, error) {
-	args := s.Called()
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*proto.ChunkDataAck), args.Error(1)
-}
-
-func (s *MockBidiStream) CloseSend() error {
-	args := s.Called()
-	return args.Error(0)
-}
-
-type MockServerStream struct {
-	grpc.ServerStreamingClient[proto.ChunkDataStream]
-	mock.Mock
-}
-
-func (s *MockServerStream) Recv() (*proto.ChunkDataStream, error) {
-	args := s.Called()
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*proto.ChunkDataStream), args.Error(1)
-}
 
 func TestStreamer_SendChunkStream(t *testing.T) {
 	data := []byte("this is some test data")
@@ -70,7 +33,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 		name             string
 		config           config.StreamerConfig
 		params           UploadChunkStreamParams
-		setupMocks       func(*MockBidiStream)
+		setupMocks       func(*testutils.MockBidiStreamClient)
 		expectErr        bool
 		expectedReplicas []*common.DataNodeInfo
 	}{
@@ -78,7 +41,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 			name:   "success",
 			config: config.DefaultStreamerConfig(true),
 			params: defaultParams,
-			setupMocks: func(s *MockBidiStream) {
+			setupMocks: func(s *testutils.MockBidiStreamClient) {
 				s.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(nil).Once()
 				s.On("Recv").Return(&proto.ChunkDataAck{
 					Success:       true,
@@ -107,7 +70,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 			name:   "success: no replicas expected",
 			config: config.DefaultStreamerConfig(false), // WaitReplicas is false
 			params: defaultParams,
-			setupMocks: func(s *MockBidiStream) {
+			setupMocks: func(s *testutils.MockBidiStreamClient) {
 				s.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(nil).Once()
 				s.On("Recv").Return(&proto.ChunkDataAck{
 					Success:       true,
@@ -123,7 +86,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 			name:   "error: send error",
 			config: config.DefaultStreamerConfig(true),
 			params: defaultParams,
-			setupMocks: func(s *MockBidiStream) {
+			setupMocks: func(s *testutils.MockBidiStreamClient) {
 				s.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(fmt.Errorf("network error")).Once()
 			},
 			expectErr: true,
@@ -136,7 +99,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 				WaitReplicas:    false,
 			},
 			params: defaultParams,
-			setupMocks: func(s *MockBidiStream) {
+			setupMocks: func(s *testutils.MockBidiStreamClient) {
 				s.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(nil).Once()
 				s.On("Recv").Return(&proto.ChunkDataAck{
 					Success: false,
@@ -157,7 +120,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 				},
 				Data: data,
 			},
-			setupMocks: func(s *MockBidiStream) {
+			setupMocks: func(s *testutils.MockBidiStreamClient) {
 				s.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(nil).Once()
 				s.On("Recv").Return(&proto.ChunkDataAck{
 					Success:       true,
@@ -177,7 +140,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 				WaitReplicas:    false,
 			},
 			params: defaultParams,
-			setupMocks: func(s *MockBidiStream) {
+			setupMocks: func(s *testutils.MockBidiStreamClient) {
 				s.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(nil).Once()
 				s.On("Recv").Return(&proto.ChunkDataAck{
 					Success:       true,
@@ -195,7 +158,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 			// Setup
 			streamer := NewStreamer(tc.config)
 			logger := logging.NewTestLogger(slog.LevelError)
-			mockStream := &MockBidiStream{}
+			mockStream := &testutils.MockBidiStreamClient{}
 			tc.setupMocks(mockStream)
 
 			// Execute
@@ -218,7 +181,7 @@ func TestStreamer_ReceiveChunkStream(t *testing.T) {
 		name         string
 		config       config.StreamerConfig
 		params       DownloadChunkStreamParams
-		setupMocks   func(*MockServerStream)
+		setupMocks   func(*testutils.MockStreamClient)
 		expectErr    bool
 		expectedData []byte
 	}{
@@ -232,7 +195,7 @@ func TestStreamer_ReceiveChunkStream(t *testing.T) {
 					Checksum: "test_checksum",
 				},
 			},
-			setupMocks: func(s *MockServerStream) {
+			setupMocks: func(s *testutils.MockStreamClient) {
 				s.On("Recv").Return(&proto.ChunkDataStream{
 					Data:    []byte("first stream frame for chunk"),
 					IsFinal: true,
@@ -247,7 +210,7 @@ func TestStreamer_ReceiveChunkStream(t *testing.T) {
 			params: DownloadChunkStreamParams{
 				SessionID: "test_session",
 			},
-			setupMocks: func(s *MockServerStream) {
+			setupMocks: func(s *testutils.MockStreamClient) {
 				s.On("Recv").Return(&proto.ChunkDataStream{
 					Data:    []byte("first stream frame for chunk"),
 					IsFinal: false,
@@ -273,7 +236,7 @@ func TestStreamer_ReceiveChunkStream(t *testing.T) {
 			// Setup
 			streamer := NewStreamer(tc.config)
 			logger := logging.NewTestLogger(slog.LevelError)
-			mockStream := &MockServerStream{}
+			mockStream := &testutils.MockStreamClient{}
 			tc.setupMocks(mockStream)
 
 			buffer := bytes.NewBuffer(nil)

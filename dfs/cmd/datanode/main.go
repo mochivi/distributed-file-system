@@ -116,11 +116,11 @@ func main() {
 	clusterStateManager := state.NewClusterStateManager()
 	nodeSelector := cluster.NewNodeSelector(clusterStateManager)
 	streamer := streamer.NewStreamer(appConfig.Node.Streamer)
-	replicationManager := datanode.NewReplicationManager(appConfig.Node.Replication, streamer, logger)
+	replicationManager := datanode.NewParalellReplicationService(appConfig.Node.Replication, streamer, logger)
 	sessionManager := datanode.NewStreamingSessionManager()
 	coordinatorFinder := state.NewCoordinatorFinder()
 
-	server := datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, clusterStateManager, coordinatorFinder, nodeSelector, &datanodeInfo, appConfig.Node, logger)
+	server := datanode.NewDataNodeServer(&datanodeInfo, appConfig.Node, chunkStore, replicationManager, sessionManager, clusterStateManager, coordinatorFinder, nodeSelector, logger)
 
 	// gRPC initialization
 	grpcServer := grpc.NewServer()

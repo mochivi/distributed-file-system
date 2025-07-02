@@ -17,7 +17,11 @@ func NewMockCoordinatorFinder() *MockCoordinatorFinder {
 }
 
 func (m *MockCoordinatorFinder) GetCoordinator(nodeID string) (clients.ICoordinatorClient, bool) {
-	return m.Called(nodeID).Get(0).(clients.ICoordinatorClient), m.Called(nodeID).Bool(1)
+	args := m.Called(nodeID)
+	if args.Get(0) == nil {
+		return nil, args.Bool(1)
+	}
+	return args.Get(0).(clients.ICoordinatorClient), args.Bool(1)
 }
 
 func (m *MockCoordinatorFinder) AddCoordinator(node *common.DataNodeInfo) {
@@ -29,13 +33,22 @@ func (m *MockCoordinatorFinder) RemoveCoordinator(nodeID string) {
 }
 
 func (m *MockCoordinatorFinder) ListCoordinators() []*common.DataNodeInfo {
-	return m.Called().Get(0).([]*common.DataNodeInfo)
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).([]*common.DataNodeInfo)
 }
 
 func (m *MockCoordinatorFinder) GetLeaderCoordinator() (clients.ICoordinatorClient, bool) {
-	return m.Called().Get(0).(clients.ICoordinatorClient), m.Called().Bool(1)
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Bool(1)
+	}
+	return args.Get(0).(clients.ICoordinatorClient), args.Bool(1)
 }
 
 func (m *MockCoordinatorFinder) BootstrapCoordinator() error {
-	return m.Called().Error(0)
+	args := m.Called()
+	return args.Error(0)
 }

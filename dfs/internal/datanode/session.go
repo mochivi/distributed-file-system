@@ -13,6 +13,14 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
+type ISessionManager interface {
+	Store(sessionID string, session *StreamingSession) error
+	Load(sessionID string) (*StreamingSession, bool)
+	Delete(sessionID string)
+	ExistsForChunk(chunkID string) bool
+	LoadByChunk(chunkID string) (*StreamingSession, bool)
+}
+
 type SessionStatus int
 
 const (

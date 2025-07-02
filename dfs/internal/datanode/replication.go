@@ -14,6 +14,10 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/streamer"
 )
 
+type ReplicationProvider interface {
+	Replicate(clients []*clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error)
+}
+
 type ReplicatedNodes struct {
 	nodes []*common.DataNodeInfo
 	mutex sync.Mutex
@@ -31,15 +35,15 @@ func (r *ReplicatedNodes) GetNodes() []*common.DataNodeInfo {
 	return r.nodes
 }
 
-type ReplicationManager struct {
+type ParalellReplicationService struct {
 	Config   config.ReplicateManagerConfig
 	streamer *streamer.Streamer
 	logger   *slog.Logger
 }
 
-func NewReplicationManager(config config.ReplicateManagerConfig, streamer *streamer.Streamer, logger *slog.Logger) *ReplicationManager {
+func NewParalellReplicationService(config config.ReplicateManagerConfig, streamer *streamer.Streamer, logger *slog.Logger) *ParalellReplicationService {
 	logger = logging.ExtendLogger(logger, slog.String("component", "replication_manager"))
-	return &ReplicationManager{
+	return &ParalellReplicationService{
 		Config:   config,
 		streamer: streamer,
 		logger:   logger,
@@ -47,7 +51,7 @@ func NewReplicationManager(config config.ReplicateManagerConfig, streamer *strea
 }
 
 // paralellReplicate replicates the chunk to the given nodes in parallel
-func (rm *ReplicationManager) paralellReplicate(clients []*clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error) {
+func (rm *ParalellReplicationService) Replicate(clients []*clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error) {
 	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", chunkHeader.ID))
 	if len(clients) == 0 {
 		return nil, fmt.Errorf("no clients provided")
@@ -117,7 +121,7 @@ func (rm *ReplicationManager) paralellReplicate(clients []*clients.DataNodeClien
 	return replicatedNodes.GetNodes(), nil
 }
 
-func (rm *ReplicationManager) replicate(ctx context.Context, client *clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, clientLogger *slog.Logger) error {
+func (rm *ParalellReplicationService) replicate(ctx context.Context, client *clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, clientLogger *slog.Logger) error {
 	// Request replication session
 	resp, err := client.ReplicateChunk(ctx, chunkHeader)
 	if err != nil {
