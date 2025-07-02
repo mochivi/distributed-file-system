@@ -3,6 +3,7 @@ package encoding
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 
@@ -65,7 +66,7 @@ func (s *ProtoSerializer) SerializeHeader(chunkHeader common.ChunkHeader) ([]byt
 func (s *ProtoSerializer) DeserializeHeader(reader io.Reader) (common.ChunkHeader, error) {
 	// 1) read magic
 	magic := make([]byte, 4)
-	if _, err := reader.Read(magic); err != nil {
+	if _, err := io.ReadFull(reader, magic); err != nil {
 		return common.ChunkHeader{}, err
 	}
 	if string(magic) != s.Magic {
@@ -74,7 +75,7 @@ func (s *ProtoSerializer) DeserializeHeader(reader io.Reader) (common.ChunkHeade
 
 	// 2) read version
 	version := make([]byte, 1)
-	if _, err := reader.Read(version); err != nil {
+	if _, err := io.ReadFull(reader, version); err != nil {
 		return common.ChunkHeader{}, err
 	}
 	if version[0] != s.Version {
@@ -82,15 +83,19 @@ func (s *ProtoSerializer) DeserializeHeader(reader io.Reader) (common.ChunkHeade
 	}
 
 	// 3) read length
-	length := make([]byte, 4)
-	if _, err := reader.Read(length); err != nil {
+	lengthBytes := make([]byte, 4)
+	if _, err := io.ReadFull(reader, lengthBytes); err != nil {
 		return common.ChunkHeader{}, err
 	}
-	lengthInt := binary.BigEndian.Uint32(length)
+	lengthInt := binary.BigEndian.Uint32(lengthBytes)
+
+	if lengthInt == 0 {
+		return common.ChunkHeader{}, errors.New("header length is 0")
+	}
 
 	// 4) read header
 	headerBytes := make([]byte, lengthInt)
-	if _, err := reader.Read(headerBytes); err != nil {
+	if _, err := io.ReadFull(reader, headerBytes); err != nil {
 		return common.ChunkHeader{}, err
 	}
 
@@ -107,5 +112,5 @@ func (s *ProtoSerializer) HeaderSize(chunkHeader common.ChunkHeader) (int, error
 	if err != nil {
 		return 0, err
 	}
-	return 13 + len(headerBytes), nil // 4 B magic + 1 B version + 4 B length + header size
+	return 9 + len(headerBytes), nil // 4 B magic + 1 B version + 4 B length
 }
