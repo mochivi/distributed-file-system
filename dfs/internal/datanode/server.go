@@ -134,6 +134,7 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 }
 
 // This is the side that is responsible for receiving the chunk data from some peer (client or another node)
+// TODO: not taking into account the partialChecksum on each chunk, so it would be a good idea to ask for a retry in case that any stream frame fails.
 func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
 	var session *StreamingSession
 	var buffer *bytes.Buffer
@@ -364,7 +365,7 @@ func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([
 	}
 
 	// Replicate to N_REPLICAS nodes
-	replicaNodes, err := s.replicationManager.paralellReplicate(replicationClients, chunkInfo, data, N_REPLICAS-1)
+	replicaNodes, err := s.replicationManager.Replicate(replicationClients, chunkInfo, data, N_REPLICAS-1)
 	if err != nil {
 		logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to replicate chunk: %v", err)

@@ -16,7 +16,15 @@ import (
 
 var (
 	ErrRequireResync = errors.New("require node resync")
+	ErrNoUpdates     = errors.New("no updates to apply")
+	ErrSameVersion   = errors.New("same version")
 )
+
+type HeartbeatProvider interface {
+	Run(info *common.DataNodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error
+}
+
+type heartbeatFunc func(ctx context.Context, req common.HeartbeatRequest, client clients.ICoordinatorClient) ([]common.NodeUpdate, error)
 
 type HeartbeatController struct {
 	ctx    context.Context
@@ -24,18 +32,21 @@ type HeartbeatController struct {
 
 	config *config.HeartbeatControllerConfig
 	logger *slog.Logger
+
+	heartbeatFunc heartbeatFunc // for testing
 }
 
-func NewHeartbeatController(ctx context.Context, config *config.HeartbeatControllerConfig, info *common.DataNodeInfo,
-	clusterStateManager state.ClusterStateManager, coordinatorFinder state.CoordinatorFinder, logger *slog.Logger) *HeartbeatController {
+func NewHeartbeatController(ctx context.Context, config *config.HeartbeatControllerConfig, logger *slog.Logger) *HeartbeatController {
 	ctx, cancel := context.WithCancelCause(ctx)
 
-	return &HeartbeatController{
+	controller := &HeartbeatController{
 		ctx:    ctx,
 		cancel: cancel,
 		config: config,
 		logger: logger,
 	}
+	controller.heartbeatFunc = controller.heartbeat
+	return controller
 }
 
 func (h *HeartbeatController) Run(info *common.DataNodeInfo, clusterStateManager state.ClusterStateManager, coordinatorFinder state.CoordinatorFinder) error {
@@ -44,17 +55,15 @@ func (h *HeartbeatController) Run(info *common.DataNodeInfo, clusterStateManager
 
 	errorCount := 0
 	for {
-		coordinatorNode, ok := coordinatorFinder.GetLeaderCoordinatorNode()
+		if h.ctx.Err() != nil {
+			return h.ctx.Err()
+		}
+
+		coordinatorClient, ok := coordinatorFinder.GetLeaderCoordinator()
 		if !ok {
 			return fmt.Errorf("no coordinator node found")
 		}
 
-		coordinatorClient, err := clients.NewCoordinatorClient(coordinatorNode)
-		if err != nil {
-			return fmt.Errorf("failed to create coordinator client: %w", err)
-		}
-
-		// TODO: figure out how to get the node info
 		req := common.HeartbeatRequest{
 			NodeID: info.ID,
 			Status: common.HealthStatus{
@@ -64,9 +73,14 @@ func (h *HeartbeatController) Run(info *common.DataNodeInfo, clusterStateManager
 			LastSeenVersion: clusterStateManager.GetCurrentVersion(),
 		}
 
-		updates, err := h.heartbeat(h.ctx, req, coordinatorClient)
+		updates, err := h.heartbeatFunc(h.ctx, req, coordinatorClient)
 		if err != nil {
 			coordinatorClient.Close()
+
+			if errors.Is(err, ErrNoUpdates) || errors.Is(err, ErrSameVersion) {
+				continue
+			}
+
 			errorCount++
 			if errorCount > 3 {
 				return fmt.Errorf("heartbeat failed: %w", err)
@@ -108,14 +122,27 @@ func (h *HeartbeatController) heartbeat(ctx context.Context, req common.Heartbea
 		return nil, ErrRequireResync
 	}
 
-	if resp.FromVersion == resp.ToVersion || len(resp.Updates) == 0 {
-		return nil, nil
+	if resp.FromVersion == resp.ToVersion {
+		return nil, ErrSameVersion
 	}
-
-	if len(resp.Updates) > 0 && resp.Updates != nil {
-		logger.Debug("Updating nodes", slog.Int("from_version", int(resp.FromVersion)), slog.Int("to_version", int(resp.ToVersion)))
+	if len(resp.Updates) == 0 {
+		return nil, ErrNoUpdates
 	}
 
 	logger.Debug("Updating nodes", slog.Int("from_version", int(resp.FromVersion)), slog.Int("to_version", int(resp.ToVersion)))
 	return resp.Updates, nil
+}
+
+// Cancel cancels the heartbeat context
+func (h *HeartbeatController) Cancel(cause ...error) {
+	if h.ctx.Err() != nil {
+		return
+	}
+
+	if len(cause) == 0 {
+		h.cancel(context.Canceled)
+		return
+	}
+
+	h.cancel(errors.Join(cause...))
 }

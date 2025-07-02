@@ -19,17 +19,29 @@ func NewNodeSelector(clusterViewer state.ClusterStateViewer) *nodeSelector {
 	}
 }
 
+// TODO: configure for overlap between chunks for the same node in cases there are few available datanodes
 func (s *nodeSelector) SelectBestNodes(n int) ([]*common.DataNodeInfo, bool) {
-	var healthyNodes []*common.DataNodeInfo
+	if n <= 0 {
+		return nil, false
+	}
+
 	nodes, _ := s.clusterViewer.ListNodes()
+	var onlyHealthyNodes []*common.DataNodeInfo
 	for _, node := range nodes {
 		if node.Status == common.NodeHealthy {
-			healthyNodes = append(healthyNodes, node)
-		}
-		if len(healthyNodes) >= n {
-			break
+			onlyHealthyNodes = append(onlyHealthyNodes, node)
 		}
 	}
 
-	return healthyNodes, len(healthyNodes) >= n
+	if len(onlyHealthyNodes) == 0 {
+		return nil, false
+	}
+
+	var selectedNodes []*common.DataNodeInfo
+	for i := 0; i < n; i++ {
+		node := onlyHealthyNodes[i%len(onlyHealthyNodes)]
+		selectedNodes = append(selectedNodes, node)
+	}
+
+	return selectedNodes, true
 }

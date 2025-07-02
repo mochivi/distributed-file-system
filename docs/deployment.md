@@ -9,7 +9,7 @@ cluster used during development.
 The file [`docker-compose.test.yml`](../docker-compose.test.yml) declares:
 * 1 × Coordinator (`8080`)
 * 6 × DataNodes (`8081`) each with an ephemeral volume mounted at `/app/data`
-* 1 × integration-runner service that runs `go test`
+* 1 × e2e-runner service that runs `go test`
 
 Start:
 ```bash

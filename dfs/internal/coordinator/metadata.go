@@ -8,10 +8,16 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
-type metadataManager struct {
+type MetadataSessionManager interface {
+	trackUpload(sessionID string, req common.UploadRequest, numChunks int)
+	commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore storage.MetadataStore) error
+}
+
+type metadataSessionManager struct {
 	sessions      map[string]metadataUploadSession
 	commitTimeout time.Duration
 	logger        *slog.Logger
@@ -23,9 +29,9 @@ type metadataUploadSession struct {
 	fileInfo *common.FileInfo
 }
 
-func NewMetadataManager(commitTimeout time.Duration, logger *slog.Logger) *metadataManager {
+func NewMetadataSessionManager(commitTimeout time.Duration, logger *slog.Logger) *metadataSessionManager {
 	metadataLogger := logging.ExtendLogger(logger, slog.String("component", "metadata_manager"))
-	manager := &metadataManager{
+	manager := &metadataSessionManager{
 		sessions:      make(map[string]metadataUploadSession),
 		commitTimeout: commitTimeout,
 		logger:        metadataLogger,
@@ -41,11 +47,11 @@ func newMetadataUploadSession(sessionID string, exp time.Duration, fileInfo *com
 	}
 }
 
-func (m *metadataManager) trackUpload(sessionID string, req common.UploadRequest, numChunks int) {
+func (m *metadataSessionManager) trackUpload(sessionID string, req common.UploadRequest, numChunks int) {
 	// Create chunk info array
 	chunkInfos := make([]common.ChunkInfo, numChunks)
 	for i := 0; i < numChunks; i++ {
-		chunkID := common.FormatChunkID(req.Path, i)
+		chunkID := chunk.FormatChunkID(req.Path, i)
 		chunkInfos[i] = common.ChunkInfo{
 			Header: common.ChunkHeader{
 				ID:       chunkID,
@@ -68,7 +74,7 @@ func (m *metadataManager) trackUpload(sessionID string, req common.UploadRequest
 	m.sessions[sessionID] = newMetadataUploadSession(sessionID, m.commitTimeout, fileInfo)
 }
 
-func (m *metadataManager) commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore storage.MetadataStore) error {
+func (m *metadataSessionManager) commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore storage.MetadataStore) error {
 	session, ok := m.sessions[sessionID]
 	if !ok {
 		return errors.New("session not found")

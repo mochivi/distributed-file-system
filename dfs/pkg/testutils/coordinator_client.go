@@ -1,4 +1,4 @@
-package datanode
+package testutils
 
 import (
 	"crypto/rand"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -16,7 +17,7 @@ import (
 
 // NewTestCoordinatorClientWithStubServer starts a stubCoordinatorServer listening on a free TCP port and
 // returns the coordinator client and a cleanup function.
-func NewTestCoordinatorClientWithStubServer(t *testing.T, server proto.CoordinatorServiceServer) (*clients.CoordinatorClient, func()) {
+func NewTestCoordinatorClientWithStubServer(t *testing.T, server proto.CoordinatorServiceServer) (clients.ICoordinatorClient, func()) {
 	t.Helper()
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
@@ -99,10 +100,10 @@ func NewTestDataNodeClientWithStubServer(t *testing.T, server proto.DataNodeServ
 // Helper functions for testing
 
 // newRandomChunk creates chunk header + data for unit testing.
-func newRandomChunk(size int) (common.ChunkHeader, []byte) {
+func NewRandomChunk(size int) (common.ChunkHeader, []byte) {
 	data := make([]byte, size)
 	_, _ = rand.Read(data)
-	checksum := common.CalculateChecksum(data)
+	checksum := chunk.CalculateChecksum(data)
 
 	header := common.ChunkHeader{
 		ID:       "chunk-" + hex.EncodeToString(data[:4]),

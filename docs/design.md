@@ -93,7 +93,7 @@ Steps in detail:
 ## 3. Roadmap / Future Work
 
 1. **Unit test coverage** across all packages.
-2. **Additional integration tests**: Download, List, Delete, etc.
+2. **Additional e2e tests**: Download, List, Delete, etc.
 3. **Garbage collection** for orphaned chunks.
 4. **Security** – TLS transport & optional at-rest encryption.
 5. **Access control** – JWT or mTLS based authentication & authorisation.

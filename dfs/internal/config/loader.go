@@ -12,20 +12,21 @@ func LoadDatanodeConfig(path string) (*DatanodeAppConfig, error) {
 	v := viper.New()
 
 	// Set defaults
-	v.SetDefault("node", DefaultDatanodeAppConfig())
-	v.SetDefault("agent", DefaultNodeAgentConfig())
+	datanodeDefaults := DefaultDatanodeAppConfig()
+	v.SetDefault("node", datanodeDefaults.Node)
+	v.SetDefault("cluster", datanodeDefaults.Agent)
 
 	// Configure file reading
-	v.SetConfigName("datanode") // a file named `datanode.yaml` can be used
-	v.SetConfigType("yaml")
-	v.AddConfigPath(path)
-	v.AddConfigPath(".")
+	// v.SetConfigName("datanode") // a file named `datanode.yaml` can be used
+	// v.SetConfigType("yaml")
+	// v.AddConfigPath(path)
+	// v.AddConfigPath(".")
 
-	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, err // Only return error if it's not a "file not found" error
-		}
-	}
+	// if err := v.ReadInConfig(); err != nil {
+	// 	if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+	// 		return nil, err // Only return error if it's not a "file not found" error
+	// 	}
+	// }
 
 	// Configure environment variable reading
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -52,17 +53,17 @@ func LoadCoordinatorConfig(path string) (*CoordinatorAppConfig, error) {
 	// Set defaults
 	v.SetDefault("coordinator", DefaultCoordinatorConfig())
 
-	// Configure file reading
-	v.SetConfigName("coordinator") // a file named `coordinator.yaml` can be used
-	v.SetConfigType("yaml")
-	v.AddConfigPath(path)
-	v.AddConfigPath(".")
+	// // Configure file reading
+	// v.SetConfigName("coordinator") // a file named `coordinator.yaml` can be used
+	// v.SetConfigType("yaml")
+	// v.AddConfigPath(path)
+	// v.AddConfigPath(".")
 
-	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, err
-		}
-	}
+	// if err := v.ReadInConfig(); err != nil {
+	// 	if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+	// 		return nil, err
+	// 	}
+	// }
 
 	// Configure environment variable reading
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))

@@ -36,7 +36,7 @@ func main() {
 	logger := logging.ExtendLogger(rootLogger, slog.String("node_id", cfg.ID))
 
 	metadataStore := metadata.NewMetadataLocalStorage()
-	metadataManager := coordinator.NewMetadataManager(cfg.Metadata.CommitTimeout, logger)
+	metadataManager := coordinator.NewMetadataSessionManager(cfg.Metadata.CommitTimeout, logger)
 
 	// TODO: FIX THIS GODAMNNNN
 	clusterStateHistoryManagerConfig := state.ClusterStateHistoryManagerConfig{

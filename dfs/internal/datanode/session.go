@@ -13,6 +13,14 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
+type ISessionManager interface {
+	Store(sessionID string, session *StreamingSession) error
+	Load(sessionID string) (*StreamingSession, bool)
+	Delete(sessionID string)
+	ExistsForChunk(chunkID string) bool
+	LoadByChunk(chunkID string) (*StreamingSession, bool)
+}
+
 type SessionStatus int
 
 const (
@@ -22,8 +30,8 @@ const (
 	SessionExpired
 )
 
-// SessionManager handles currently open chunk streaming sessions with clients
-type SessionManager struct {
+// StreamingSessionManager handles currently open chunk streaming sessions with clients
+type StreamingSessionManager struct {
 	sessions map[string]*StreamingSession
 	mu       sync.RWMutex
 }
@@ -44,30 +52,32 @@ type StreamingSession struct {
 	RunningChecksum hash.Hash // Running checksum calculation
 
 	// Concurrency control
-	// mutex  sync.RWMutex
+	// mu     sync.RWMutex
 	Status SessionStatus
 
 	// scoped logger for this session
 	logger *slog.Logger
 }
 
-func NewSessionManager() *SessionManager {
-	return &SessionManager{sessions: make(map[string]*StreamingSession)}
+func NewStreamingSessionManager() *StreamingSessionManager {
+	return &StreamingSessionManager{sessions: make(map[string]*StreamingSession)}
 }
 
-func (sm *SessionManager) Store(sessionID string, session *StreamingSession) error {
+func (sm *StreamingSessionManager) Store(sessionID string, session *StreamingSession) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	if sm.ExistsForChunk(session.ChunkHeader.ID) {
-		return fmt.Errorf("session for chunk %s already exists", session.ChunkHeader.ID)
+	for _, s := range sm.sessions {
+		if s.ChunkHeader.ID == session.ChunkHeader.ID && s.Status == SessionActive {
+			return fmt.Errorf("session for chunk %s already exists", session.ChunkHeader.ID)
+		}
 	}
 
 	sm.sessions[sessionID] = session
 	return nil
 }
 
-func (sm *SessionManager) Load(sessionID string) (*StreamingSession, bool) {
+func (sm *StreamingSessionManager) Load(sessionID string) (*StreamingSession, bool) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	session, ok := sm.sessions[sessionID]
@@ -77,14 +87,16 @@ func (sm *SessionManager) Load(sessionID string) (*StreamingSession, bool) {
 	return session, true
 }
 
-func (sm *SessionManager) Delete(sessionID string) {
+func (sm *StreamingSessionManager) Delete(sessionID string) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	delete(sm.sessions, sessionID)
 }
 
 // Temporary solution to check if a chunk is already being streamed, stops duplicate requests
-func (sm *SessionManager) ExistsForChunk(chunkID string) bool {
+func (sm *StreamingSessionManager) ExistsForChunk(chunkID string) bool {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
 	for _, session := range sm.sessions {
 		if session.ChunkHeader.ID == chunkID && session.Status == SessionActive {
 			return true
@@ -93,7 +105,7 @@ func (sm *SessionManager) ExistsForChunk(chunkID string) bool {
 	return false
 }
 
-func (sm *SessionManager) LoadByChunk(chunkID string) (*StreamingSession, bool) {
+func (sm *StreamingSessionManager) LoadByChunk(chunkID string) (*StreamingSession, bool) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 

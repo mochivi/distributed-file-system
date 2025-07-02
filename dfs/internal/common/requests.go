@@ -343,7 +343,7 @@ func DownloadResponseFromProto(pb *proto.DownloadResponse) DownloadResponse {
 }
 
 func (dr DownloadResponse) ToProto() *proto.DownloadResponse {
-	protoChunkLocations := make([]*proto.ChunkLocation, len(dr.ChunkLocations))
+	protoChunkLocations := make([]*proto.ChunkLocation, 0, len(dr.ChunkLocations))
 	for _, item := range dr.ChunkLocations {
 		protoChunkLocations = append(protoChunkLocations, item.ToProto())
 	}

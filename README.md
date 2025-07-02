@@ -1,6 +1,6 @@
 # Distributed File System (DFS) – Go implementation
 
-[![Go](https://img.shields.io/badge/go-1.22+-00ADD8?logo=go)](https://golang.org/) [![CI](https://github.com/mochivi/distributed-file-system/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/mochivi/distributed-file-system/actions) [![License](https://img.shields.io/github/license/mochivi/distributed-file-system)](LICENSE)
+[![Go](https://img.shields.io/badge/go-1.22+-00ADD8?logo=go)](https://golang.org/) [![CI](https://github.com/mochivi/distributed-file-system/actions/workflows/go-tests.yml/badge.svg)](https://github.com/mochivi/distributed-file-system/actions) [![License](https://img.shields.io/github/license/mochivi/distributed-file-system)](LICENSE)
 
 A **self-contained distributed file-system** written in Go.  
 It is a learning project that demonstrates chunk-based storage, streaming gRPC replication, and metadata coordination – all designed to run locally via Docker.
@@ -28,7 +28,7 @@ It is a learning project that demonstrates chunk-based storage, streaming gRPC r
 * **Client SDK** that splits files, uploads chunks in parallel and confirms the upload.
 * Bidirectional streaming gRPC (`ChunkDataStream`) with back-pressure and checksums.
 * Default **replication factor = 3** (1 primary + 2 replicas).
-* Integration test-bed – `docker-compose` spins up 1 × Coordinator + 6 × DataNodes.
+* e2e test-bed – `docker-compose` spins up 1 × Coordinator + 6 × DataNodes.
 * Pluggable chunk storage – local filesystem today; S3 / GCS adapters planned.
 * Zero external dependencies beyond Go stdlib + gRPC.
 
@@ -44,15 +44,15 @@ It is a learning project that demonstrates chunk-based storage, streaming gRPC r
 ---
 
 ## Quick start
-Run the integration cluster locally (1 coordinator + 6 datanodes):
+Run the e2e cluster locally (1 coordinator + 6 datanodes):
 
 ```bash
-make integration        # same target used by CI
+make e2e        # same target used by CI
 ```
 
 Logs are tailed to `./logs/*.log`.  Shut everything down with:
 ```bash
-make integration-down
+make e2e-down
 ```
 
 ---
@@ -85,7 +85,7 @@ deploy/         Dockerfiles, compose, CI scripts
 
 ## Testing
 * **Unit tests** – `make test` runs `go test ./...` with race detector.
-* **Integration** – `make integration` spins up the full cluster and runs end-to-end scenarios.
+* **e2e** – `make e2e` spins up the full cluster and runs end-to-end scenarios.
 * **Lint** – `make lint` executes `golangci-lint run` (requires the tool installed).
 
 CI executes *all* of the above on every pull request.

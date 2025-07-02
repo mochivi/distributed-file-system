@@ -11,7 +11,9 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
+	"github.com/mochivi/distributed-file-system/pkg/streamer"
 )
 
 // chunkInfoMap stores information about each datanode where chunks are stored
@@ -128,11 +130,11 @@ type uploadSession struct {
 
 // Uploads chunks to peer
 type Uploader struct {
-	streamer *common.Streamer
+	streamer *streamer.Streamer
 	config   UploaderConfig
 }
 
-func NewUploader(streamer *common.Streamer, logger *slog.Logger, config UploaderConfig) *Uploader {
+func NewUploader(streamer *streamer.Streamer, logger *slog.Logger, config UploaderConfig) *Uploader {
 	return &Uploader{
 		streamer: streamer,
 		config:   config,
@@ -208,7 +210,7 @@ func (u *Uploader) QueueWork(ctx context.Context, session *uploadSession, file *
 		}
 		chunkData = chunkData[:n]
 
-		checksum := common.CalculateChecksum(chunkData)
+		checksum := chunk.CalculateChecksum(chunkData)
 		chunkHeader := common.ChunkHeader{
 			ID:       chunkUploadLocation.ChunkID,
 			Index:    i,
@@ -285,7 +287,7 @@ func (u *Uploader) uploadChunk(work UploaderWork, session *uploadSession) ([]*co
 	}
 
 	// Stream chunk to peer
-	replicatedNodes, err := u.streamer.SendChunkStream(session.ctx, stream, session.logger, common.UploadChunkStreamParams{
+	replicatedNodes, err := u.streamer.SendChunkStream(session.ctx, stream, session.logger, streamer.UploadChunkStreamParams{
 		SessionID:   work.sessionID, // This sessionID is the streaming sessionID, NOT the metadata sessionID or uploadSessionID
 		ChunkHeader: work.chunkHeader,
 		Data:        work.data,

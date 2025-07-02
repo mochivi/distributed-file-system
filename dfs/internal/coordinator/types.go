@@ -21,13 +21,13 @@ type Coordinator struct {
 
 	// Coordinates metadata storage
 	metaStore       storage.MetadataStore
-	metadataManager *metadataManager // Coordinates when to actually commit metadata
+	metadataManager MetadataSessionManager // Coordinates when to actually commit metadata
 
 	config config.CoordinatorConfig
 	logger *slog.Logger
 }
 
-func NewCoordinator(cfg config.CoordinatorConfig, metaStore storage.MetadataStore, metadataManager *metadataManager,
+func NewCoordinator(cfg config.CoordinatorConfig, metaStore storage.MetadataStore, metadataManager MetadataSessionManager,
 	clusterStateHistoryManager state.ClusterStateHistoryManager, selector cluster.NodeSelector, logger *slog.Logger) *Coordinator {
 	coordinatorLogger := logging.ExtendLogger(logger, slog.String("component", "coordinator_server"))
 	return &Coordinator{

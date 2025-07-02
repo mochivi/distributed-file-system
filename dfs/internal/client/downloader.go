@@ -11,6 +11,7 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/pkg/streamer"
 )
 
 type DownloaderConfig struct {
@@ -28,7 +29,7 @@ type DownloadWork struct {
 
 type Downloader struct {
 	config   DownloaderConfig
-	streamer *common.Streamer
+	streamer *streamer.Streamer
 }
 
 type downloadSession struct {
@@ -48,7 +49,7 @@ type downloadSession struct {
 	logger   *slog.Logger // scoped to the upload session
 }
 
-func NewDownloader(streamer *common.Streamer, config DownloaderConfig) *Downloader {
+func NewDownloader(streamer *streamer.Streamer, config DownloaderConfig) *Downloader {
 	return &Downloader{
 		config:   config,
 		streamer: streamer,
@@ -158,7 +159,7 @@ func (d *Downloader) downloadChunk(work DownloadWork, session *downloadSession) 
 	// TODO: the buffer is as large as the chunk, but we would prefer to flush the buffer from time to time to avoid memory issues
 	buffer := bytes.NewBuffer(make([]byte, work.chunkHeader.Size))
 
-	if err := d.streamer.ReceiveChunkStream(session.ctx, stream, buffer, session.logger, common.DownloadChunkStreamParams{
+	if err := d.streamer.ReceiveChunkStream(session.ctx, stream, buffer, session.logger, streamer.DownloadChunkStreamParams{
 		SessionID:   work.sessionID,
 		ChunkHeader: work.chunkHeader,
 	}); err != nil {

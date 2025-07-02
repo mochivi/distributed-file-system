@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -32,9 +33,13 @@ type clusterStateHistoryManager struct {
 }
 
 func NewClusterStateHistoryManager(config ClusterStateHistoryManagerConfig) *clusterStateHistoryManager {
+	if config.MaxHistorySize <= 0 {
+		config.MaxHistorySize = 100 // Default value
+	}
 	return &clusterStateHistoryManager{
-		store:  newNodeStore(),
-		config: config,
+		store:   newNodeStore(),
+		config:  config,
+		history: make([]common.NodeUpdate, config.MaxHistorySize), // The buffer has no need to extend capacity
 	}
 }
 
@@ -47,6 +52,7 @@ func (m *clusterStateHistoryManager) GetNode(nodeID string) (*common.DataNodeInf
 func (m *clusterStateHistoryManager) AddNode(node *common.DataNodeInfo) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.version++
 	m.store.addNode(node)
 	m.addToHistory(common.NODE_ADDED, node)
 }
@@ -58,6 +64,7 @@ func (m *clusterStateHistoryManager) RemoveNode(nodeID string) error {
 	if !ok {
 		return fmt.Errorf("node with ID %s not found", nodeID)
 	}
+	m.version++
 	m.store.removeNode(nodeID)
 	m.addToHistory(common.NODE_REMOVED, node)
 	return nil
@@ -66,10 +73,11 @@ func (m *clusterStateHistoryManager) RemoveNode(nodeID string) error {
 func (m *clusterStateHistoryManager) UpdateNode(node *common.DataNodeInfo) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	node, ok := m.store.getNode(node.ID)
+	_, ok := m.store.getNode(node.ID)
 	if !ok {
 		return fmt.Errorf("node with ID %s not found", node.ID)
 	}
+	m.version++
 	m.store.updateNode(node)
 	m.addToHistory(common.NODE_UPDATED, node)
 	return nil
@@ -112,14 +120,27 @@ func (m *clusterStateHistoryManager) GetUpdatesSince(sinceVersion int64) ([]comm
 		return []common.NodeUpdate{}, m.version, nil
 	}
 
-	// Collect updates since requested version
 	var updates []common.NodeUpdate
-	for i := 0; i < m.config.MaxHistorySize; i++ {
-		update := m.history[i]
-		if update.Version > sinceVersion && update.Version <= m.version {
-			updates = append(updates, update)
+	// If buffer isn't full, history is from index 0 to historyIndex-1
+	if m.version < int64(m.config.MaxHistorySize) {
+		for i := 0; i < m.historyIndex; i++ {
+			update := m.history[i]
+			if update.Version > sinceVersion {
+				updates = append(updates, update)
+			}
+		}
+	} else { // Buffer has wrapped around, so we need to check all of it
+		for _, update := range m.history {
+			if update.Version > sinceVersion {
+				updates = append(updates, update)
+			}
 		}
 	}
+
+	// Sort updates by version to ensure chronological order
+	sort.Slice(updates, func(i, j int) bool {
+		return updates[i].Version < updates[j].Version
+	})
 
 	return updates, m.version, nil
 }

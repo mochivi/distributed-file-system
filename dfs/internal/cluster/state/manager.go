@@ -2,6 +2,7 @@ package state
 
 import (
 	"sync"
+	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 )
@@ -51,6 +52,7 @@ func (v *clusterStateManager) ListNodes(n ...int) ([]*common.DataNodeInfo, int64
 func (m *clusterStateManager) AddNode(node *common.DataNodeInfo) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	node.LastSeen = time.Now()
 	m.store.addNode(node)
 	m.version++
 }

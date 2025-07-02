@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -13,11 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"io/fs"
-
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 	"github.com/mochivi/distributed-file-system/internal/cluster"
+	datanode_controllers "github.com/mochivi/distributed-file-system/internal/cluster/datanode/controllers"
+	datanode_services "github.com/mochivi/distributed-file-system/internal/cluster/datanode/services"
 	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
@@ -26,6 +24,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"github.com/mochivi/distributed-file-system/pkg/streamer"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 	"google.golang.org/grpc"
 )
@@ -63,12 +62,6 @@ import (
 // - Multiple timeout layers prevent process from hanging indefinitely
 // - Buffered error channel prevents goroutines from blocking during shutdown
 func main() {
-	if err := godotenv.Load(); err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
-			log.Fatalf("failed to load environment: %v", err)
-		}
-	}
-
 	// Load configuration
 	appConfig, err := config.LoadDatanodeConfig(".") // Load datanode-specific config
 	if err != nil {
@@ -112,12 +105,12 @@ func main() {
 
 	clusterStateManager := state.NewClusterStateManager()
 	nodeSelector := cluster.NewNodeSelector(clusterStateManager)
-	streamer := common.NewStreamer(appConfig.Node.Streamer)
-	replicationManager := datanode.NewReplicationManager(appConfig.Node.Replication, streamer, logger)
-	sessionManager := datanode.NewSessionManager()
+	streamer := streamer.NewStreamer(appConfig.Node.Streamer)
+	replicationManager := datanode.NewParalellReplicationService(appConfig.Node.Replication, streamer, logger)
+	sessionManager := datanode.NewStreamingSessionManager()
 	coordinatorFinder := state.NewCoordinatorFinder()
 
-	server := datanode.NewDataNodeServer(chunkStore, replicationManager, sessionManager, clusterStateManager, coordinatorFinder, nodeSelector, &datanodeInfo, appConfig.Node, logger)
+	server := datanode.NewDataNodeServer(&datanodeInfo, appConfig.Node, chunkStore, replicationManager, sessionManager, clusterStateManager, coordinatorFinder, nodeSelector, logger)
 
 	// gRPC initialization
 	grpcServer := grpc.NewServer()
@@ -152,7 +145,9 @@ func main() {
 	}()
 
 	// Cluster node setup
-	nodeAgent := cluster.NewNodeAgent(&appConfig.Agent, &datanodeInfo, clusterStateManager, coordinatorFinder, logger)
+	nodeServices := datanode_services.NewNodeAgentServices(coordinatorFinder, datanode_services.NewRegisterService(logger))
+	nodeControllers := datanode_controllers.NewNodeAgentControllers(datanode_controllers.NewHeartbeatController(ctx, appConfig.Agent.Heartbeat, logger))
+	nodeAgent := cluster.NewNodeAgent(&appConfig.Agent, &datanodeInfo, clusterStateManager, coordinatorFinder, nodeServices, nodeControllers, logger)
 
 	// Run node agent, which includes heartbeat loop
 	wg.Add(1)
