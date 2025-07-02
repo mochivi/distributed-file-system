@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -13,10 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"io/fs"
-
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 	"github.com/mochivi/distributed-file-system/internal/cluster"
 	datanode_controllers "github.com/mochivi/distributed-file-system/internal/cluster/datanode/controllers"
 	datanode_services "github.com/mochivi/distributed-file-system/internal/cluster/datanode/services"
@@ -66,12 +62,6 @@ import (
 // - Multiple timeout layers prevent process from hanging indefinitely
 // - Buffered error channel prevents goroutines from blocking during shutdown
 func main() {
-	if err := godotenv.Load(); err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
-			log.Fatalf("failed to load environment: %v", err)
-		}
-	}
-
 	// Load configuration
 	appConfig, err := config.LoadDatanodeConfig(".") // Load datanode-specific config
 	if err != nil {

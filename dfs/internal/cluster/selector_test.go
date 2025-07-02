@@ -27,7 +27,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 		expectedOk    bool
 	}{
 		{
-			name:          "Select 2 healthy nodes",
+			name:          "success: select 2 healthy nodes",
 			n:             2,
 			nodesToReturn: nodes,
 			expectedNodes: []*common.DataNodeInfo{
@@ -37,7 +37,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 			expectedOk: true,
 		},
 		{
-			name:          "Select 3 healthy nodes",
+			name:          "success: select 3 healthy nodes",
 			n:             3,
 			nodesToReturn: nodes,
 			expectedNodes: []*common.DataNodeInfo{
@@ -48,38 +48,41 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 			expectedOk: true,
 		},
 		{
-			name:          "Request more healthy nodes than available",
-			n:             4,
+			name:          "Success: request more healthy nodes than available",
+			n:             6,
 			nodesToReturn: nodes,
 			expectedNodes: []*common.DataNodeInfo{
 				{ID: "node-1", Status: common.NodeHealthy},
 				{ID: "node-3", Status: common.NodeHealthy},
 				{ID: "node-4", Status: common.NodeHealthy},
+				{ID: "node-1", Status: common.NodeHealthy},
+				{ID: "node-3", Status: common.NodeHealthy},
+				{ID: "node-4", Status: common.NodeHealthy},
 			},
-			expectedOk: false,
+			expectedOk: true,
 		},
 		{
-			name:          "Request 0 nodes",
+			name:          "error: request 0 nodes",
 			n:             0,
 			nodesToReturn: nodes,
-			expectedNodes: []*common.DataNodeInfo{},
+			expectedNodes: nil,
 			expectedOk:    false,
 		},
 		{
-			name: "No healthy nodes available",
+			name: "error: no healthy nodes available",
 			n:    1,
 			nodesToReturn: []*common.DataNodeInfo{
 				{ID: "node-1", Status: common.NodeUnhealthy},
 				{ID: "node-2", Status: common.NodeUnhealthy},
 			},
-			expectedNodes: []*common.DataNodeInfo{},
+			expectedNodes: nil,
 			expectedOk:    false,
 		},
 		{
-			name:          "No nodes in cluster",
+			name:          "error: no nodes in cluster",
 			n:             1,
 			nodesToReturn: []*common.DataNodeInfo{},
-			expectedNodes: []*common.DataNodeInfo{},
+			expectedNodes: nil,
 			expectedOk:    false,
 		},
 	}
@@ -87,9 +90,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockViewer := state.NewMockClusterStateManager()
-			if tc.name != "Request 0 nodes" {
-				mockViewer.On("ListNodes", mock.Anything).Return(tc.nodesToReturn, int64(len(tc.nodesToReturn)))
-			}
+			mockViewer.On("ListNodes", mock.Anything).Return(tc.nodesToReturn, int64(len(tc.nodesToReturn))).Maybe()
 
 			selector := cluster.NewNodeSelector(mockViewer)
 			selectedNodes, ok := selector.SelectBestNodes(tc.n)

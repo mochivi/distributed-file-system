@@ -17,6 +17,7 @@ services:
     ports:
       - "8081:8081"
     environment:
+      - DATANODE_PORT=8081
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode1
@@ -34,6 +35,7 @@ services:
     ports:
       - "8082:8081"
     environment:
+      - DATANODE_PORT=8081
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode2
@@ -51,6 +53,7 @@ services:
     ports:
       - "8083:8081"
     environment:
+      - DATANODE_PORT=8081
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode3
@@ -68,6 +71,7 @@ services:
     ports:
       - "8084:8081"
     environment:
+      - DATANODE_PORT=8081
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode4
@@ -85,6 +89,7 @@ services:
     ports:
       - "8085:8081"
     environment:
+      - DATANODE_PORT=8081
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode5
@@ -102,6 +107,7 @@ services:
     ports:
       - "8086:8081"
     environment:
+      - DATANODE_PORT=8081
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode6

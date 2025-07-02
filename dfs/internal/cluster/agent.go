@@ -8,16 +8,13 @@ func (c *NodeAgent) Run() error {
 		return fmt.Errorf("failed to bootstrap coordinator node: %w", err)
 	}
 
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		c.controllers.Heartbeat.Run(c.info, c.clusterStateManager, c.services.Coordinator)
-	}()
+	// Register with coordinator before starting the controller loops
+	c.services.Register.RegisterWithCoordinator(c.ctx, c.info, c.clusterStateManager, c.services.Coordinator)
 
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		c.services.Register.RegisterWithCoordinator(c.ctx, c.info, c.clusterStateManager, c.services.Coordinator)
+		c.controllers.Heartbeat.Run(c.info, c.clusterStateManager, c.services.Coordinator)
 	}()
 
 	c.wg.Wait()

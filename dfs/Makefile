@@ -1,4 +1,4 @@
-.PHONY: proto clean build test run-coordinator run-datanode run-client
+.PHONY: proto clean build e2e e2e-down test run-coordinator run-datanode run-client deps fmt dev-setup help
 
 # Generate protobuf files
 proto:
@@ -35,7 +35,7 @@ e2e-down:
 # Run tests
 test:
 	@echo "Running tests..."
-	@go test -v ./...
+	@go test -v $$(go list ./... | grep -v 'tests/e2e') -race
 
 # Run coordinator
 run-coordinator: build
