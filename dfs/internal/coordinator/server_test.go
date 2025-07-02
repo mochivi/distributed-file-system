@@ -56,6 +56,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 				mocks.nodeSelector.On("SelectBestNodes", 1).Return([]*common.DataNodeInfo{
 					{ID: "node1", Status: common.NodeHealthy, Host: "127.0.0.1", Port: 8081},
 				}, true)
+				mocks.metadataManager.On("trackUpload", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 			},
 			req: &proto.UploadRequest{
 				Path:      "test.txt",
@@ -81,6 +82,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 				mocks.nodeSelector.On("SelectBestNodes", 2).Return([]*common.DataNodeInfo{
 					{ID: "node1", Status: common.NodeHealthy, Host: "127.0.0.1", Port: 8081},
 				}, true)
+				mocks.metadataManager.On("trackUpload", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 			},
 			req: &proto.UploadRequest{
 				Path:      "test.txt",
@@ -107,7 +109,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 		{
 			name: "error: node selector not ok",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.nodeSelector.On("SelectBestNodes", 1).Return([]*common.DataNodeInfo{}, false)
+				mocks.nodeSelector.On("SelectBestNodes", 1).Return(nil, false)
 			},
 			req: &proto.UploadRequest{
 				Path:      "test.txt",
@@ -131,6 +133,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 			coordinator := NewCoordinator(cfg, mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector, logger)
 
 			resp, err := coordinator.UploadFile(context.Background(), tc.req)
+			time.Sleep(1 * time.Second) // wait for metadataManager goroutine to start and finish, this is a hack to avoid race conditions
 
 			if tc.expectErr {
 				assert.Error(t, err)

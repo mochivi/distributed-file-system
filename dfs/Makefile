@@ -21,14 +21,14 @@ build: proto
 	@go build -o bin/client ./cmd/client
 	@echo "Build complete"
 
-# Optional log file for docker compose output (can be overridden: `make integration LOG_FILE=my.log`)
-LOG_FILE ?= ../logs/integration_run.log
+# Optional log file for docker compose output (can be overridden: `make e2e LOG_FILE=my.log`)
+LOG_FILE ?= ../logs/e2e_run.log
 
-integration:
-	@echo "Running integration tests (logs -> $(LOG_FILE))"
+e2e:
+	@echo "Running e2e tests (logs -> $(LOG_FILE))"
 	@docker compose -f docker-compose.test.yml up --build 2>&1 | tee $(LOG_FILE)
 
-integration-down:
+e2e-down:
 	@echo "Downing containers..."
 	@docker compose -f docker-compose.test.yml down --volumes
 

@@ -18,8 +18,11 @@ dfs/bin/*
 
 # test files
 dfs/test-data/*
-dfs/tests/integration/test_files/*
+dfs/tests/e2e/test_files/*
 tests/*
+dfs/tests/e2e/coverage/*
+dfs/tests/e2e/logs/*
+dfs/tests/unit/coverage/*
 
 # logs
 logs/*
@@ -34,3 +37,8 @@ docs/contributing.md
 
 # Review documents
 /ideas
+
+# Tests
+
+# Coverage
+*coverage.out

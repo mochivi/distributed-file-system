@@ -1,0 +1,100 @@
+name: Go Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit-tests:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    defaults:
+      run:
+        working-directory: ./dfs
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./dfs/go.mod
+          cache: true
+      
+      - name: Create unit test directories
+        run: mkdir -p ./tests/unit
+
+      - name: Run unit tests and generate coverage report
+        run: go test $(go list ./... | grep -v 'tests/e2e') -v -race -coverprofile=tests/unit/coverage.out -covermode=atomic
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: ./dfs/tests/unit/coverage.out
+
+  e2e:
+    name: Run E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: ./dfs
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./dfs/go.mod
+          cache: true
+
+      - name: Create e2e test directories
+        run: mkdir -p ./tests/e2e/coverage
+
+      # Run the stack and stream logs to a file
+      - name: Run e2e tests (capture logs)
+        id: tests
+        run: |
+          set -o pipefail
+          mkdir -p ./tests/e2e/logs
+          docker compose -f docker-compose.test.yml \
+            up --build --exit-code-from e2e-runner 2>&1 \
+            | tee ./tests/e2e/logs/compose-output.log
+
+      # Always grab full container logs too
+      - name: Collect docker logs
+        if: always()
+        run: |
+          docker compose -f docker-compose.test.yml logs --no-color --timestamps \
+            > ./tests/e2e/logs/compose-logs-full.txt
+
+      # Save both log files as artifacts
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: |
+            ./dfs/tests/e2e/logs/compose-output.log
+            ./dfs/tests/e2e/logs/compose-logs-full.txt
+
+      - name: Upload e2e coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-coverage
+          path: ./dfs/tests/e2e/coverage/e2e-coverage.out
+
+      # Tear down the environment regardless of test result
+      - name: Shutdown environment
+        if: always()
+        run: |
+          docker compose -f docker-compose.test.yml down --volumes --remove-orphans
