@@ -36,12 +36,12 @@ func (r *ReplicatedNodes) GetNodes() []*common.DataNodeInfo {
 }
 
 type ParalellReplicationService struct {
-	Config   config.ReplicateManagerConfig
+	Config   config.ParallelReplicationServiceConfig
 	streamer *streamer.Streamer
 	logger   *slog.Logger
 }
 
-func NewParalellReplicationService(config config.ReplicateManagerConfig, streamer *streamer.Streamer, logger *slog.Logger) *ParalellReplicationService {
+func NewParalellReplicationService(config config.ParallelReplicationServiceConfig, streamer *streamer.Streamer, logger *slog.Logger) *ParalellReplicationService {
 	logger = logging.ExtendLogger(logger, slog.String("component", "replication_manager"))
 	return &ParalellReplicationService{
 		Config:   config,
@@ -50,7 +50,7 @@ func NewParalellReplicationService(config config.ReplicateManagerConfig, streame
 	}
 }
 
-// paralellReplicate replicates the chunk to the given nodes in parallel
+// Replicate replicates the chunk to the given nodes in parallel
 func (rm *ParalellReplicationService) Replicate(clients []*clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error) {
 	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", chunkHeader.ID))
 	if len(clients) == 0 {

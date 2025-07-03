@@ -9,11 +9,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
-type ISessionManager interface {
+type SessionManager interface {
+	NewSession(chunkHeader common.ChunkHeader, propagate bool) *StreamingSession
+	GetSession(sessionID string) (*StreamingSession, bool)
 	Store(sessionID string, session *StreamingSession) error
 	Load(sessionID string) (*StreamingSession, bool)
 	Delete(sessionID string)
@@ -34,6 +38,8 @@ const (
 type StreamingSessionManager struct {
 	sessions map[string]*StreamingSession
 	mu       sync.RWMutex
+	config   config.StreamingSessionManagerConfig
+	logger   *slog.Logger
 }
 
 // StreamingSession controls the data flow during a chunk streaming session
@@ -59,8 +65,35 @@ type StreamingSession struct {
 	logger *slog.Logger
 }
 
-func NewStreamingSessionManager() *StreamingSessionManager {
-	return &StreamingSessionManager{sessions: make(map[string]*StreamingSession)}
+func NewStreamingSessionManager(config config.StreamingSessionManagerConfig, logger *slog.Logger) *StreamingSessionManager {
+	return &StreamingSessionManager{sessions: make(map[string]*StreamingSession), config: config, logger: logger}
+}
+
+func (sm *StreamingSessionManager) NewSession(chunkHeader common.ChunkHeader, propagate bool) *StreamingSession {
+	sessionID := uuid.New().String()
+	streamLogger := logging.OperationLogger(sm.logger, "chunk_streaming_session", slog.String("session_id", sessionID))
+	session := &StreamingSession{
+		SessionID:       sessionID,
+		ChunkHeader:     chunkHeader,
+		CreatedAt:       time.Now(),
+		ExpiresAt:       time.Now().Add(sm.config.SessionTimeout), // How much the client has until they submit a request initiating the streaming session
+		Propagate:       propagate,
+		Status:          SessionActive,
+		RunningChecksum: sha256.New(),
+		logger:          streamLogger,
+	}
+	return session
+}
+
+func (sm *StreamingSessionManager) GetSession(sessionID string) (*StreamingSession, bool) {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	session, ok := sm.sessions[sessionID]
+	if !ok {
+		return nil, false
+	}
+
+	return session, true
 }
 
 func (sm *StreamingSessionManager) Store(sessionID string, session *StreamingSession) error {
@@ -115,26 +148,6 @@ func (sm *StreamingSessionManager) LoadByChunk(chunkID string) (*StreamingSessio
 		}
 	}
 	return nil, false
-}
-
-// DataNode creates and stores a session
-func (s *DataNodeServer) createStreamingSession(sessionId string, chunkHeader common.ChunkHeader, propagate bool, logger *slog.Logger) error {
-	streamLogger := logging.OperationLogger(logger, "chunk_streaming_session", slog.String("session_id", sessionId))
-	session := &StreamingSession{
-		SessionID:       sessionId,
-		ChunkHeader:     chunkHeader,
-		CreatedAt:       time.Now(),
-		ExpiresAt:       time.Now().Add(s.config.Session.SessionTimeout), // How much the client has until they submit a request initiating the streaming session
-		Propagate:       propagate,
-		Status:          SessionActive,
-		RunningChecksum: sha256.New(),
-		logger:          streamLogger,
-	}
-	if err := s.sessionManager.Store(sessionId, session); err != nil {
-		return err
-	}
-	streamLogger.Info("Streaming session created")
-	return nil
 }
 
 // DataNode retrieves the streaming session

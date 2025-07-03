@@ -1,11 +1,25 @@
 package datanode
 
 import (
+	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/stretchr/testify/mock"
 )
 
 type MockStreamingSessionManager struct {
 	mock.Mock
+}
+
+func (m *MockStreamingSessionManager) NewSession(chunkHeader common.ChunkHeader, propagate bool) *StreamingSession {
+	args := m.Called(chunkHeader, propagate)
+	return args.Get(0).(*StreamingSession)
+}
+
+func (m *MockStreamingSessionManager) GetSession(sessionID string) (*StreamingSession, bool) {
+	args := m.Called(sessionID)
+	if args.Get(0) == nil {
+		return nil, false
+	}
+	return args.Get(0).(*StreamingSession), args.Bool(1)
 }
 
 func (m *MockStreamingSessionManager) Store(sessionID string, session *StreamingSession) error {

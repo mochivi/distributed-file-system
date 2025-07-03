@@ -14,28 +14,28 @@ type DatanodeAppConfig struct {
 }
 
 type DataNodeConfig struct {
-	Session     SessionManagerConfig   `mapstructure:"session" validate:"required"`
-	Replication ReplicateManagerConfig `mapstructure:"replication" validate:"required"`
-	DiskStorage DiskStorageConfig      `mapstructure:"disk_storage" validate:"required"`
-	Streamer    StreamerConfig         `mapstructure:"streamer" validate:"required"`
+	Session     StreamingSessionManagerConfig    `mapstructure:"session" validate:"required"`
+	Replication ParallelReplicationServiceConfig `mapstructure:"replication" validate:"required"`
+	DiskStorage DiskStorageConfig                `mapstructure:"disk_storage" validate:"required"`
+	Streamer    StreamerConfig                   `mapstructure:"streamer" validate:"required"`
 }
 
-type SessionManagerConfig struct {
+type StreamingSessionManagerConfig struct {
 	SessionTimeout time.Duration `mapstructure:"session_timeout" validate:"required,gt=0"` // timeout until chunk upload session times out
 }
 
-func DefaultSessionManagerConfig() SessionManagerConfig {
-	return SessionManagerConfig{
+func DefaultStreamingSessionManagerConfig() StreamingSessionManagerConfig {
+	return StreamingSessionManagerConfig{
 		SessionTimeout: 1 * time.Minute,
 	}
 }
 
-type ReplicateManagerConfig struct {
+type ParallelReplicationServiceConfig struct {
 	ReplicateTimeout time.Duration `mapstructure:"replicate_timeout" validate:"required,gt=0"` // timeout until replication to another node is considered failed
 }
 
-func DefaultReplicateManagerConfig() ReplicateManagerConfig {
-	return ReplicateManagerConfig{
+func DefaultParallelReplicationServiceConfig() ParallelReplicationServiceConfig {
+	return ParallelReplicationServiceConfig{
 		ReplicateTimeout: 10 * time.Minute,
 	}
 }
@@ -74,8 +74,8 @@ func DefaultStreamerConfig(waitReplicas bool) StreamerConfig {
 func DefaultDatanodeAppConfig() DatanodeAppConfig {
 	return DatanodeAppConfig{
 		Node: DataNodeConfig{
-			Session:     DefaultSessionManagerConfig(),
-			Replication: DefaultReplicateManagerConfig(),
+			Session:     DefaultStreamingSessionManagerConfig(),
+			Replication: DefaultParallelReplicationServiceConfig(),
 			DiskStorage: DefaultDiskStorageConfig(),
 			Streamer:    DefaultStreamerConfig(false),
 		},

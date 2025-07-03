@@ -42,7 +42,7 @@ func (m *serverMocks) assertExpectations(t *testing.T) {
 
 func TestDataNodeServer_PrepareChunkUpload(t *testing.T) {
 	defaultInfo := &common.DataNodeInfo{ID: "test-node", Capacity: 2048, Used: 1024}
-	defaultConfig := config.DataNodeConfig{Session: config.SessionManagerConfig{SessionTimeout: 1 * time.Minute}}
+	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 
 	testCases := []struct {
@@ -55,8 +55,10 @@ func TestDataNodeServer_PrepareChunkUpload(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(m *serverMocks) {
+				session := &StreamingSession{SessionID: "session1", Status: SessionActive, ExpiresAt: time.Now().Add(1 * time.Minute), logger: logger}
 				m.sessionManager.On("LoadByChunk", "chunk1").Return(nil, false)
-				m.sessionManager.On("Store", mock.Anything, mock.AnythingOfType("*datanode.StreamingSession")).Return(nil)
+				m.sessionManager.On("NewSession", mock.AnythingOfType("common.ChunkHeader"), mock.AnythingOfType("bool")).Return(session)
+				m.sessionManager.On("Store", session.SessionID, session).Return(nil)
 			},
 			req: &proto.UploadChunkRequest{
 				ChunkHeader: &proto.ChunkHeader{Id: "chunk1", Size: 512},
@@ -144,7 +146,7 @@ func TestDataNodeServer_PrepareChunkUpload(t *testing.T) {
 
 func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 	defaultInfo := &common.DataNodeInfo{ID: "test-node"}
-	defaultConfig := config.DataNodeConfig{Session: config.SessionManagerConfig{SessionTimeout: 1 * time.Minute}}
+	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 	chunkHeader := common.ChunkHeader{ID: "chunk1", Size: 1024, Checksum: "abc"}
 
@@ -158,9 +160,11 @@ func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(m *serverMocks) {
+				session := &StreamingSession{SessionID: "session1", Status: SessionActive, ExpiresAt: time.Now().Add(1 * time.Minute), logger: logger}
 				m.store.On("Exists", "chunk1").Return(true)
 				m.store.On("GetChunkHeader", "chunk1").Return(chunkHeader, nil)
-				m.sessionManager.On("Store", mock.Anything, mock.AnythingOfType("*datanode.StreamingSession")).Return(nil)
+				m.sessionManager.On("NewSession", mock.AnythingOfType("common.ChunkHeader"), mock.AnythingOfType("bool")).Return(session)
+				m.sessionManager.On("Store", session.SessionID, session).Return(nil)
 			},
 			req: &proto.DownloadChunkRequest{ChunkId: "chunk1"},
 			expectedResp: &proto.DownloadReady{
@@ -189,9 +193,11 @@ func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 		{
 			name: "error: streaming session already exists",
 			setupMocks: func(m *serverMocks) {
+				session := &StreamingSession{SessionID: "session1", Status: SessionActive, ExpiresAt: time.Now().Add(1 * time.Minute), logger: logger}
 				m.store.On("Exists", "existing-chunk").Return(true)
 				m.store.On("GetChunkHeader", "existing-chunk").Return(chunkHeader, nil)
-				m.sessionManager.On("Store", mock.Anything, mock.AnythingOfType("*datanode.StreamingSession")).Return(assert.AnError)
+				m.sessionManager.On("NewSession", mock.AnythingOfType("common.ChunkHeader"), mock.AnythingOfType("bool")).Return(session)
+				m.sessionManager.On("Store", session.SessionID, session).Return(assert.AnError)
 			},
 			req:       &proto.DownloadChunkRequest{ChunkId: "existing-chunk"},
 			expectErr: true,
@@ -297,7 +303,7 @@ func TestDataNodeServer_DeleteChunk(t *testing.T) {
 
 func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 	defaultInfo := &common.DataNodeInfo{ID: "test-node", Capacity: 2048, Used: 1024}
-	defaultConfig := config.DataNodeConfig{Session: config.SessionManagerConfig{SessionTimeout: 1 * time.Minute}}
+	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 
 	testCases := []struct {
@@ -568,7 +574,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 
 func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 	defaultInfo := &common.DataNodeInfo{ID: "test-node"}
-	defaultConfig := config.DataNodeConfig{Session: config.SessionManagerConfig{SessionTimeout: 1 * time.Minute}}
+	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 
 	testCases := []struct {

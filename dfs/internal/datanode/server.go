@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
@@ -59,16 +58,16 @@ func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.Uploa
 			}.ToProto(), nil
 		}
 	}
-	sessionID := uuid.NewString()
-	if err := s.createStreamingSession(sessionID, req.ChunkHeader, req.Propagate, logger); err != nil {
-		logger.Error("Failed to create streaming session", slog.String("error", err.Error()))
-		return nil, status.Errorf(codes.AlreadyExists, "failed to create streaming session: %v", err)
+	session := s.sessionManager.NewSession(req.ChunkHeader, req.Propagate)
+	if err := s.sessionManager.Store(session.SessionID, session); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to store streaming session: %v", err)
 	}
+	session.logger.Info("Streaming session created")
 
 	return common.NodeReady{
 		Accept:    true,
 		Message:   "Ready to receive chunk data",
-		SessionID: sessionID,
+		SessionID: session.SessionID,
 	}.ToProto(), nil
 }
 
@@ -90,17 +89,17 @@ func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.Dow
 		return nil, status.Errorf(codes.Internal, "failed to get chunk info: %v", err)
 	}
 
-	sessionID := uuid.NewString()
-	if err := s.createStreamingSession(sessionID, chunkHeader, false, logger); err != nil {
-		logger.Error("Failed to create streaming session", slog.String("error", err.Error()))
-		return nil, status.Errorf(codes.AlreadyExists, "failed to create streaming session: %v", err)
+	session := s.sessionManager.NewSession(chunkHeader, false)
+	if err := s.sessionManager.Store(session.SessionID, session); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to store streaming session: %v", err)
 	}
+	session.logger.Info("Streaming session created")
 
 	return common.DownloadReady{
 		NodeReady: common.NodeReady{
 			Accept:    true,
 			Message:   "Ready to download chunk data",
-			SessionID: sessionID,
+			SessionID: session.SessionID,
 		},
 		ChunkHeader: chunkHeader,
 	}.ToProto(), nil

@@ -18,7 +18,7 @@ type DataNodeServer struct {
 
 	store              storage.ChunkStorage
 	replicationManager ReplicationProvider
-	sessionManager     ISessionManager
+	sessionManager     SessionManager
 	clusterViewer      state.ClusterStateViewer
 	coordinatorFinder  state.CoordinatorFinder
 	selector           cluster.NodeSelector
@@ -29,8 +29,10 @@ type DataNodeServer struct {
 	logger *slog.Logger
 }
 
-func NewDataNodeServer(info *common.DataNodeInfo, config config.DataNodeConfig, store storage.ChunkStorage, replicationManager ReplicationProvider, sessionManager ISessionManager,
-	clusterViewer state.ClusterStateViewer, coordinatorFinder state.CoordinatorFinder, selector cluster.NodeSelector, logger *slog.Logger) *DataNodeServer {
+func NewDataNodeServer(info *common.DataNodeInfo, config config.DataNodeConfig, store storage.ChunkStorage, replicationManager ReplicationProvider,
+	sessionManager SessionManager, clusterViewer state.ClusterStateViewer, coordinatorFinder state.CoordinatorFinder,
+	selector cluster.NodeSelector, logger *slog.Logger) *DataNodeServer {
+
 	datanodeLogger := logging.ExtendLogger(logger, slog.String("component", "datanode_server"))
 	return &DataNodeServer{
 		store:              store,

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,12 +19,12 @@ func newTestSession(sessionID, chunkID string, status SessionStatus) *StreamingS
 			ID: chunkID,
 		},
 		Status: status,
-		logger: logging.NewTestLogger(slog.LevelDebug),
+		logger: logging.NewTestLogger(slog.LevelError),
 	}
 }
 
 func TestNewStreamingSessionManager(t *testing.T) {
-	sm := NewStreamingSessionManager()
+	sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
 	assert.NotNil(t, sm)
 	assert.NotNil(t, sm.sessions)
 	assert.Empty(t, sm.sessions)
@@ -62,7 +63,7 @@ func TestStreamingSessionManager_Store(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sm := NewStreamingSessionManager()
+			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
 			sm.sessions = tc.initialState
 
 			err := sm.Store(tc.sessionToStore.SessionID, tc.sessionToStore)
@@ -108,7 +109,7 @@ func TestStreamingSessionManager_Load(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sm := NewStreamingSessionManager()
+			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
 			sm.sessions = tc.initialState
 
 			session, found := sm.Load(tc.sessionIDToLoad)
@@ -120,7 +121,7 @@ func TestStreamingSessionManager_Load(t *testing.T) {
 }
 
 func TestStreamingSessionManager_Delete(t *testing.T) {
-	sm := NewStreamingSessionManager()
+	sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
 	session := newTestSession("session-to-delete", "chunk-to-delete", SessionActive)
 
 	// Store it first
@@ -172,7 +173,7 @@ func TestStreamingSessionManager_ExistsForChunk(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sm := NewStreamingSessionManager()
+			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
 			sm.sessions = tc.initialState
 
 			exists := sm.ExistsForChunk(tc.chunkID)
@@ -214,7 +215,7 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sm := NewStreamingSessionManager()
+			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
 			sm.sessions = tc.initialState
 
 			session, found := sm.LoadByChunk(tc.chunkID)
@@ -225,7 +226,7 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 }
 
 func TestStreamingSessionManager_Concurrency(t *testing.T) {
-	sm := NewStreamingSessionManager()
+	sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
 	var wg sync.WaitGroup
 	numGoroutines := 100
 
