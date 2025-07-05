@@ -16,8 +16,8 @@ alwaysApply: false
 
 ```
 dfs/
-├── cmd/                    # Entry points
-│   ├── coordinator/        # Coordinator service main
+├── cmd/                   # Entry points
+│   ├── coordinator/       # Coordinator service main
 │   ├── datanode/          # DataNode service main
 │   └── client/            # Client CLI main
 ├── internal/              # Private application code
