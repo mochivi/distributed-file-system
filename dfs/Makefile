@@ -1,4 +1,4 @@
-.PHONY: proto clean build e2e e2e-down test run-coordinator run-datanode run-client deps fmt dev-setup help
+.PHONY: proto clean build e2e e2e-down test deps fmt dev-setup help
 
 # Generate protobuf files
 proto:
@@ -37,21 +37,6 @@ test:
 	@echo "Running tests..."
 	@go test -v $$(go list ./... | grep -v 'tests/e2e') -race
 
-# Run coordinator
-run-coordinator: build
-	@echo "Starting coordinator..."
-	@./bin/coordinator
-
-# Run datanode
-run-datanode: build
-	@echo "Starting datanode..."
-	@./bin/datanode
-
-# Run client
-run-client: build
-	@echo "Starting client..."
-	@./bin/client
-
 # Install dependencies
 deps:
 	@echo "Installing dependencies..."
@@ -76,9 +61,6 @@ help:
 	@echo "  clean         - Clean generated files"
 	@echo "  build         - Build all binaries"
 	@echo "  test          - Run tests"
-	@echo "  run-coordinator - Run coordinator service"
-	@echo "  run-datanode    - Run datanode service"
-	@echo "  run-client      - Run client"
 	@echo "  deps          - Install/update dependencies"
 	@echo "  fmt           - Format code"
 	@echo "  dev-setup     - Install development tools"

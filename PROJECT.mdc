@@ -1,0 +1,279 @@
+---
+alwaysApply: false
+---
+# DFS Project Reference Guide
+
+> Quick reference for developers working on the Distributed File System project
+
+## Project Overview
+
+**Tech Stack:** Go 1.24.4, gRPC, Protocol Buffers, Docker  
+**Architecture:** Distributed with single-leader coordinator + data nodes -> refer to docs/design.md & docs/architecture.md
+**Storage:** Chunk-based with replication
+**Communication:** Data transfer services use gRPC streaming with back-pressure control. Node to Node communication uses gRPC, external services might use HTTP protocols (TBD)
+
+## Directory Structure
+
+```
+dfs/
+├── cmd/                    # Entry points
+│   ├── coordinator/        # Coordinator service main
+│   ├── datanode/          # DataNode service main
+│   └── client/            # Client CLI main
+├── internal/              # Private application code
+│   ├── client/            # Client SDK (uploader, downloader)
+│   ├── clients/           # gRPC client wrappers
+│   ├── cluster/           # Node management & selection
+│   ├── common/            # Shared types, proto -> internal type conversion & validation
+│   ├── config/            # Configuration management
+│   ├── coordinator/       # Coordinator business logic
+│   ├── datanode/          # DataNode business logic
+│   └── storage/           # Storage interfaces and implementations
+│       ├── chunk/         # Chunk storage (disk-based)
+│       ├── encoding/      # Serialization interface and protocol (protobuf)
+│       └── metadata/      # Metadata storage (currently in-memory)
+├── pkg/                   # Public library code
+│   ├── proto/             # Generated protobuf files
+│   ├── logging/           # Structured logging utilities
+│   ├── streamer/          # Streaming utilities
+│   ├── utils/             # General utilities, small functions, prototyping
+|   ├── testutils/         # Test utilities
+├── tests/                 # Test files
+│   └── e2e/              # End-to-end tests
+├── configs/              # Example yaml configuration files
+├── deploy/               # Deployment configurations
+├── docs/                 # Documentation
+└── logs/                 # Log output directory, local testing
+```
+
+## Available Commands
+
+### Development Commands
+```bash
+# Build all binaries
+make build
+
+# Generate protobuf files (when .proto files change)
+make clean # Remove current files 
+make proto # Add new files
+
+# Run unit tests
+make test
+
+# Format code
+make fmt
+
+# Clean generated files
+make clean
+
+# Install development tools
+make dev-setup
+```
+
+### E2E Testing
+```bash
+# Start full cluster (1 coordinator + 6 datanodes)
+make e2e
+
+# Stop cluster and cleanup
+make e2e-down
+
+# Check logs
+tail -f logs/e2e_run.log
+```
+
+## Key Concepts
+
+### Chunk Management
+- **Chunk ID Format:** `<path_hash>_<chunk_index>` (e.g., `f1d2d2f924e9_0`)
+- **Default Chunk Size:** 8MB (configurable, up to 64MB)
+- **Replication Factor:** Default -> 3 (1 primary + 2 replicas). Will implement according to user's plan
+- **Storage Path:** `<rootDir>/<dir1>/<dir2>/<chunkID>` (nested to avoid filesystem limits)
+
+### Streaming Protocol
+- **Two-phase:** Prepare → Stream
+- **Back-pressure:** `ready_for_next` flag controls flow
+- **Checksums:** SHA-256 verification at multiple levels
+- **Streaming Session Management:** UUID-based session tracking -> session expires if client does not attempt to stream after preparing
+- **Metadata Session Management:** UUID-based session tracking -> coordinator does not commit metadata until client confirms upload (includes replication)
+
+### Node States
+- **NODE_HEALTHY:** Accepting requests
+- **NODE_DEGRADED:** Limited functionality  
+- **NODE_UNHEALTHY:** Not accepting requests
+
+## Configuration Patterns
+
+### Environment Variables
+```bash
+# Coordinator is currently bootstrapped into datanodes by injecting the coordinator HOST and PORT.
+COORDINATOR_HOST=coordinator
+COORDINATOR_PORT=8080
+
+# DataNode - Datanode provides its HOST and PORT to coordinator when registering into the cluster. Currenly, just a temporary solution with env variables + docker DNS name. 
+DATANODE_HOST=datanode1
+DATANODE_PORT=8081
+```
+
+### Config Files
+- Located in `configs/` directory
+- YAML format with environment overrides
+- Validation using `go-playground/validator`
+
+## Development Workflow
+
+### 1. Making gRPC Changes
+```bash
+# 1. Remove current files
+make clean
+# 2. Edit .proto files in pkg/proto/
+# 3. Regenerate Go code
+make proto
+# 4. Update implementing services
+# 5. Run tests
+make test
+```
+
+### 2. Adding New Features
+```bash
+# 1. Implement feature
+# 2. Write unit tests
+# 3. Add integration tests if needed
+# 4. Run full test suite (requires Docker installed)
+# 5. Update documentation
+make test && make e2e
+```
+
+### 3. Testing Strategy
+- **Unit Tests:** `*_test.go` files alongside source
+- **Mocks:** Generated using testify/mock
+- **E2E Tests:** In `tests/e2e/` directory
+- **Test Coverage:** Aim for >80% unit test coverage
+
+## Key Interfaces
+
+### Storage Interfaces
+```go
+// Chunk storage
+type ChunkStorage interface {
+	Store(chunkHeader common.ChunkHeader, data []byte) error
+	GetChunkHeader(chunkID string) (common.ChunkHeader, error)
+	GetChunkData(chunkID string) ([]byte, error)
+	GetChunk(chunkID string) (common.ChunkHeader, []byte, error)
+	Delete(chunkID string) error
+	Exists(chunkID string) bool
+	List() ([]string, error)
+}
+
+// Metadata storage
+type MetadataStore interface {
+    PutFile(path string, info *FileInfo) error
+    GetFile(path string) (*FileInfo, error)
+    DeleteFile(path string) error
+    ListFiles(directory string) ([]*FileInfo, error)
+}
+```
+
+### Client Interfaces
+```go
+// Coordinator client
+type ICoordinatorClient interface {
+	UploadFile(ctx context.Context, req common.UploadRequest, opts ...grpc.CallOption) (common.UploadResponse, error)
+	DownloadFile(ctx context.Context, req common.DownloadRequest, opts ...grpc.CallOption) (common.DownloadResponse, error)
+	DeleteFile(ctx context.Context, req common.DeleteRequest, opts ...grpc.CallOption) (common.DeleteResponse, error)
+	ConfirmUpload(ctx context.Context, req common.ConfirmUploadRequest, opts ...grpc.CallOption) (common.ConfirmUploadResponse, error)
+	ListFiles(ctx context.Context, req common.ListRequest, opts ...grpc.CallOption) (common.ListResponse, error)
+	RegisterDataNode(ctx context.Context, req common.RegisterDataNodeRequest, opts ...grpc.CallOption) (common.RegisterDataNodeResponse, error)
+	DataNodeHeartbeat(ctx context.Context, req common.HeartbeatRequest, opts ...grpc.CallOption) (common.HeartbeatResponse, error)
+	ListNodes(ctx context.Context, rqe common.ListNodesRequest, opts ...grpc.CallOption) (common.ListNodesResponse, error)
+	Node() *common.DataNodeInfo
+	Close() error
+}
+```
+
+## Common Patterns
+
+### Error Handling
+```go
+// Use structured logging with context
+logger.Error("operation failed", 
+    slog.String("operation", "upload"),
+    slog.String("chunk_id", chunkID),
+    slog.String("error", err.Error()))
+
+// Wrap errors with context
+return fmt.Errorf("failed to store chunk %s: %w", chunkID, err)
+```
+
+### Context Management
+```go
+// Always pass context through call chain
+func (c *Client) UploadFile(ctx context.Context, ...) error {
+    // Create cancellable context for internal operations
+    uploadCtx, cancel := context.WithCancel(ctx)
+    defer cancel()
+    
+    // Use context in all downstream calls
+    return c.uploader.UploadFile(uploadCtx, ...)
+}
+```
+
+### Concurrent Operations
+```go
+// Use sync.WaitGroup for coordinating goroutines
+var wg sync.WaitGroup
+for i := range workers {
+    wg.Add(1)
+    go func(workerID int) {
+        defer wg.Done()
+        // worker logic
+    }(i)
+}
+wg.Wait()
+```
+
+## Debugging Tips
+
+### Enable Debug Logging
+```bash
+export LOG_LEVEL=debug
+```
+
+### Check Cluster State
+```bash
+# View coordinator logs
+docker logs dfs_coordinator_1
+
+# View specific datanode logs  
+docker logs dfs_datanode_1
+```
+
+### Common Issues
+1. **"rpc error: code = Canceled"** → Client timeout, increase `REPLICATE_TIMEOUT`
+2. **"failed to receive replicas response: EOF"** → Replication timeout, check node connectivity
+3. **"chunk not found"** → Check chunk ID format and storage path
+
+## Dependencies
+
+### Core Dependencies
+- `google.golang.org/grpc` - gRPC framework
+- `google.golang.org/protobuf` - Protocol Buffers
+- `github.com/google/uuid` - UUID generation
+- `github.com/spf13/viper` - Configuration management
+
+### Testing Dependencies  
+- `github.com/stretchr/testify` - Testing framework with mocks
+- `github.com/go-playground/validator` - Validation
+
+## Quick Start for New Developers
+
+1. **Setup:** `make dev-setup && make deps`
+2. **Build:** `make build`
+3. **Test:** `make test`
+4. **Run E2E:** `make e2e`
+5. **Read docs:** `docs/architecture.md`, `docs/protocol.md`
+6. **Check roadmap:** `docs/roadmap.md`
+
+---
+
+*Keep this file updated as the project evolves!*
