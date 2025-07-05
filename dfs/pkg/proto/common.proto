@@ -27,7 +27,7 @@ message ChunkHeader {
 message ChunkInfo {
   ChunkHeader header = 1;
   repeated NodeInfo replicas = 3;  // DataNodes storing this chunk
-}  
+}
 
 message NodeInfo {
   string id = 1;

@@ -42,7 +42,7 @@ func (m *serverMocks) assertExpectations(t *testing.T) {
 
 func TestDataNodeServer_PrepareChunkUpload(t *testing.T) {
 	defaultInfo := &common.NodeInfo{ID: "test-node", Capacity: 2048, Used: 1024}
-	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
+	defaultConfig := config.DataNodeConfig{StreamingSession: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 
 	testCases := []struct {
@@ -146,7 +146,7 @@ func TestDataNodeServer_PrepareChunkUpload(t *testing.T) {
 
 func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 	defaultInfo := &common.NodeInfo{ID: "test-node"}
-	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
+	defaultConfig := config.DataNodeConfig{StreamingSession: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 	chunkHeader := common.ChunkHeader{ID: "chunk1", Size: 1024, Checksum: "abc"}
 
@@ -303,7 +303,7 @@ func TestDataNodeServer_DeleteChunk(t *testing.T) {
 
 func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 	defaultInfo := &common.NodeInfo{ID: "test-node", Capacity: 2048, Used: 1024}
-	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
+	defaultConfig := config.DataNodeConfig{StreamingSession: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 
 	testCases := []struct {
@@ -574,7 +574,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 
 func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 	defaultInfo := &common.NodeInfo{ID: "test-node"}
-	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
+	defaultConfig := config.DataNodeConfig{StreamingSession: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 
 	testCases := []struct {

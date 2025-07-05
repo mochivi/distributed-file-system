@@ -20,7 +20,7 @@ type NodeAgent struct {
 
 	// Dependencies
 	info                *common.NodeInfo // TODO: think about this, maybe we should just use the config instead, but there are extra configuration steps first that need to be done
-	config              *config.NodeAgentConfig
+	config              *config.DatanodeAgentConfig
 	clusterStateManager state.ClusterStateManager
 	logger              *slog.Logger
 
@@ -31,7 +31,7 @@ type NodeAgent struct {
 	controllers datanode_controllers.NodeAgentControllers
 }
 
-func NewNodeAgent(config *config.NodeAgentConfig, info *common.NodeInfo, clusterStateManager state.ClusterStateManager,
+func NewNodeAgent(config *config.DatanodeAgentConfig, info *common.NodeInfo, clusterStateManager state.ClusterStateManager,
 	coordinatorFinder state.CoordinatorFinder, services datanode_services.NodeAgentServices, controllers datanode_controllers.NodeAgentControllers, logger *slog.Logger) *NodeAgent {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -59,7 +59,7 @@ type CoordinatorNodeAgent struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	config              *config.NodeAgentConfig
+	config              *config.DatanodeAgentConfig
 	clusterStateManager state.ClusterStateManager
 	logger              *slog.Logger
 
@@ -67,7 +67,7 @@ type CoordinatorNodeAgent struct {
 	controllers CoordinatorNodeAgentControllers
 }
 
-func NewCoordinatorNodeAgent(config *config.NodeAgentConfig, info *common.NodeInfo, clusterStateManager state.ClusterStateManager,
+func NewCoordinatorNodeAgent(config *config.DatanodeAgentConfig, info *common.NodeInfo, clusterStateManager state.ClusterStateManager,
 	coordinatorFinder state.CoordinatorFinder, logger *slog.Logger) *CoordinatorNodeAgent {
 	ctx, cancel := context.WithCancel(context.Background())
 

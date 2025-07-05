@@ -133,6 +133,50 @@ func (dcr DeleteChunkResponse) ToProto() *proto.DeleteChunkResponse {
 	}
 }
 
+type BulkDeleteChunkRequest struct {
+	ChunkIDs []string
+	Reason   string
+}
+
+func BulkDeleteChunkRequestFromProto(pb *proto.BulkDeleteChunkRequest) BulkDeleteChunkRequest {
+	return BulkDeleteChunkRequest{
+		ChunkIDs: pb.ChunkIds,
+		Reason:   pb.Reason,
+	}
+}
+
+func (bcr BulkDeleteChunkRequest) ToProto() *proto.BulkDeleteChunkRequest {
+	return &proto.BulkDeleteChunkRequest{
+		ChunkIds: bcr.ChunkIDs,
+		Reason:   bcr.Reason,
+	}
+}
+
+type BulkDeleteChunkResponse struct {
+	Success    bool
+	Message    string
+	Failed     []string
+	InProgress []string
+}
+
+func BulkDeleteChunkResponseFromProto(pb *proto.BulkDeleteChunkResponse) BulkDeleteChunkResponse {
+	return BulkDeleteChunkResponse{
+		Success:    pb.Success,
+		Message:    pb.Message,
+		Failed:     pb.Failed,
+		InProgress: pb.InProgress,
+	}
+}
+
+func (bcr BulkDeleteChunkResponse) ToProto() *proto.BulkDeleteChunkResponse {
+	return &proto.BulkDeleteChunkResponse{
+		Success:    bcr.Success,
+		Message:    bcr.Message,
+		Failed:     bcr.Failed,
+		InProgress: bcr.InProgress,
+	}
+}
+
 type ChunkDataStream struct {
 	SessionID       string
 	ChunkID         string
@@ -630,4 +674,28 @@ func (cs *ChunkLocation) ToProto() *proto.ChunkLocation {
 		ChunkId: cs.ChunkID,
 		Nodes:   nodes,
 	}
+}
+
+type GetChunksForNodeRequest struct {
+	NodeID string
+}
+
+func GetChunksForNodeRequestFromProto(pb *proto.GetChunksForNodeRequest) GetChunksForNodeRequest {
+	return GetChunksForNodeRequest{NodeID: pb.NodeId}
+}
+
+func (gcr GetChunksForNodeRequest) ToProto() *proto.GetChunksForNodeRequest {
+	return &proto.GetChunksForNodeRequest{NodeId: gcr.NodeID}
+}
+
+type GetChunksForNodeResponse struct {
+	ChunkIDs []string
+}
+
+func GetChunksForNodeResponseFromProto(pb *proto.GetChunksForNodeResponse) GetChunksForNodeResponse {
+	return GetChunksForNodeResponse{ChunkIDs: pb.ChunkIds}
+}
+
+func (gcr GetChunksForNodeResponse) ToProto() *proto.GetChunksForNodeResponse {
+	return &proto.GetChunksForNodeResponse{ChunkIds: gcr.ChunkIDs}
 }

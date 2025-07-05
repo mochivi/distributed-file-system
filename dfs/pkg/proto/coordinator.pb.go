@@ -1061,6 +1061,94 @@ func (x *NodeUpdate) GetTimestamp() *timestamppb.Timestamp {
 	return nil
 }
 
+type GetChunksForNodeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChunksForNodeRequest) Reset() {
+	*x = GetChunksForNodeRequest{}
+	mi := &file_coordinator_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChunksForNodeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChunksForNodeRequest) ProtoMessage() {}
+
+func (x *GetChunksForNodeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_coordinator_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChunksForNodeRequest.ProtoReflect.Descriptor instead.
+func (*GetChunksForNodeRequest) Descriptor() ([]byte, []int) {
+	return file_coordinator_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *GetChunksForNodeRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+type GetChunksForNodeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChunkIds      []string               `protobuf:"bytes,1,rep,name=chunk_ids,json=chunkIds,proto3" json:"chunk_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChunksForNodeResponse) Reset() {
+	*x = GetChunksForNodeResponse{}
+	mi := &file_coordinator_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChunksForNodeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChunksForNodeResponse) ProtoMessage() {}
+
+func (x *GetChunksForNodeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_coordinator_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChunksForNodeResponse.ProtoReflect.Descriptor instead.
+func (*GetChunksForNodeResponse) Descriptor() ([]byte, []int) {
+	return file_coordinator_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *GetChunksForNodeResponse) GetChunkIds() []string {
+	if x != nil {
+		return x.ChunkIds
+	}
+	return nil
+}
+
 var File_coordinator_proto protoreflect.FileDescriptor
 
 const file_coordinator_proto_rawDesc = "" +
@@ -1137,7 +1225,11 @@ const file_coordinator_proto_rawDesc = "" +
 	"\n" +
 	"NODE_ADDED\x10\x00\x12\x10\n" +
 	"\fNODE_REMOVED\x10\x01\x12\x10\n" +
-	"\fNODE_UPDATED\x10\x022\x8a\x04\n" +
+	"\fNODE_UPDATED\x10\x02\"2\n" +
+	"\x17GetChunksForNodeRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"7\n" +
+	"\x18GetChunksForNodeResponse\x12\x1b\n" +
+	"\tchunk_ids\x18\x01 \x03(\tR\bchunkIds2\xdb\x04\n" +
 	"\x12CoordinatorService\x125\n" +
 	"\n" +
 	"UploadFile\x12\x12.dfs.UploadRequest\x1a\x13.dfs.UploadResponse\x12;\n" +
@@ -1146,6 +1238,7 @@ const file_coordinator_proto_rawDesc = "" +
 	"DeleteFile\x12\x12.dfs.DeleteRequest\x1a\x13.dfs.DeleteResponse\x120\n" +
 	"\tListFiles\x12\x10.dfs.ListRequest\x1a\x11.dfs.ListResponse\x12F\n" +
 	"\rConfirmUpload\x12\x19.dfs.ConfirmUploadRequest\x1a\x1a.dfs.ConfirmUploadResponse\x12O\n" +
+	"\x10GetChunksForNode\x12\x1c.dfs.GetChunksForNodeRequest\x1a\x1d.dfs.GetChunksForNodeResponse\x12O\n" +
 	"\x10RegisterDataNode\x12\x1c.dfs.RegisterDataNodeRequest\x1a\x1d.dfs.RegisterDataNodeResponse\x12B\n" +
 	"\x11DataNodeHeartbeat\x12\x15.dfs.HeartbeatRequest\x1a\x16.dfs.HeartbeatResponse\x12:\n" +
 	"\tListNodes\x12\x15.dfs.ListNodesRequest\x1a\x16.dfs.ListNodesResponseB\vZ\tpkg/protob\x06proto3"
@@ -1163,7 +1256,7 @@ func file_coordinator_proto_rawDescGZIP() []byte {
 }
 
 var file_coordinator_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_coordinator_proto_goTypes = []any{
 	(NodeUpdate_UpdateType)(0),       // 0: dfs.NodeUpdate.UpdateType
 	(*UploadRequest)(nil),            // 1: dfs.UploadRequest
@@ -1184,45 +1277,49 @@ var file_coordinator_proto_goTypes = []any{
 	(*ListNodesRequest)(nil),         // 16: dfs.ListNodesRequest
 	(*ListNodesResponse)(nil),        // 17: dfs.ListNodesResponse
 	(*NodeUpdate)(nil),               // 18: dfs.NodeUpdate
-	(*NodeInfo)(nil),                 // 19: dfs.NodeInfo
-	(*FileInfo)(nil),                 // 20: dfs.FileInfo
-	(*ChunkInfo)(nil),                // 21: dfs.ChunkInfo
-	(*HealthStatus)(nil),             // 22: dfs.HealthStatus
-	(*timestamppb.Timestamp)(nil),    // 23: google.protobuf.Timestamp
+	(*GetChunksForNodeRequest)(nil),  // 19: dfs.GetChunksForNodeRequest
+	(*GetChunksForNodeResponse)(nil), // 20: dfs.GetChunksForNodeResponse
+	(*NodeInfo)(nil),                 // 21: dfs.NodeInfo
+	(*FileInfo)(nil),                 // 22: dfs.FileInfo
+	(*ChunkInfo)(nil),                // 23: dfs.ChunkInfo
+	(*HealthStatus)(nil),             // 24: dfs.HealthStatus
+	(*timestamppb.Timestamp)(nil),    // 25: google.protobuf.Timestamp
 }
 var file_coordinator_proto_depIdxs = []int32{
 	3,  // 0: dfs.UploadResponse.chunk_locations:type_name -> dfs.ChunkLocation
-	19, // 1: dfs.ChunkLocation.nodes:type_name -> dfs.NodeInfo
-	20, // 2: dfs.DownloadResponse.file_info:type_name -> dfs.FileInfo
+	21, // 1: dfs.ChunkLocation.nodes:type_name -> dfs.NodeInfo
+	22, // 2: dfs.DownloadResponse.file_info:type_name -> dfs.FileInfo
 	3,  // 3: dfs.DownloadResponse.chunk_locations:type_name -> dfs.ChunkLocation
-	21, // 4: dfs.ConfirmUploadRequest.chunk_infos:type_name -> dfs.ChunkInfo
-	20, // 5: dfs.ListResponse.files:type_name -> dfs.FileInfo
-	19, // 6: dfs.RegisterDataNodeRequest.node_info:type_name -> dfs.NodeInfo
-	19, // 7: dfs.RegisterDataNodeResponse.full_node_list:type_name -> dfs.NodeInfo
-	22, // 8: dfs.HeartbeatRequest.status:type_name -> dfs.HealthStatus
+	23, // 4: dfs.ConfirmUploadRequest.chunk_infos:type_name -> dfs.ChunkInfo
+	22, // 5: dfs.ListResponse.files:type_name -> dfs.FileInfo
+	21, // 6: dfs.RegisterDataNodeRequest.node_info:type_name -> dfs.NodeInfo
+	21, // 7: dfs.RegisterDataNodeResponse.full_node_list:type_name -> dfs.NodeInfo
+	24, // 8: dfs.HeartbeatRequest.status:type_name -> dfs.HealthStatus
 	18, // 9: dfs.HeartbeatResponse.updates:type_name -> dfs.NodeUpdate
-	19, // 10: dfs.ListNodesResponse.nodes:type_name -> dfs.NodeInfo
+	21, // 10: dfs.ListNodesResponse.nodes:type_name -> dfs.NodeInfo
 	0,  // 11: dfs.NodeUpdate.type:type_name -> dfs.NodeUpdate.UpdateType
-	19, // 12: dfs.NodeUpdate.node:type_name -> dfs.NodeInfo
-	23, // 13: dfs.NodeUpdate.timestamp:type_name -> google.protobuf.Timestamp
+	21, // 12: dfs.NodeUpdate.node:type_name -> dfs.NodeInfo
+	25, // 13: dfs.NodeUpdate.timestamp:type_name -> google.protobuf.Timestamp
 	1,  // 14: dfs.CoordinatorService.UploadFile:input_type -> dfs.UploadRequest
 	4,  // 15: dfs.CoordinatorService.DownloadFile:input_type -> dfs.DownloadRequest
 	6,  // 16: dfs.CoordinatorService.DeleteFile:input_type -> dfs.DeleteRequest
 	10, // 17: dfs.CoordinatorService.ListFiles:input_type -> dfs.ListRequest
 	8,  // 18: dfs.CoordinatorService.ConfirmUpload:input_type -> dfs.ConfirmUploadRequest
-	12, // 19: dfs.CoordinatorService.RegisterDataNode:input_type -> dfs.RegisterDataNodeRequest
-	14, // 20: dfs.CoordinatorService.DataNodeHeartbeat:input_type -> dfs.HeartbeatRequest
-	16, // 21: dfs.CoordinatorService.ListNodes:input_type -> dfs.ListNodesRequest
-	2,  // 22: dfs.CoordinatorService.UploadFile:output_type -> dfs.UploadResponse
-	5,  // 23: dfs.CoordinatorService.DownloadFile:output_type -> dfs.DownloadResponse
-	7,  // 24: dfs.CoordinatorService.DeleteFile:output_type -> dfs.DeleteResponse
-	11, // 25: dfs.CoordinatorService.ListFiles:output_type -> dfs.ListResponse
-	9,  // 26: dfs.CoordinatorService.ConfirmUpload:output_type -> dfs.ConfirmUploadResponse
-	13, // 27: dfs.CoordinatorService.RegisterDataNode:output_type -> dfs.RegisterDataNodeResponse
-	15, // 28: dfs.CoordinatorService.DataNodeHeartbeat:output_type -> dfs.HeartbeatResponse
-	17, // 29: dfs.CoordinatorService.ListNodes:output_type -> dfs.ListNodesResponse
-	22, // [22:30] is the sub-list for method output_type
-	14, // [14:22] is the sub-list for method input_type
+	19, // 19: dfs.CoordinatorService.GetChunksForNode:input_type -> dfs.GetChunksForNodeRequest
+	12, // 20: dfs.CoordinatorService.RegisterDataNode:input_type -> dfs.RegisterDataNodeRequest
+	14, // 21: dfs.CoordinatorService.DataNodeHeartbeat:input_type -> dfs.HeartbeatRequest
+	16, // 22: dfs.CoordinatorService.ListNodes:input_type -> dfs.ListNodesRequest
+	2,  // 23: dfs.CoordinatorService.UploadFile:output_type -> dfs.UploadResponse
+	5,  // 24: dfs.CoordinatorService.DownloadFile:output_type -> dfs.DownloadResponse
+	7,  // 25: dfs.CoordinatorService.DeleteFile:output_type -> dfs.DeleteResponse
+	11, // 26: dfs.CoordinatorService.ListFiles:output_type -> dfs.ListResponse
+	9,  // 27: dfs.CoordinatorService.ConfirmUpload:output_type -> dfs.ConfirmUploadResponse
+	20, // 28: dfs.CoordinatorService.GetChunksForNode:output_type -> dfs.GetChunksForNodeResponse
+	13, // 29: dfs.CoordinatorService.RegisterDataNode:output_type -> dfs.RegisterDataNodeResponse
+	15, // 30: dfs.CoordinatorService.DataNodeHeartbeat:output_type -> dfs.HeartbeatResponse
+	17, // 31: dfs.CoordinatorService.ListNodes:output_type -> dfs.ListNodesResponse
+	23, // [23:32] is the sub-list for method output_type
+	14, // [14:23] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name
 	14, // [14:14] is the sub-list for extension extendee
 	0,  // [0:14] is the sub-list for field type_name
@@ -1240,7 +1337,7 @@ func file_coordinator_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_coordinator_proto_rawDesc), len(file_coordinator_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   18,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

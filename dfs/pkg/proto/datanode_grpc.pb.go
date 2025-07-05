@@ -24,6 +24,7 @@ const (
 	DataNodeService_UploadChunkStream_FullMethodName    = "/dfs.DataNodeService/UploadChunkStream"
 	DataNodeService_DownloadChunkStream_FullMethodName  = "/dfs.DataNodeService/DownloadChunkStream"
 	DataNodeService_DeleteChunk_FullMethodName          = "/dfs.DataNodeService/DeleteChunk"
+	DataNodeService_BulkDeleteChunk_FullMethodName      = "/dfs.DataNodeService/BulkDeleteChunk"
 	DataNodeService_HealthCheck_FullMethodName          = "/dfs.DataNodeService/HealthCheck"
 )
 
@@ -43,6 +44,7 @@ type DataNodeServiceClient interface {
 	DownloadChunkStream(ctx context.Context, in *DownloadStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChunkDataStream], error)
 	// Unary operation to delete a chunk
 	DeleteChunk(ctx context.Context, in *DeleteChunkRequest, opts ...grpc.CallOption) (*DeleteChunkResponse, error)
+	BulkDeleteChunk(ctx context.Context, in *BulkDeleteChunkRequest, opts ...grpc.CallOption) (*BulkDeleteChunkResponse, error)
 	// Health check
 	HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 }
@@ -117,6 +119,16 @@ func (c *dataNodeServiceClient) DeleteChunk(ctx context.Context, in *DeleteChunk
 	return out, nil
 }
 
+func (c *dataNodeServiceClient) BulkDeleteChunk(ctx context.Context, in *BulkDeleteChunkRequest, opts ...grpc.CallOption) (*BulkDeleteChunkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BulkDeleteChunkResponse)
+	err := c.cc.Invoke(ctx, DataNodeService_BulkDeleteChunk_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *dataNodeServiceClient) HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HealthCheckResponse)
@@ -143,6 +155,7 @@ type DataNodeServiceServer interface {
 	DownloadChunkStream(*DownloadStreamRequest, grpc.ServerStreamingServer[ChunkDataStream]) error
 	// Unary operation to delete a chunk
 	DeleteChunk(context.Context, *DeleteChunkRequest) (*DeleteChunkResponse, error)
+	BulkDeleteChunk(context.Context, *BulkDeleteChunkRequest) (*BulkDeleteChunkResponse, error)
 	// Health check
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	mustEmbedUnimplementedDataNodeServiceServer()
@@ -169,6 +182,9 @@ func (UnimplementedDataNodeServiceServer) DownloadChunkStream(*DownloadStreamReq
 }
 func (UnimplementedDataNodeServiceServer) DeleteChunk(context.Context, *DeleteChunkRequest) (*DeleteChunkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteChunk not implemented")
+}
+func (UnimplementedDataNodeServiceServer) BulkDeleteChunk(context.Context, *BulkDeleteChunkRequest) (*BulkDeleteChunkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BulkDeleteChunk not implemented")
 }
 func (UnimplementedDataNodeServiceServer) HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
@@ -266,6 +282,24 @@ func _DataNodeService_DeleteChunk_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DataNodeService_BulkDeleteChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BulkDeleteChunkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataNodeServiceServer).BulkDeleteChunk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DataNodeService_BulkDeleteChunk_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataNodeServiceServer).BulkDeleteChunk(ctx, req.(*BulkDeleteChunkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DataNodeService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HealthCheckRequest)
 	if err := dec(in); err != nil {
@@ -302,6 +336,10 @@ var DataNodeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteChunk",
 			Handler:    _DataNodeService_DeleteChunk_Handler,
+		},
+		{
+			MethodName: "BulkDeleteChunk",
+			Handler:    _DataNodeService_BulkDeleteChunk_Handler,
 		},
 		{
 			MethodName: "HealthCheck",

@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"sync"
+	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 )
@@ -31,12 +32,23 @@ func (m *MetadataDiskStorage) PutFile(path string, info *common.FileInfo) error 
 
 	return nil
 }
+
 func (m *MetadataDiskStorage) GetFile(path string) (*common.FileInfo, error) {
 	return nil, nil
 }
+
 func (m *MetadataDiskStorage) DeleteFile(path string) error {
 	return nil
 }
-func (m *MetadataDiskStorage) ListFiles(directory string) ([]*common.FileInfo, error) {
+
+func (m *MetadataDiskStorage) ListFiles(directory string, recursive bool) ([]*common.FileInfo, error) {
+	return nil, nil
+}
+
+func (m *MetadataDiskStorage) GetChunksForNode(nodeID string) (map[string]common.ChunkHeader, error) {
+	return nil, nil
+}
+
+func (m *MetadataDiskStorage) GetDeletedFiles(olderThan time.Time) ([]string, error) {
 	return nil, nil
 }

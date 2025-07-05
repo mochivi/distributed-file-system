@@ -22,6 +22,7 @@ service DataNodeService {
 
   // Unary operation to delete a chunk
   rpc DeleteChunk(DeleteChunkRequest) returns (DeleteChunkResponse);
+  rpc BulkDeleteChunk(BulkDeleteChunkRequest) returns (BulkDeleteChunkResponse);
 
   // Health check
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
@@ -62,6 +63,25 @@ message DeleteChunkRequest {
 message DeleteChunkResponse {
   bool success = 1;
   string message = 2;
+}
+
+// Bulk delete chunks
+message BulkDeleteChunkRequest {
+  repeated string chunk_ids = 1;
+  
+  // gc, rebalance
+  string reason = 2;
+}
+
+message BulkDeleteChunkResponse {
+  bool success = 1;
+  string message = 2;
+  
+  // ChunkIDs that failed to delete
+  repeated string failed = 3;  
+
+  // ChunkIDs in process of deletion
+  repeated string in_progress = 4;
 }
 
 message ChunkDataStream {

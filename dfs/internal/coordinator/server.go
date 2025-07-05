@@ -112,10 +112,14 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 // 	return nil, nil
 // }
 
-// // Client request to delete a file
-// func (c *Coordinator) DeleteFile(ctx context.Context, pb *proto.DeleteRequest) (*proto.DeleteResponse, error) {
-// 	return nil, nil
-// }
+// Client request to delete a file
+// 1. Client sends delete request to coordinator
+// 2. Coordinator deletes the file from metadata store
+// 3. Coordinator replies with success or error
+// 4. Background gc process deletes the files from storage
+func (c *Coordinator) DeleteFile(ctx context.Context, pb *proto.DeleteRequest) (*proto.DeleteResponse, error) {
+	return nil, nil
+}
 
 func (c *Coordinator) ConfirmUpload(ctx context.Context, pb *proto.ConfirmUploadRequest) (*proto.ConfirmUploadResponse, error) {
 	req := common.ConfirmUploadRequestFromProto(pb)
@@ -202,4 +206,8 @@ func (c *Coordinator) ListNodes(ctx context.Context, req *proto.ListNodesRequest
 		Nodes:          nodes,
 		CurrentVersion: version,
 	}.ToProto(), nil
+}
+
+func (c *Coordinator) GetChunksForNode(ctx context.Context, pb *proto.GetChunksForNodeRequest) (*proto.GetChunksForNodeResponse, error) {
+	return nil, nil
 }
