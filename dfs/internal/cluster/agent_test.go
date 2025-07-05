@@ -40,7 +40,7 @@ func (m *agentMocks) AssertExpectations(t *testing.T) {
 }
 
 func TestNodeAgent_Run(t *testing.T) {
-	nodeInfo := &common.DataNodeInfo{ID: "test-node"}
+	nodeInfo := &common.NodeInfo{ID: "test-node"}
 
 	testCases := []struct {
 		name        string

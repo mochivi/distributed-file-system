@@ -10,17 +10,17 @@ import (
 
 type MockCoordinatorClient struct {
 	mock.Mock
-	node *common.DataNodeInfo
+	node *common.NodeInfo
 }
 
-func NewMockCoordinatorClient(node *common.DataNodeInfo) *MockCoordinatorClient {
+func NewMockCoordinatorClient(node *common.NodeInfo) *MockCoordinatorClient {
 	return &MockCoordinatorClient{
 		Mock: mock.Mock{},
 		node: node,
 	}
 }
 
-func (m *MockCoordinatorClient) Node() *common.DataNodeInfo {
+func (m *MockCoordinatorClient) Node() *common.NodeInfo {
 	return m.node
 }
 

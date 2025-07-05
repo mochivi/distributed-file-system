@@ -235,7 +235,7 @@ func (x *ChunkHeader) GetChecksum() string {
 type ChunkInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Header        *ChunkHeader           `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
-	Replicas      []*DataNodeInfo        `protobuf:"bytes,3,rep,name=replicas,proto3" json:"replicas,omitempty"` // DataNodes storing this chunk
+	Replicas      []*NodeInfo            `protobuf:"bytes,3,rep,name=replicas,proto3" json:"replicas,omitempty"` // DataNodes storing this chunk
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -277,14 +277,14 @@ func (x *ChunkInfo) GetHeader() *ChunkHeader {
 	return nil
 }
 
-func (x *ChunkInfo) GetReplicas() []*DataNodeInfo {
+func (x *ChunkInfo) GetReplicas() []*NodeInfo {
 	if x != nil {
 		return x.Replicas
 	}
 	return nil
 }
 
-type DataNodeInfo struct {
+type NodeInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	IpAddress     string                 `protobuf:"bytes,2,opt,name=ip_address,json=ipAddress,proto3" json:"ip_address,omitempty"`
@@ -297,20 +297,20 @@ type DataNodeInfo struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DataNodeInfo) Reset() {
-	*x = DataNodeInfo{}
+func (x *NodeInfo) Reset() {
+	*x = NodeInfo{}
 	mi := &file_common_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DataNodeInfo) String() string {
+func (x *NodeInfo) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DataNodeInfo) ProtoMessage() {}
+func (*NodeInfo) ProtoMessage() {}
 
-func (x *DataNodeInfo) ProtoReflect() protoreflect.Message {
+func (x *NodeInfo) ProtoReflect() protoreflect.Message {
 	mi := &file_common_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -322,54 +322,54 @@ func (x *DataNodeInfo) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DataNodeInfo.ProtoReflect.Descriptor instead.
-func (*DataNodeInfo) Descriptor() ([]byte, []int) {
+// Deprecated: Use NodeInfo.ProtoReflect.Descriptor instead.
+func (*NodeInfo) Descriptor() ([]byte, []int) {
 	return file_common_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *DataNodeInfo) GetId() string {
+func (x *NodeInfo) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *DataNodeInfo) GetIpAddress() string {
+func (x *NodeInfo) GetIpAddress() string {
 	if x != nil {
 		return x.IpAddress
 	}
 	return ""
 }
 
-func (x *DataNodeInfo) GetPort() int32 {
+func (x *NodeInfo) GetPort() int32 {
 	if x != nil {
 		return x.Port
 	}
 	return 0
 }
 
-func (x *DataNodeInfo) GetCapacity() int64 {
+func (x *NodeInfo) GetCapacity() int64 {
 	if x != nil {
 		return x.Capacity
 	}
 	return 0
 }
 
-func (x *DataNodeInfo) GetUsed() int64 {
+func (x *NodeInfo) GetUsed() int64 {
 	if x != nil {
 		return x.Used
 	}
 	return 0
 }
 
-func (x *DataNodeInfo) GetStatus() NodeStatus {
+func (x *NodeInfo) GetStatus() NodeStatus {
 	if x != nil {
 		return x.Status
 	}
 	return NodeStatus_NODE_HEALTHY
 }
 
-func (x *DataNodeInfo) GetLastSeen() *timestamppb.Timestamp {
+func (x *NodeInfo) GetLastSeen() *timestamppb.Timestamp {
 	if x != nil {
 		return x.LastSeen
 	}
@@ -447,11 +447,11 @@ const file_common_proto_rawDesc = "" +
 	"\aversion\x18\x02 \x01(\rR\aversion\x12\x14\n" +
 	"\x05index\x18\x03 \x01(\x05R\x05index\x12\x12\n" +
 	"\x04size\x18\x04 \x01(\x03R\x04size\x12\x1a\n" +
-	"\bchecksum\x18\x05 \x01(\tR\bchecksum\"d\n" +
+	"\bchecksum\x18\x05 \x01(\tR\bchecksum\"`\n" +
 	"\tChunkInfo\x12(\n" +
-	"\x06header\x18\x01 \x01(\v2\x10.dfs.ChunkHeaderR\x06header\x12-\n" +
-	"\breplicas\x18\x03 \x03(\v2\x11.dfs.DataNodeInfoR\breplicas\"\xe3\x01\n" +
-	"\fDataNodeInfo\x12\x0e\n" +
+	"\x06header\x18\x01 \x01(\v2\x10.dfs.ChunkHeaderR\x06header\x12)\n" +
+	"\breplicas\x18\x03 \x03(\v2\r.dfs.NodeInfoR\breplicas\"\xdf\x01\n" +
+	"\bNodeInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
 	"ip_address\x18\x02 \x01(\tR\tipAddress\x12\x12\n" +
@@ -488,7 +488,7 @@ var file_common_proto_goTypes = []any{
 	(*FileInfo)(nil),              // 1: dfs.FileInfo
 	(*ChunkHeader)(nil),           // 2: dfs.ChunkHeader
 	(*ChunkInfo)(nil),             // 3: dfs.ChunkInfo
-	(*DataNodeInfo)(nil),          // 4: dfs.DataNodeInfo
+	(*NodeInfo)(nil),              // 4: dfs.NodeInfo
 	(*HealthStatus)(nil),          // 5: dfs.HealthStatus
 	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
 }
@@ -496,9 +496,9 @@ var file_common_proto_depIdxs = []int32{
 	3, // 0: dfs.FileInfo.chunks:type_name -> dfs.ChunkInfo
 	6, // 1: dfs.FileInfo.created_at:type_name -> google.protobuf.Timestamp
 	2, // 2: dfs.ChunkInfo.header:type_name -> dfs.ChunkHeader
-	4, // 3: dfs.ChunkInfo.replicas:type_name -> dfs.DataNodeInfo
-	0, // 4: dfs.DataNodeInfo.status:type_name -> dfs.NodeStatus
-	6, // 5: dfs.DataNodeInfo.last_seen:type_name -> google.protobuf.Timestamp
+	4, // 3: dfs.ChunkInfo.replicas:type_name -> dfs.NodeInfo
+	0, // 4: dfs.NodeInfo.status:type_name -> dfs.NodeStatus
+	6, // 5: dfs.NodeInfo.last_seen:type_name -> google.protobuf.Timestamp
 	0, // 6: dfs.HealthStatus.status:type_name -> dfs.NodeStatus
 	6, // 7: dfs.HealthStatus.last_seen:type_name -> google.protobuf.Timestamp
 	8, // [8:8] is the sub-list for method output_type

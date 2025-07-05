@@ -29,7 +29,7 @@ type TestFile struct {
 func NewTestClient(t *testing.T, logger *slog.Logger) *client.Client {
 	coordinatorHost := utils.GetEnvString("COORDINATOR_HOST", "coordinator")
 	coordinatorPort := utils.GetEnvInt("COORDINATOR_PORT", 8080)
-	coordinatorNode := &common.DataNodeInfo{
+	coordinatorNode := &common.NodeInfo{
 		ID:     "coordinator",
 		Host:   coordinatorHost,
 		Port:   coordinatorPort,

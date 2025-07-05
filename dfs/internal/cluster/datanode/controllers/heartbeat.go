@@ -21,7 +21,7 @@ var (
 )
 
 type HeartbeatProvider interface {
-	Run(info *common.DataNodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error
+	Run(info *common.NodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error
 }
 
 type heartbeatFunc func(ctx context.Context, req common.HeartbeatRequest, client clients.ICoordinatorClient) ([]common.NodeUpdate, error)
@@ -49,7 +49,7 @@ func NewHeartbeatController(ctx context.Context, config *config.HeartbeatControl
 	return controller
 }
 
-func (h *HeartbeatController) Run(info *common.DataNodeInfo, clusterStateManager state.ClusterStateManager, coordinatorFinder state.CoordinatorFinder) error {
+func (h *HeartbeatController) Run(info *common.NodeInfo, clusterStateManager state.ClusterStateManager, coordinatorFinder state.CoordinatorFinder) error {
 	ticker := time.NewTicker(h.config.Interval)
 	defer ticker.Stop()
 

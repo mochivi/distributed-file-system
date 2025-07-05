@@ -9,23 +9,23 @@ type MockClusterStateHistoryManager struct {
 	mock.Mock
 }
 
-func (m *MockClusterStateHistoryManager) ListNodes(n ...int) ([]*common.DataNodeInfo, int64) {
+func (m *MockClusterStateHistoryManager) ListNodes(n ...int) ([]*common.NodeInfo, int64) {
 	args := m.Called(n)
 	if args.Get(0) == nil {
 		return nil, args.Get(1).(int64)
 	}
-	return args.Get(0).([]*common.DataNodeInfo), args.Get(1).(int64)
+	return args.Get(0).([]*common.NodeInfo), args.Get(1).(int64)
 }
 
-func (m *MockClusterStateHistoryManager) GetNode(nodeID string) (*common.DataNodeInfo, bool) {
+func (m *MockClusterStateHistoryManager) GetNode(nodeID string) (*common.NodeInfo, bool) {
 	args := m.Called(nodeID)
 	if args.Get(0) == nil {
 		return nil, args.Bool(1)
 	}
-	return args.Get(0).(*common.DataNodeInfo), args.Bool(1)
+	return args.Get(0).(*common.NodeInfo), args.Bool(1)
 }
 
-func (m *MockClusterStateHistoryManager) AddNode(node *common.DataNodeInfo) {
+func (m *MockClusterStateHistoryManager) AddNode(node *common.NodeInfo) {
 	m.Called(node)
 }
 
@@ -34,12 +34,12 @@ func (m *MockClusterStateHistoryManager) RemoveNode(nodeID string) error {
 	return args.Error(0)
 }
 
-func (m *MockClusterStateHistoryManager) UpdateNode(node *common.DataNodeInfo) error {
+func (m *MockClusterStateHistoryManager) UpdateNode(node *common.NodeInfo) error {
 	args := m.Called(node)
 	return args.Error(0)
 }
 
-func (m *MockClusterStateHistoryManager) InitializeNodes(nodes []*common.DataNodeInfo, version int64) {
+func (m *MockClusterStateHistoryManager) InitializeNodes(nodes []*common.NodeInfo, version int64) {
 	m.Called(nodes, version)
 }
 
@@ -70,10 +70,10 @@ func (m *MockClusterStateHistoryManager) GetOldestVersionInHistory() int64 {
 	return args.Get(0).(int64)
 }
 
-func (m *MockClusterStateHistoryManager) GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool) {
+func (m *MockClusterStateHistoryManager) GetAvailableNodesForChunk(replicaIDs []*common.NodeInfo) ([]*common.NodeInfo, bool) {
 	args := m.Called(replicaIDs)
 	if args.Get(0) == nil {
 		return nil, args.Bool(1)
 	}
-	return args.Get(0).([]*common.DataNodeInfo), args.Bool(1)
+	return args.Get(0).([]*common.NodeInfo), args.Bool(1)
 }

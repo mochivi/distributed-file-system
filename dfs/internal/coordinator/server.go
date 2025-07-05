@@ -45,7 +45,7 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		chunkID := chunk.FormatChunkID(req.Path, i)
 
 		// Randomly select a node from the available nodes
-		selectedNodes := make([]*common.DataNodeInfo, 0, 3)
+		selectedNodes := make([]*common.NodeInfo, 0, 3)
 		count := 0
 		for _, node := range nodes {
 			selectedNodes = append(selectedNodes, node)
@@ -138,7 +138,7 @@ func (c *Coordinator) ConfirmUpload(ctx context.Context, pb *proto.ConfirmUpload
 
 // DataNode ingress mechanism
 func (c *Coordinator) RegisterDataNode(ctx context.Context, pb *proto.RegisterDataNodeRequest) (*proto.RegisterDataNodeResponse, error) {
-	nodeInfo := common.DataNodeInfoFromProto(pb.NodeInfo)
+	nodeInfo := common.NodeInfoFromProto(pb.NodeInfo)
 	c.logger.Debug("Received RegisterDataNodeRequest from data node", slog.String("node_id", nodeInfo.ID))
 	nodeInfo.LastSeen = time.Now()
 

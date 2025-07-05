@@ -472,7 +472,7 @@ type ChunkDataAck struct {
 	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 	BytesReceived int64                  `protobuf:"varint,4,opt,name=bytes_received,json=bytesReceived,proto3" json:"bytes_received,omitempty"` // Total bytes received so far
 	ReadyForNext  bool                   `protobuf:"varint,5,opt,name=ready_for_next,json=readyForNext,proto3" json:"ready_for_next,omitempty"`  // Flow control: ready for next chunk
-	Replicas      []*DataNodeInfo        `protobuf:"bytes,6,rep,name=replicas,proto3" json:"replicas,omitempty"`                                 // The last request send out by the server confirms all replica nodes
+	Replicas      []*NodeInfo            `protobuf:"bytes,6,rep,name=replicas,proto3" json:"replicas,omitempty"`                                 // The last request send out by the server confirms all replica nodes
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -542,7 +542,7 @@ func (x *ChunkDataAck) GetReadyForNext() bool {
 	return false
 }
 
-func (x *ChunkDataAck) GetReplicas() []*DataNodeInfo {
+func (x *ChunkDataAck) GetReplicas() []*NodeInfo {
 	if x != nil {
 		return x.Replicas
 	}
@@ -664,15 +664,15 @@ const file_datanode_proto_rawDesc = "" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12\x16\n" +
 	"\x06offset\x18\x04 \x01(\x03R\x06offset\x12\x19\n" +
 	"\bis_final\x18\x05 \x01(\bR\aisFinal\x12)\n" +
-	"\x10partial_checksum\x18\x06 \x01(\tR\x0fpartialChecksum\"\xdd\x01\n" +
+	"\x10partial_checksum\x18\x06 \x01(\tR\x0fpartialChecksum\"\xd9\x01\n" +
 	"\fChunkDataAck\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x18\n" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\x12%\n" +
 	"\x0ebytes_received\x18\x04 \x01(\x03R\rbytesReceived\x12$\n" +
-	"\x0eready_for_next\x18\x05 \x01(\bR\freadyForNext\x12-\n" +
-	"\breplicas\x18\x06 \x03(\v2\x11.dfs.DataNodeInfoR\breplicas\"\x14\n" +
+	"\x0eready_for_next\x18\x05 \x01(\bR\freadyForNext\x12)\n" +
+	"\breplicas\x18\x06 \x03(\v2\r.dfs.NodeInfoR\breplicas\"\x14\n" +
 	"\x12HealthCheckRequest\"@\n" +
 	"\x13HealthCheckResponse\x12)\n" +
 	"\x06status\x18\x01 \x01(\v2\x11.dfs.HealthStatusR\x06status2\xa8\x03\n" +
@@ -710,14 +710,14 @@ var file_datanode_proto_goTypes = []any{
 	(*HealthCheckRequest)(nil),    // 9: dfs.HealthCheckRequest
 	(*HealthCheckResponse)(nil),   // 10: dfs.HealthCheckResponse
 	(*ChunkHeader)(nil),           // 11: dfs.ChunkHeader
-	(*DataNodeInfo)(nil),          // 12: dfs.DataNodeInfo
+	(*NodeInfo)(nil),              // 12: dfs.NodeInfo
 	(*HealthStatus)(nil),          // 13: dfs.HealthStatus
 }
 var file_datanode_proto_depIdxs = []int32{
 	11, // 0: dfs.UploadChunkRequest.chunk_header:type_name -> dfs.ChunkHeader
 	1,  // 1: dfs.DownloadReady.ready:type_name -> dfs.NodeReady
 	11, // 2: dfs.DownloadReady.chunk_header:type_name -> dfs.ChunkHeader
-	12, // 3: dfs.ChunkDataAck.replicas:type_name -> dfs.DataNodeInfo
+	12, // 3: dfs.ChunkDataAck.replicas:type_name -> dfs.NodeInfo
 	13, // 4: dfs.HealthCheckResponse.status:type_name -> dfs.HealthStatus
 	0,  // 5: dfs.DataNodeService.PrepareChunkUpload:input_type -> dfs.UploadChunkRequest
 	3,  // 6: dfs.DataNodeService.PrepareChunkDownload:input_type -> dfs.DownloadChunkRequest

@@ -16,7 +16,7 @@ func TestNewNodeStore(t *testing.T) {
 
 func TestNodeStore_AddAndGetNode(t *testing.T) {
 	store := newNodeStore()
-	node1 := &common.DataNodeInfo{ID: "node1", Host: "host1"}
+	node1 := &common.NodeInfo{ID: "node1", Host: "host1"}
 
 	// Add and get
 	store.addNode(node1)
@@ -29,7 +29,7 @@ func TestNodeStore_AddAndGetNode(t *testing.T) {
 	assert.False(t, ok)
 
 	// Overwrite existing
-	node1Updated := &common.DataNodeInfo{ID: "node1", Host: "host1-updated"}
+	node1Updated := &common.NodeInfo{ID: "node1", Host: "host1-updated"}
 	store.addNode(node1Updated)
 	gotNode, ok = store.getNode("node1")
 	assert.True(t, ok)
@@ -38,7 +38,7 @@ func TestNodeStore_AddAndGetNode(t *testing.T) {
 
 func TestNodeStore_RemoveNode(t *testing.T) {
 	store := newNodeStore()
-	node1 := &common.DataNodeInfo{ID: "node1"}
+	node1 := &common.NodeInfo{ID: "node1"}
 	store.addNode(node1)
 
 	// Remove existing
@@ -55,11 +55,11 @@ func TestNodeStore_RemoveNode(t *testing.T) {
 
 func TestNodeStore_UpdateNode(t *testing.T) {
 	store := newNodeStore()
-	node1 := &common.DataNodeInfo{ID: "node1", Host: "host1"}
+	node1 := &common.NodeInfo{ID: "node1", Host: "host1"}
 	store.addNode(node1)
 
 	// Update existing
-	node1Updated := &common.DataNodeInfo{ID: "node1", Host: "host1-updated"}
+	node1Updated := &common.NodeInfo{ID: "node1", Host: "host1-updated"}
 	err := store.updateNode(node1Updated)
 	assert.NoError(t, err)
 	gotNode, ok := store.getNode("node1")
@@ -67,16 +67,16 @@ func TestNodeStore_UpdateNode(t *testing.T) {
 	assert.Equal(t, "host1-updated", gotNode.Host)
 
 	// Update non-existent
-	err = store.updateNode(&common.DataNodeInfo{ID: "non-existent"})
+	err = store.updateNode(&common.NodeInfo{ID: "non-existent"})
 	assert.Error(t, err)
 	assert.EqualError(t, err, "node with ID non-existent not found")
 }
 
 func TestNodeStore_ListNodes(t *testing.T) {
 	store := newNodeStore()
-	node1 := &common.DataNodeInfo{ID: "node1"}
-	node2 := &common.DataNodeInfo{ID: "node2"}
-	node3 := &common.DataNodeInfo{ID: "node3"}
+	node1 := &common.NodeInfo{ID: "node1"}
+	node2 := &common.NodeInfo{ID: "node2"}
+	node3 := &common.NodeInfo{ID: "node3"}
 	store.addNode(node1)
 	store.addNode(node2)
 	store.addNode(node3)
@@ -111,9 +111,9 @@ func TestNodeStore_ListNodes(t *testing.T) {
 
 func TestNodeStore_InitializeNodes(t *testing.T) {
 	store := newNodeStore()
-	store.addNode(&common.DataNodeInfo{ID: "old-node"})
+	store.addNode(&common.NodeInfo{ID: "old-node"})
 
-	newNodes := []*common.DataNodeInfo{
+	newNodes := []*common.NodeInfo{
 		{ID: "node1"},
 		{ID: "node2"},
 	}
@@ -135,7 +135,7 @@ func TestNodeStore_InitializeNodes(t *testing.T) {
 	assert.Equal(t, newNodes[1], gotNode2)
 
 	// Initialize with empty slice
-	store.initializeNodes([]*common.DataNodeInfo{})
+	store.initializeNodes([]*common.NodeInfo{})
 	nodes = store.listNodes()
 	assert.Empty(t, nodes)
 }

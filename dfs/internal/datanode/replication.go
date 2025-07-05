@@ -15,21 +15,21 @@ import (
 )
 
 type ReplicationProvider interface {
-	Replicate(clients []*clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error)
+	Replicate(clients []*clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.NodeInfo, error)
 }
 
 type ReplicatedNodes struct {
-	nodes []*common.DataNodeInfo
+	nodes []*common.NodeInfo
 	mutex sync.Mutex
 }
 
-func (r *ReplicatedNodes) AddNode(node *common.DataNodeInfo) {
+func (r *ReplicatedNodes) AddNode(node *common.NodeInfo) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.nodes = append(r.nodes, node)
 }
 
-func (r *ReplicatedNodes) GetNodes() []*common.DataNodeInfo {
+func (r *ReplicatedNodes) GetNodes() []*common.NodeInfo {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	return r.nodes
@@ -51,7 +51,7 @@ func NewParalellReplicationService(config config.ParallelReplicationServiceConfi
 }
 
 // Replicate replicates the chunk to the given nodes in parallel
-func (rm *ParalellReplicationService) Replicate(clients []*clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.DataNodeInfo, error) {
+func (rm *ParalellReplicationService) Replicate(clients []*clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.NodeInfo, error) {
 	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", chunkHeader.ID))
 	if len(clients) == 0 {
 		return nil, fmt.Errorf("no clients provided")

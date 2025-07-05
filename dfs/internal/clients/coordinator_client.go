@@ -18,7 +18,7 @@ type ICoordinatorClient interface {
 	RegisterDataNode(ctx context.Context, req common.RegisterDataNodeRequest, opts ...grpc.CallOption) (common.RegisterDataNodeResponse, error)
 	DataNodeHeartbeat(ctx context.Context, req common.HeartbeatRequest, opts ...grpc.CallOption) (common.HeartbeatResponse, error)
 	ListNodes(ctx context.Context, rqe common.ListNodesRequest, opts ...grpc.CallOption) (common.ListNodesResponse, error)
-	Node() *common.DataNodeInfo
+	Node() *common.NodeInfo
 	Close() error
 }
 
@@ -26,10 +26,10 @@ type ICoordinatorClient interface {
 type CoordinatorClient struct {
 	client proto.CoordinatorServiceClient
 	conn   *grpc.ClientConn
-	node   *common.DataNodeInfo
+	node   *common.NodeInfo
 }
 
-func NewCoordinatorClient(node *common.DataNodeInfo, opts ...grpc.DialOption) (ICoordinatorClient, error) {
+func NewCoordinatorClient(node *common.NodeInfo, opts ...grpc.DialOption) (ICoordinatorClient, error) {
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	conn, err := grpc.NewClient(
@@ -119,6 +119,6 @@ func (c *CoordinatorClient) ListNodes(ctx context.Context, rqe common.ListNodesR
 }
 
 // Other methods not related to the gRPC server
-func (c *CoordinatorClient) Node() *common.DataNodeInfo {
+func (c *CoordinatorClient) Node() *common.NodeInfo {
 	return c.node
 }

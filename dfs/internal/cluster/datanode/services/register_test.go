@@ -31,14 +31,14 @@ func (s *stubCoordinatorRegisterServer) RegisterDataNode(ctx context.Context, re
 }
 
 func TestRegisterService_RegisterWithCoordinator(t *testing.T) {
-	nodeInfo := &common.DataNodeInfo{
+	nodeInfo := &common.NodeInfo{
 		ID:       "node1",
 		Status:   common.NodeHealthy,
 		LastSeen: time.Now(),
 	}
 
 	// Create a coordinator finder
-	coordinatorNodeInfo := &common.DataNodeInfo{
+	coordinatorNodeInfo := &common.NodeInfo{
 		ID:       "coordinator",
 		Status:   common.NodeHealthy,
 		LastSeen: time.Now(),
@@ -60,7 +60,7 @@ func TestRegisterService_RegisterWithCoordinator(t *testing.T) {
 				return context.Background()
 			},
 			setupMocks: func(mockClusterStateManager *state.MockClusterStateManager) {
-				mockClusterStateManager.On("InitializeNodes", mock.AnythingOfType("[]*common.DataNodeInfo"), mock.AnythingOfType("int64")).Return(nil)
+				mockClusterStateManager.On("InitializeNodes", mock.AnythingOfType("[]*common.NodeInfo"), mock.AnythingOfType("int64")).Return(nil)
 			},
 			coordinatorRegisterResp: common.RegisterDataNodeResponse{
 				Success: true,
@@ -102,7 +102,7 @@ func TestRegisterService_RegisterWithCoordinator(t *testing.T) {
 			setupMocks: func(mockClusterStateManager *state.MockClusterStateManager) {},
 			coordinatorRegisterResp: common.RegisterDataNodeResponse{
 				Success:        true,
-				FullNodeList:   []*common.DataNodeInfo{},
+				FullNodeList:   []*common.NodeInfo{},
 				CurrentVersion: 1,
 			},
 			coordinatorRegisterErr: nil,
@@ -127,7 +127,7 @@ func TestRegisterService_RegisterWithCoordinator(t *testing.T) {
 			tc.setupMocks(mockClusterStateManager)
 
 			// Setup coordinator finder to open a connection to a coordinator with a stub server
-			coordinatorFinder.SetClientConnectionFunc(func(node *common.DataNodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error) {
+			coordinatorFinder.SetClientConnectionFunc(func(node *common.NodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error) {
 				coordinatorClient, _ := testutils.NewTestCoordinatorClientWithStubServer(t, &stubCoordinatorRegisterServer{
 					registerResp: tc.coordinatorRegisterResp,
 					registerErr:  tc.coordinatorRegisterErr,

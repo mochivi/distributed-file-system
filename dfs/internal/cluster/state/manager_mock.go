@@ -15,17 +15,17 @@ func NewMockClusterStateManager() *MockClusterStateManager {
 	}
 }
 
-func (m *MockClusterStateManager) GetNode(nodeID string) (*common.DataNodeInfo, bool) {
+func (m *MockClusterStateManager) GetNode(nodeID string) (*common.NodeInfo, bool) {
 	args := m.Called(nodeID)
-	return args.Get(0).(*common.DataNodeInfo), args.Get(1).(bool)
+	return args.Get(0).(*common.NodeInfo), args.Get(1).(bool)
 }
 
-func (m *MockClusterStateManager) ListNodes(n ...int) ([]*common.DataNodeInfo, int64) {
+func (m *MockClusterStateManager) ListNodes(n ...int) ([]*common.NodeInfo, int64) {
 	args := m.Called(n)
-	return args.Get(0).([]*common.DataNodeInfo), args.Get(1).(int64)
+	return args.Get(0).([]*common.NodeInfo), args.Get(1).(int64)
 }
 
-func (m *MockClusterStateManager) AddNode(node *common.DataNodeInfo) {
+func (m *MockClusterStateManager) AddNode(node *common.NodeInfo) {
 	m.Called(node)
 }
 
@@ -34,7 +34,7 @@ func (m *MockClusterStateManager) RemoveNode(nodeID string) error {
 	return args.Error(0)
 }
 
-func (m *MockClusterStateManager) UpdateNode(node *common.DataNodeInfo) error {
+func (m *MockClusterStateManager) UpdateNode(node *common.NodeInfo) error {
 	args := m.Called(node)
 	return args.Error(0)
 }
@@ -43,7 +43,7 @@ func (m *MockClusterStateManager) ApplyUpdates(updates []common.NodeUpdate) {
 	m.Called(updates)
 }
 
-func (m *MockClusterStateManager) InitializeNodes(nodes []*common.DataNodeInfo, version int64) {
+func (m *MockClusterStateManager) InitializeNodes(nodes []*common.NodeInfo, version int64) {
 	m.Called(nodes, version)
 }
 

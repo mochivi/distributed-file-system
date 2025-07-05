@@ -90,18 +90,18 @@ func (ch ChunkHeader) ToProto() *proto.ChunkHeader {
 
 type ChunkInfo struct {
 	Header   ChunkHeader
-	Replicas []*DataNodeInfo // DataNode IDs storing this chunk
+	Replicas []*NodeInfo // DataNode IDs storing this chunk
 }
 
 func ChunkInfoFromProto(pb *proto.ChunkInfo) ChunkInfo {
 	return ChunkInfo{
 		Header:   ChunkHeaderFromProto(pb.Header),
-		Replicas: make([]*DataNodeInfo, 0, len(pb.Replicas)),
+		Replicas: make([]*NodeInfo, 0, len(pb.Replicas)),
 	}
 }
 
 func (ci ChunkInfo) ToProto() *proto.ChunkInfo {
-	protoReplicas := make([]*proto.DataNodeInfo, len(ci.Replicas))
+	protoReplicas := make([]*proto.NodeInfo, len(ci.Replicas))
 	for _, replica := range ci.Replicas {
 		protoReplicas = append(protoReplicas, replica.ToProto())
 	}
@@ -131,8 +131,8 @@ func (hs HealthStatus) ToProto() *proto.HealthStatus {
 	}
 }
 
-// DataNodeInfo + proto conversions
-type DataNodeInfo struct {
+// NodeInfo + proto conversions
+type NodeInfo struct {
 	ID       string
 	Host     string
 	Port     int
@@ -142,16 +142,16 @@ type DataNodeInfo struct {
 	LastSeen time.Time
 }
 
-func (di DataNodeInfo) String() string {
-	return fmt.Sprintf("DataNodeInfo{ID: %s, Host: %s, Port: %d, Status: %v}", di.ID, di.Host, di.Port, di.Status)
+func (di NodeInfo) String() string {
+	return fmt.Sprintf("NodeInfo{ID: %s, Host: %s, Port: %d, Status: %v}", di.ID, di.Host, di.Port, di.Status)
 }
 
-func (di DataNodeInfo) Endpoint() string {
+func (di NodeInfo) Endpoint() string {
 	return fmt.Sprintf("%s:%d", di.Host, di.Port)
 }
 
-func DataNodeInfoFromProto(pb *proto.DataNodeInfo) DataNodeInfo {
-	return DataNodeInfo{
+func NodeInfoFromProto(pb *proto.NodeInfo) NodeInfo {
+	return NodeInfo{
 		ID:       pb.Id,
 		Host:     pb.IpAddress,
 		Port:     int(pb.Port),
@@ -162,8 +162,8 @@ func DataNodeInfoFromProto(pb *proto.DataNodeInfo) DataNodeInfo {
 	}
 }
 
-func (di DataNodeInfo) ToProto() *proto.DataNodeInfo {
-	return &proto.DataNodeInfo{
+func (di NodeInfo) ToProto() *proto.NodeInfo {
+	return &proto.NodeInfo{
 		Id:        di.ID,
 		IpAddress: di.Host,
 		Port:      int32(di.Port),

@@ -7,16 +7,16 @@ import (
 )
 
 type nodeStore struct {
-	nodes map[string]*common.DataNodeInfo
+	nodes map[string]*common.NodeInfo
 }
 
 func newNodeStore() *nodeStore {
 	return &nodeStore{
-		nodes: make(map[string]*common.DataNodeInfo),
+		nodes: make(map[string]*common.NodeInfo),
 	}
 }
 
-func (m *nodeStore) getNode(nodeID string) (*common.DataNodeInfo, bool) {
+func (m *nodeStore) getNode(nodeID string) (*common.NodeInfo, bool) {
 	node, ok := m.nodes[nodeID]
 	if !ok {
 		return nil, false
@@ -24,7 +24,7 @@ func (m *nodeStore) getNode(nodeID string) (*common.DataNodeInfo, bool) {
 	return node, true
 }
 
-func (m *nodeStore) addNode(node *common.DataNodeInfo) {
+func (m *nodeStore) addNode(node *common.NodeInfo) {
 	m.nodes[node.ID] = node
 }
 
@@ -37,7 +37,7 @@ func (m *nodeStore) removeNode(nodeID string) error {
 	return nil
 }
 
-func (m *nodeStore) updateNode(node *common.DataNodeInfo) error {
+func (m *nodeStore) updateNode(node *common.NodeInfo) error {
 	_, ok := m.nodes[node.ID]
 	if !ok {
 		return fmt.Errorf("node with ID %s not found", node.ID)
@@ -46,8 +46,8 @@ func (m *nodeStore) updateNode(node *common.DataNodeInfo) error {
 	return nil
 }
 
-func (m *nodeStore) listNodes(n ...int) []*common.DataNodeInfo {
-	nodes := make([]*common.DataNodeInfo, 0, len(m.nodes))
+func (m *nodeStore) listNodes(n ...int) []*common.NodeInfo {
+	nodes := make([]*common.NodeInfo, 0, len(m.nodes))
 	for _, node := range m.nodes {
 		if len(n) > 0 && len(nodes) >= n[0] {
 			break
@@ -57,8 +57,8 @@ func (m *nodeStore) listNodes(n ...int) []*common.DataNodeInfo {
 	return nodes
 }
 
-func (m *nodeStore) initializeNodes(nodes []*common.DataNodeInfo) {
-	m.nodes = make(map[string]*common.DataNodeInfo)
+func (m *nodeStore) initializeNodes(nodes []*common.NodeInfo) {
+	m.nodes = make(map[string]*common.NodeInfo)
 	for _, node := range nodes {
 		m.nodes[node.ID] = node
 	}

@@ -12,7 +12,7 @@ import (
 )
 
 type RegisterProvider interface {
-	RegisterWithCoordinator(ctx context.Context, info *common.DataNodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error
+	RegisterWithCoordinator(ctx context.Context, info *common.NodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error
 }
 
 type RegisterService struct {
@@ -26,7 +26,7 @@ func NewRegisterService(logger *slog.Logger) *RegisterService {
 	}
 }
 
-func (s *RegisterService) RegisterWithCoordinator(ctx context.Context, nodeInfo *common.DataNodeInfo,
+func (s *RegisterService) RegisterWithCoordinator(ctx context.Context, nodeInfo *common.NodeInfo,
 	clusterStateManager state.ClusterStateManager, coordinatorFinder state.CoordinatorFinder) error {
 	coordinatorClient, ok := coordinatorFinder.GetLeaderCoordinator()
 	if !ok {

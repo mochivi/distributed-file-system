@@ -243,7 +243,7 @@ func (u *Uploader) QueueWork(ctx context.Context, session *uploadSession, file *
 func (u *Uploader) processWork(work UploaderWork, session *uploadSession) error {
 	workLogger := logging.OperationLogger(session.logger, "upload_chunk", slog.String("chunk_id", work.chunkHeader.ID))
 	retryCount := 0
-	var replicatedNodes []*common.DataNodeInfo
+	var replicatedNodes []*common.NodeInfo
 	for retryCount < u.config.ChunkRetryCount {
 		var err error
 		replicatedNodes, err = u.uploadChunk(work, session)
@@ -269,7 +269,7 @@ func (u *Uploader) processWork(work UploaderWork, session *uploadSession) error 
 	return nil
 }
 
-func (u *Uploader) uploadChunk(work UploaderWork, session *uploadSession) ([]*common.DataNodeInfo, error) {
+func (u *Uploader) uploadChunk(work UploaderWork, session *uploadSession) ([]*common.NodeInfo, error) {
 	workLogger := logging.OperationLogger(session.logger, "upload_chunk", slog.String("chunk_id", work.chunkHeader.ID))
 	workLogger.Info("Streaming chunk")
 

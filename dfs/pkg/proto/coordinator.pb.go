@@ -195,7 +195,7 @@ func (x *UploadResponse) GetSessionId() string {
 type ChunkLocation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ChunkId       string                 `protobuf:"bytes,1,opt,name=chunk_id,json=chunkId,proto3" json:"chunk_id,omitempty"`
-	Nodes         []*DataNodeInfo        `protobuf:"bytes,2,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	Nodes         []*NodeInfo            `protobuf:"bytes,2,rep,name=nodes,proto3" json:"nodes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -237,7 +237,7 @@ func (x *ChunkLocation) GetChunkId() string {
 	return ""
 }
 
-func (x *ChunkLocation) GetNodes() []*DataNodeInfo {
+func (x *ChunkLocation) GetNodes() []*NodeInfo {
 	if x != nil {
 		return x.Nodes
 	}
@@ -643,7 +643,7 @@ func (x *ListResponse) GetFiles() []*FileInfo {
 // Node management
 type RegisterDataNodeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	NodeInfo      *DataNodeInfo          `protobuf:"bytes,1,opt,name=node_info,json=nodeInfo,proto3" json:"node_info,omitempty"`
+	NodeInfo      *NodeInfo              `protobuf:"bytes,1,opt,name=node_info,json=nodeInfo,proto3" json:"node_info,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -678,7 +678,7 @@ func (*RegisterDataNodeRequest) Descriptor() ([]byte, []int) {
 	return file_coordinator_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *RegisterDataNodeRequest) GetNodeInfo() *DataNodeInfo {
+func (x *RegisterDataNodeRequest) GetNodeInfo() *NodeInfo {
 	if x != nil {
 		return x.NodeInfo
 	}
@@ -690,7 +690,7 @@ type RegisterDataNodeResponse struct {
 	Success bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	Message string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	// Initial full snapshot of all nodes
-	FullNodeList []*DataNodeInfo `protobuf:"bytes,3,rep,name=full_node_list,json=fullNodeList,proto3" json:"full_node_list,omitempty"`
+	FullNodeList []*NodeInfo `protobuf:"bytes,3,rep,name=full_node_list,json=fullNodeList,proto3" json:"full_node_list,omitempty"`
 	// Current version to track incremental updates
 	CurrentVersion int64 `protobuf:"varint,4,opt,name=current_version,json=currentVersion,proto3" json:"current_version,omitempty"`
 	unknownFields  protoimpl.UnknownFields
@@ -741,7 +741,7 @@ func (x *RegisterDataNodeResponse) GetMessage() string {
 	return ""
 }
 
-func (x *RegisterDataNodeResponse) GetFullNodeList() []*DataNodeInfo {
+func (x *RegisterDataNodeResponse) GetFullNodeList() []*NodeInfo {
 	if x != nil {
 		return x.FullNodeList
 	}
@@ -941,7 +941,7 @@ func (*ListNodesRequest) Descriptor() ([]byte, []int) {
 
 type ListNodesResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	Nodes          []*DataNodeInfo        `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	Nodes          []*NodeInfo            `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
 	CurrentVersion int64                  `protobuf:"varint,2,opt,name=current_version,json=currentVersion,proto3" json:"current_version,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -977,7 +977,7 @@ func (*ListNodesResponse) Descriptor() ([]byte, []int) {
 	return file_coordinator_proto_rawDescGZIP(), []int{16}
 }
 
-func (x *ListNodesResponse) GetNodes() []*DataNodeInfo {
+func (x *ListNodesResponse) GetNodes() []*NodeInfo {
 	if x != nil {
 		return x.Nodes
 	}
@@ -996,7 +996,7 @@ type NodeUpdate struct {
 	// Monotonic version number for ordering
 	Version int64                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
 	Type    NodeUpdate_UpdateType `protobuf:"varint,2,opt,name=type,proto3,enum=dfs.NodeUpdate_UpdateType" json:"type,omitempty"`
-	Node    *DataNodeInfo         `protobuf:"bytes,3,opt,name=node,proto3" json:"node,omitempty"`
+	Node    *NodeInfo             `protobuf:"bytes,3,opt,name=node,proto3" json:"node,omitempty"`
 	// Timestamp for debugging/monitoring
 	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1047,7 +1047,7 @@ func (x *NodeUpdate) GetType() NodeUpdate_UpdateType {
 	return NodeUpdate_NODE_ADDED
 }
 
-func (x *NodeUpdate) GetNode() *DataNodeInfo {
+func (x *NodeUpdate) GetNode() *NodeInfo {
 	if x != nil {
 		return x.Node
 	}
@@ -1075,10 +1075,10 @@ const file_coordinator_proto_rawDesc = "" +
 	"\x0eUploadResponse\x12;\n" +
 	"\x0fchunk_locations\x18\x01 \x03(\v2\x12.dfs.ChunkLocationR\x0echunkLocations\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x02 \x01(\tR\tsessionId\"S\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\"O\n" +
 	"\rChunkLocation\x12\x19\n" +
-	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12'\n" +
-	"\x05nodes\x18\x02 \x03(\v2\x11.dfs.DataNodeInfoR\x05nodes\"%\n" +
+	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12#\n" +
+	"\x05nodes\x18\x02 \x03(\v2\r.dfs.NodeInfoR\x05nodes\"%\n" +
 	"\x0fDownloadRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"\x9a\x01\n" +
 	"\x10DownloadResponse\x12*\n" +
@@ -1102,13 +1102,13 @@ const file_coordinator_proto_rawDesc = "" +
 	"\vListRequest\x12\x1c\n" +
 	"\tdirectory\x18\x01 \x01(\tR\tdirectory\"3\n" +
 	"\fListResponse\x12#\n" +
-	"\x05files\x18\x01 \x03(\v2\r.dfs.FileInfoR\x05files\"I\n" +
-	"\x17RegisterDataNodeRequest\x12.\n" +
-	"\tnode_info\x18\x01 \x01(\v2\x11.dfs.DataNodeInfoR\bnodeInfo\"\xb0\x01\n" +
+	"\x05files\x18\x01 \x03(\v2\r.dfs.FileInfoR\x05files\"E\n" +
+	"\x17RegisterDataNodeRequest\x12*\n" +
+	"\tnode_info\x18\x01 \x01(\v2\r.dfs.NodeInfoR\bnodeInfo\"\xac\x01\n" +
 	"\x18RegisterDataNodeResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x127\n" +
-	"\x0efull_node_list\x18\x03 \x03(\v2\x11.dfs.DataNodeInfoR\ffullNodeList\x12'\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x123\n" +
+	"\x0efull_node_list\x18\x03 \x03(\v2\r.dfs.NodeInfoR\ffullNodeList\x12'\n" +
 	"\x0fcurrent_version\x18\x04 \x01(\x03R\x0ecurrentVersion\"\x82\x01\n" +
 	"\x10HeartbeatRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12)\n" +
@@ -1122,15 +1122,15 @@ const file_coordinator_proto_rawDesc = "" +
 	"\n" +
 	"to_version\x18\x05 \x01(\x03R\ttoVersion\x120\n" +
 	"\x14requires_full_resync\x18\x06 \x01(\bR\x12requiresFullResync\"\x12\n" +
-	"\x10ListNodesRequest\"e\n" +
-	"\x11ListNodesResponse\x12'\n" +
-	"\x05nodes\x18\x01 \x03(\v2\x11.dfs.DataNodeInfoR\x05nodes\x12'\n" +
-	"\x0fcurrent_version\x18\x02 \x01(\x03R\x0ecurrentVersion\"\xf9\x01\n" +
+	"\x10ListNodesRequest\"a\n" +
+	"\x11ListNodesResponse\x12#\n" +
+	"\x05nodes\x18\x01 \x03(\v2\r.dfs.NodeInfoR\x05nodes\x12'\n" +
+	"\x0fcurrent_version\x18\x02 \x01(\x03R\x0ecurrentVersion\"\xf5\x01\n" +
 	"\n" +
 	"NodeUpdate\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\x03R\aversion\x12.\n" +
-	"\x04type\x18\x02 \x01(\x0e2\x1a.dfs.NodeUpdate.UpdateTypeR\x04type\x12%\n" +
-	"\x04node\x18\x03 \x01(\v2\x11.dfs.DataNodeInfoR\x04node\x128\n" +
+	"\x04type\x18\x02 \x01(\x0e2\x1a.dfs.NodeUpdate.UpdateTypeR\x04type\x12!\n" +
+	"\x04node\x18\x03 \x01(\v2\r.dfs.NodeInfoR\x04node\x128\n" +
 	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"@\n" +
 	"\n" +
 	"UpdateType\x12\x0e\n" +
@@ -1184,7 +1184,7 @@ var file_coordinator_proto_goTypes = []any{
 	(*ListNodesRequest)(nil),         // 16: dfs.ListNodesRequest
 	(*ListNodesResponse)(nil),        // 17: dfs.ListNodesResponse
 	(*NodeUpdate)(nil),               // 18: dfs.NodeUpdate
-	(*DataNodeInfo)(nil),             // 19: dfs.DataNodeInfo
+	(*NodeInfo)(nil),                 // 19: dfs.NodeInfo
 	(*FileInfo)(nil),                 // 20: dfs.FileInfo
 	(*ChunkInfo)(nil),                // 21: dfs.ChunkInfo
 	(*HealthStatus)(nil),             // 22: dfs.HealthStatus
@@ -1192,18 +1192,18 @@ var file_coordinator_proto_goTypes = []any{
 }
 var file_coordinator_proto_depIdxs = []int32{
 	3,  // 0: dfs.UploadResponse.chunk_locations:type_name -> dfs.ChunkLocation
-	19, // 1: dfs.ChunkLocation.nodes:type_name -> dfs.DataNodeInfo
+	19, // 1: dfs.ChunkLocation.nodes:type_name -> dfs.NodeInfo
 	20, // 2: dfs.DownloadResponse.file_info:type_name -> dfs.FileInfo
 	3,  // 3: dfs.DownloadResponse.chunk_locations:type_name -> dfs.ChunkLocation
 	21, // 4: dfs.ConfirmUploadRequest.chunk_infos:type_name -> dfs.ChunkInfo
 	20, // 5: dfs.ListResponse.files:type_name -> dfs.FileInfo
-	19, // 6: dfs.RegisterDataNodeRequest.node_info:type_name -> dfs.DataNodeInfo
-	19, // 7: dfs.RegisterDataNodeResponse.full_node_list:type_name -> dfs.DataNodeInfo
+	19, // 6: dfs.RegisterDataNodeRequest.node_info:type_name -> dfs.NodeInfo
+	19, // 7: dfs.RegisterDataNodeResponse.full_node_list:type_name -> dfs.NodeInfo
 	22, // 8: dfs.HeartbeatRequest.status:type_name -> dfs.HealthStatus
 	18, // 9: dfs.HeartbeatResponse.updates:type_name -> dfs.NodeUpdate
-	19, // 10: dfs.ListNodesResponse.nodes:type_name -> dfs.DataNodeInfo
+	19, // 10: dfs.ListNodesResponse.nodes:type_name -> dfs.NodeInfo
 	0,  // 11: dfs.NodeUpdate.type:type_name -> dfs.NodeUpdate.UpdateType
-	19, // 12: dfs.NodeUpdate.node:type_name -> dfs.DataNodeInfo
+	19, // 12: dfs.NodeUpdate.node:type_name -> dfs.NodeInfo
 	23, // 13: dfs.NodeUpdate.timestamp:type_name -> google.protobuf.Timestamp
 	1,  // 14: dfs.CoordinatorService.UploadFile:input_type -> dfs.UploadRequest
 	4,  // 15: dfs.CoordinatorService.DownloadFile:input_type -> dfs.DownloadRequest

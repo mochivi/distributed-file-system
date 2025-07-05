@@ -18,6 +18,6 @@ func NewMockRegisterService() *MockRegisterService {
 	}
 }
 
-func (m *MockRegisterService) RegisterWithCoordinator(ctx context.Context, info *common.DataNodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error {
+func (m *MockRegisterService) RegisterWithCoordinator(ctx context.Context, info *common.NodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error {
 	return m.Called(ctx, info, csm, cf).Error(0)
 }

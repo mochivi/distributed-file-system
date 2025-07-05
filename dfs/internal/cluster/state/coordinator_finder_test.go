@@ -22,8 +22,8 @@ func TestNewCoordinatorFinder(t *testing.T) {
 
 func TestCoordinatorFinder_AddRemoveList(t *testing.T) {
 	finder := NewCoordinatorFinder()
-	node1 := &common.DataNodeInfo{ID: "coord1", Host: "localhost", Port: 8080}
-	node2 := &common.DataNodeInfo{ID: "coord2", Host: "localhost", Port: 8081}
+	node1 := &common.NodeInfo{ID: "coord1", Host: "localhost", Port: 8080}
+	node2 := &common.NodeInfo{ID: "coord2", Host: "localhost", Port: 8081}
 
 	// Initial state
 	assert.Empty(t, finder.ListCoordinators())
@@ -36,7 +36,7 @@ func TestCoordinatorFinder_AddRemoveList(t *testing.T) {
 	// Add another
 	finder.AddCoordinator(node2)
 	assert.Len(t, finder.ListCoordinators(), 2)
-	assert.ElementsMatch(t, []*common.DataNodeInfo{node1, node2}, finder.ListCoordinators())
+	assert.ElementsMatch(t, []*common.NodeInfo{node1, node2}, finder.ListCoordinators())
 
 	// Remove one
 	finder.RemoveCoordinator("coord1")
@@ -50,12 +50,12 @@ func TestCoordinatorFinder_AddRemoveList(t *testing.T) {
 }
 
 func TestCoordinatorFinder_GetCoordinator(t *testing.T) {
-	node1 := &common.DataNodeInfo{ID: "coord1", Host: "localhost", Port: 8080}
+	node1 := &common.NodeInfo{ID: "coord1", Host: "localhost", Port: 8080}
 
 	testCases := []struct {
 		name           string
 		nodeIDToGet    string
-		initialNodes   []*common.DataNodeInfo
+		initialNodes   []*common.NodeInfo
 		setupFinder    func(finder *coordinatorFinder)
 		expectFound    bool
 		expectedNodeID string
@@ -63,9 +63,9 @@ func TestCoordinatorFinder_GetCoordinator(t *testing.T) {
 		{
 			name:         "get existing coordinator",
 			nodeIDToGet:  "coord1",
-			initialNodes: []*common.DataNodeInfo{node1},
+			initialNodes: []*common.NodeInfo{node1},
 			setupFinder: func(finder *coordinatorFinder) {
-				finder.SetClientConnectionFunc(func(node *common.DataNodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error) {
+				finder.SetClientConnectionFunc(func(node *common.NodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error) {
 					return clients.NewMockCoordinatorClient(node), nil
 				})
 			},
@@ -75,16 +75,16 @@ func TestCoordinatorFinder_GetCoordinator(t *testing.T) {
 		{
 			name:         "get non-existent coordinator",
 			nodeIDToGet:  "non-existent",
-			initialNodes: []*common.DataNodeInfo{node1},
+			initialNodes: []*common.NodeInfo{node1},
 			setupFinder:  func(finder *coordinatorFinder) {},
 			expectFound:  false,
 		},
 		{
 			name:         "connection func returns error",
 			nodeIDToGet:  "coord1",
-			initialNodes: []*common.DataNodeInfo{node1},
+			initialNodes: []*common.NodeInfo{node1},
 			setupFinder: func(finder *coordinatorFinder) {
-				finder.SetClientConnectionFunc(func(node *common.DataNodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error) {
+				finder.SetClientConnectionFunc(func(node *common.NodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error) {
 					return nil, errors.New("connection failed")
 				})
 			},
@@ -114,35 +114,35 @@ func TestCoordinatorFinder_GetCoordinator(t *testing.T) {
 }
 
 func TestCoordinatorFinder_GetLeaderCoordinator(t *testing.T) {
-	nodeHealthy := &common.DataNodeInfo{ID: "healthy", Status: common.NodeHealthy}
-	nodeUnhealthy := &common.DataNodeInfo{ID: "unhealthy", Status: common.NodeUnhealthy}
-	nodeFailsConnect := &common.DataNodeInfo{ID: "fails-connect", Status: common.NodeHealthy}
+	nodeHealthy := &common.NodeInfo{ID: "healthy", Status: common.NodeHealthy}
+	nodeUnhealthy := &common.NodeInfo{ID: "unhealthy", Status: common.NodeUnhealthy}
+	nodeFailsConnect := &common.NodeInfo{ID: "fails-connect", Status: common.NodeHealthy}
 
 	testCases := []struct {
 		name             string
-		initialNodes     []*common.DataNodeInfo
+		initialNodes     []*common.NodeInfo
 		setupFinder      func(finder *coordinatorFinder)
 		expectFound      bool
 		expectedLeaderID string
 	}{
 		{
 			name:         "no coordinators",
-			initialNodes: []*common.DataNodeInfo{},
+			initialNodes: []*common.NodeInfo{},
 			setupFinder:  func(finder *coordinatorFinder) {},
 			expectFound:  false,
 		},
 		{
 			name:         "only unhealthy coordinators",
-			initialNodes: []*common.DataNodeInfo{nodeUnhealthy},
+			initialNodes: []*common.NodeInfo{nodeUnhealthy},
 			setupFinder:  func(finder *coordinatorFinder) {},
 			expectFound:  false,
 		},
 		{
 			name: "skips failing node and finds healthy one",
 			// Add in non-alphabetical order to test iteration
-			initialNodes: []*common.DataNodeInfo{nodeFailsConnect, nodeUnhealthy, nodeHealthy},
+			initialNodes: []*common.NodeInfo{nodeFailsConnect, nodeUnhealthy, nodeHealthy},
 			setupFinder: func(finder *coordinatorFinder) {
-				finder.SetClientConnectionFunc(func(node *common.DataNodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error) {
+				finder.SetClientConnectionFunc(func(node *common.NodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error) {
 					if node.ID == "fails-connect" {
 						return nil, errors.New("connection failed")
 					}
@@ -181,7 +181,7 @@ func TestCoordinatorFinder_Concurrency(t *testing.T) {
 	numRoutines := 100
 
 	// Mock connection func
-	finder.SetClientConnectionFunc(func(node *common.DataNodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error) {
+	finder.SetClientConnectionFunc(func(node *common.NodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error) {
 		return clients.NewMockCoordinatorClient(node), nil
 	})
 
@@ -191,7 +191,7 @@ func TestCoordinatorFinder_Concurrency(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			nodeID := fmt.Sprintf("node-%d", i)
-			node := &common.DataNodeInfo{ID: nodeID, Status: common.NodeHealthy}
+			node := &common.NodeInfo{ID: nodeID, Status: common.NodeHealthy}
 			finder.AddCoordinator(node)
 			if i%2 == 0 {
 				finder.RemoveCoordinator(nodeID)

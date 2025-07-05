@@ -32,14 +32,14 @@ func (s *stubCoordinatorHeartbeatServer) DataNodeHeartbeat(ctx context.Context, 
 }
 
 func TestHeartbeatController_RunLoop(t *testing.T) {
-	nodeInfo := &common.DataNodeInfo{
+	nodeInfo := &common.NodeInfo{
 		ID:       "node1",
 		Status:   common.NodeHealthy,
 		LastSeen: time.Now(),
 	}
 
 	// Create a coordinator finder - the returned client is not actually used, so this just has to exist while not doing anything
-	coordinatorNodeInfo := &common.DataNodeInfo{
+	coordinatorNodeInfo := &common.NodeInfo{
 		ID:       "coordinator",
 		Status:   common.NodeHealthy,
 		LastSeen: time.Now(),
@@ -212,7 +212,7 @@ func TestHeartbeatController_heartbeat(t *testing.T) {
 				ToVersion:          2,
 				Updates: []common.NodeUpdate{
 					{
-						Node: &common.DataNodeInfo{
+						Node: &common.NodeInfo{
 							ID:       "node2",
 							Status:   common.NodeHealthy,
 							LastSeen: time.Now(),
@@ -304,7 +304,7 @@ func TestHeartbeatController_heartbeat(t *testing.T) {
 				ToVersion:          1,
 				Updates: []common.NodeUpdate{
 					{
-						Node: &common.DataNodeInfo{
+						Node: &common.NodeInfo{
 							ID:       "node2",
 							Status:   common.NodeHealthy,
 							LastSeen: time.Now(),

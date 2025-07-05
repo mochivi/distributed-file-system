@@ -23,13 +23,13 @@ type DataNodeServer struct {
 	coordinatorFinder  state.CoordinatorFinder
 	selector           cluster.NodeSelector
 
-	info   *common.DataNodeInfo
+	info   *common.NodeInfo
 	config config.DataNodeConfig
 
 	logger *slog.Logger
 }
 
-func NewDataNodeServer(info *common.DataNodeInfo, config config.DataNodeConfig, store storage.ChunkStorage, replicationManager ReplicationProvider,
+func NewDataNodeServer(info *common.NodeInfo, config config.DataNodeConfig, store storage.ChunkStorage, replicationManager ReplicationProvider,
 	sessionManager SessionManager, clusterViewer state.ClusterStateViewer, coordinatorFinder state.CoordinatorFinder,
 	selector cluster.NodeSelector, logger *slog.Logger) *DataNodeServer {
 

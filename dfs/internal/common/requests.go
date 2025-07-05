@@ -170,13 +170,13 @@ type ChunkDataAck struct {
 	Message       string
 	BytesReceived int
 	ReadyForNext  bool
-	Replicas      []*DataNodeInfo
+	Replicas      []*NodeInfo
 }
 
 func ChunkDataAckFromProto(pb *proto.ChunkDataAck) ChunkDataAck {
-	replicas := make([]*DataNodeInfo, len(pb.Replicas))
+	replicas := make([]*NodeInfo, len(pb.Replicas))
 	for i, replica := range pb.Replicas {
-		replicaInfo := DataNodeInfoFromProto(replica)
+		replicaInfo := NodeInfoFromProto(replica)
 		replicas[i] = &replicaInfo
 	}
 	return ChunkDataAck{
@@ -190,7 +190,7 @@ func ChunkDataAckFromProto(pb *proto.ChunkDataAck) ChunkDataAck {
 }
 
 func (cda ChunkDataAck) ToProto() *proto.ChunkDataAck {
-	replicas := make([]*proto.DataNodeInfo, len(cda.Replicas))
+	replicas := make([]*proto.NodeInfo, len(cda.Replicas))
 	for i, replica := range cda.Replicas {
 		replicas[i] = replica.ToProto()
 	}
@@ -237,12 +237,12 @@ const (
 type NodeUpdate struct {
 	Version   int64
 	Type      NodeUpdateType
-	Node      *DataNodeInfo
+	Node      *NodeInfo
 	Timestamp time.Time
 }
 
 func NodeUpdateFromProto(pb *proto.NodeUpdate) NodeUpdate {
-	node := DataNodeInfoFromProto(pb.Node)
+	node := NodeInfoFromProto(pb.Node)
 	return NodeUpdate{
 		Version:   pb.Version,
 		Type:      NodeUpdateType(pb.Type),
@@ -455,11 +455,11 @@ func (lr ListResponse) ToProto() *proto.ListResponse {
 
 // Data nodes registration
 type RegisterDataNodeRequest struct {
-	NodeInfo DataNodeInfo
+	NodeInfo NodeInfo
 }
 
 func RegisterDataNodeRequestFromProto(pb *proto.RegisterDataNodeRequest) RegisterDataNodeRequest {
-	return RegisterDataNodeRequest{NodeInfo: DataNodeInfoFromProto(pb.NodeInfo)}
+	return RegisterDataNodeRequest{NodeInfo: NodeInfoFromProto(pb.NodeInfo)}
 }
 
 func (rr RegisterDataNodeRequest) ToProto() *proto.RegisterDataNodeRequest {
@@ -469,14 +469,14 @@ func (rr RegisterDataNodeRequest) ToProto() *proto.RegisterDataNodeRequest {
 type RegisterDataNodeResponse struct {
 	Success        bool
 	Message        string
-	FullNodeList   []*DataNodeInfo
+	FullNodeList   []*NodeInfo
 	CurrentVersion int64
 }
 
 func RegisterDataNodeResponseFromProto(pb *proto.RegisterDataNodeResponse) RegisterDataNodeResponse {
-	fullNodeList := make([]*DataNodeInfo, 0, len(pb.FullNodeList))
+	fullNodeList := make([]*NodeInfo, 0, len(pb.FullNodeList))
 	for _, protoNode := range pb.FullNodeList {
-		node := DataNodeInfoFromProto(protoNode)
+		node := NodeInfoFromProto(protoNode)
 		fullNodeList = append(fullNodeList, &node)
 	}
 
@@ -489,7 +489,7 @@ func RegisterDataNodeResponseFromProto(pb *proto.RegisterDataNodeResponse) Regis
 }
 
 func (r RegisterDataNodeResponse) ToProto() *proto.RegisterDataNodeResponse {
-	fullNodeList := make([]*proto.DataNodeInfo, 0, len(r.FullNodeList))
+	fullNodeList := make([]*proto.NodeInfo, 0, len(r.FullNodeList))
 	for _, node := range r.FullNodeList {
 		fullNodeList = append(fullNodeList, node.ToProto())
 	}
@@ -576,14 +576,14 @@ func ListNodesRequestFromProto(pb *proto.ListNodesRequest) ListNodesRequest {
 func (lnr ListNodesRequest) ToProto() *proto.ListNodesRequest { return &proto.ListNodesRequest{} }
 
 type ListNodesResponse struct {
-	Nodes          []*DataNodeInfo
+	Nodes          []*NodeInfo
 	CurrentVersion int64
 }
 
 func ListNodesResponseFromProto(pb *proto.ListNodesResponse) ListNodesResponse {
-	nodes := make([]*DataNodeInfo, 0, len(pb.Nodes))
+	nodes := make([]*NodeInfo, 0, len(pb.Nodes))
 	for _, node := range pb.Nodes {
-		nodeInfo := DataNodeInfoFromProto(node)
+		nodeInfo := NodeInfoFromProto(node)
 		nodes = append(nodes, &nodeInfo)
 	}
 	return ListNodesResponse{
@@ -593,7 +593,7 @@ func ListNodesResponseFromProto(pb *proto.ListNodesResponse) ListNodesResponse {
 }
 
 func (lnr ListNodesResponse) ToProto() *proto.ListNodesResponse {
-	nodes := make([]*proto.DataNodeInfo, 0, len(lnr.Nodes))
+	nodes := make([]*proto.NodeInfo, 0, len(lnr.Nodes))
 	for _, node := range lnr.Nodes {
 		nodes = append(nodes, (*node).ToProto())
 	}
@@ -606,13 +606,13 @@ func (lnr ListNodesResponse) ToProto() *proto.ListNodesResponse {
 // ChunkLocation represents where some chunk should be stored (primary node + endpoint)
 type ChunkLocation struct {
 	ChunkID string
-	Nodes   []*DataNodeInfo
+	Nodes   []*NodeInfo
 }
 
 func ChunkLocationFromProto(pb *proto.ChunkLocation) ChunkLocation {
-	nodes := make([]*DataNodeInfo, 0, len(pb.Nodes))
+	nodes := make([]*NodeInfo, 0, len(pb.Nodes))
 	for _, node := range pb.Nodes {
-		nodeInfo := DataNodeInfoFromProto(node)
+		nodeInfo := NodeInfoFromProto(node)
 		nodes = append(nodes, &nodeInfo)
 	}
 	return ChunkLocation{
@@ -622,7 +622,7 @@ func ChunkLocationFromProto(pb *proto.ChunkLocation) ChunkLocation {
 }
 
 func (cs *ChunkLocation) ToProto() *proto.ChunkLocation {
-	nodes := make([]*proto.DataNodeInfo, 0, len(cs.Nodes))
+	nodes := make([]*proto.NodeInfo, 0, len(cs.Nodes))
 	for _, node := range cs.Nodes {
 		nodes = append(nodes, node.ToProto())
 	}

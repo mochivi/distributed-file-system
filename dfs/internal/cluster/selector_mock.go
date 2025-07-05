@@ -9,10 +9,10 @@ type MockNodeSelector struct {
 	mock.Mock
 }
 
-func (m *MockNodeSelector) SelectBestNodes(numChunks int) ([]*common.DataNodeInfo, bool) {
+func (m *MockNodeSelector) SelectBestNodes(numChunks int) ([]*common.NodeInfo, bool) {
 	args := m.Called(numChunks)
 	if args.Get(0) == nil {
 		return nil, false
 	}
-	return args.Get(0).([]*common.DataNodeInfo), args.Bool(1)
+	return args.Get(0).([]*common.NodeInfo), args.Bool(1)
 }

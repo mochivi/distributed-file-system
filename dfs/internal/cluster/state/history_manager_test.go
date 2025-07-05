@@ -35,7 +35,7 @@ func TestNewClusterStateHistoryManager(t *testing.T) {
 
 func TestClusterStateHistoryManager_AddNode(t *testing.T) {
 	manager := newTestHistoryManager(5)
-	node1 := &common.DataNodeInfo{ID: "node1"}
+	node1 := &common.NodeInfo{ID: "node1"}
 	manager.AddNode(node1)
 
 	// Check node
@@ -56,7 +56,7 @@ func TestClusterStateHistoryManager_AddNode(t *testing.T) {
 
 func TestClusterStateHistoryManager_RemoveNode(t *testing.T) {
 	manager := newTestHistoryManager(5)
-	node1 := &common.DataNodeInfo{ID: "node1"}
+	node1 := &common.NodeInfo{ID: "node1"}
 	manager.AddNode(node1) // Version 1
 
 	err := manager.RemoveNode("node1") // Version 2
@@ -78,8 +78,8 @@ func TestClusterStateHistoryManager_RemoveNode(t *testing.T) {
 
 func TestClusterStateHistoryManager_UpdateNode(t *testing.T) {
 	manager := newTestHistoryManager(5)
-	node1 := &common.DataNodeInfo{ID: "node1", Host: "host1"}
-	updatedNode1 := &common.DataNodeInfo{ID: "node1", Host: "host2"}
+	node1 := &common.NodeInfo{ID: "node1", Host: "host1"}
+	updatedNode1 := &common.NodeInfo{ID: "node1", Host: "host2"}
 	manager.AddNode(node1) // Version 1
 
 	err := manager.UpdateNode(updatedNode1) // Version 2
@@ -95,7 +95,7 @@ func TestClusterStateHistoryManager_UpdateNode(t *testing.T) {
 	assert.Equal(t, int64(2), updates[0].Version)
 	assert.Equal(t, common.NODE_UPDATED, updates[0].Type)
 
-	err = manager.UpdateNode(&common.DataNodeInfo{ID: "node_nonexistent"})
+	err = manager.UpdateNode(&common.NodeInfo{ID: "node_nonexistent"})
 	assert.Error(t, err)
 	assert.Equal(t, int64(2), manager.GetCurrentVersion())
 }
@@ -103,7 +103,7 @@ func TestClusterStateHistoryManager_UpdateNode(t *testing.T) {
 func TestClusterStateHistoryManager_GetUpdatesSince(t *testing.T) {
 	manager := newTestHistoryManager(5)
 	for i := 1; i <= 7; i++ {
-		manager.AddNode(&common.DataNodeInfo{ID: fmt.Sprintf("node%d", i)})
+		manager.AddNode(&common.NodeInfo{ID: fmt.Sprintf("node%d", i)})
 	}
 	assert.Equal(t, int64(7), manager.GetCurrentVersion())
 	// History should contain versions 3, 4, 5, 6, 7
@@ -144,7 +144,7 @@ func TestClusterStateHistoryManager_CircularBuffer(t *testing.T) {
 
 	// Add 15 nodes, so history wraps around
 	for i := 1; i <= 15; i++ {
-		manager.AddNode(&common.DataNodeInfo{ID: fmt.Sprintf("node%d", i)})
+		manager.AddNode(&common.NodeInfo{ID: fmt.Sprintf("node%d", i)})
 	}
 
 	assert.Equal(t, int64(15), manager.GetCurrentVersion())
@@ -171,7 +171,7 @@ func TestClusterStateHistoryManager_CircularBuffer(t *testing.T) {
 	}
 
 	// Add one more node
-	manager.AddNode(&common.DataNodeInfo{ID: "node16"}) // Version 16
+	manager.AddNode(&common.NodeInfo{ID: "node16"}) // Version 16
 	assert.Equal(t, int64(7), manager.GetOldestVersionInHistory())
 	assert.True(t, manager.IsVersionTooOld(6))
 }
@@ -179,9 +179,9 @@ func TestClusterStateHistoryManager_CircularBuffer(t *testing.T) {
 func TestClusterStateHistoryManager_ApplyUpdates(t *testing.T) {
 	manager := newTestHistoryManager(10)
 	updates := []common.NodeUpdate{
-		{Version: 1, Type: common.NODE_ADDED, Node: &common.DataNodeInfo{ID: "node1"}},
-		{Version: 2, Type: common.NODE_ADDED, Node: &common.DataNodeInfo{ID: "node2"}},
-		{Version: 3, Type: common.NODE_REMOVED, Node: &common.DataNodeInfo{ID: "node1"}},
+		{Version: 1, Type: common.NODE_ADDED, Node: &common.NodeInfo{ID: "node1"}},
+		{Version: 2, Type: common.NODE_ADDED, Node: &common.NodeInfo{ID: "node2"}},
+		{Version: 3, Type: common.NODE_REMOVED, Node: &common.NodeInfo{ID: "node1"}},
 	}
 
 	manager.ApplyUpdates(updates)
@@ -197,7 +197,7 @@ func TestClusterStateHistoryManager_ApplyUpdates(t *testing.T) {
 
 func TestClusterStateHistoryManager_InitializeNodes(t *testing.T) {
 	manager := newTestHistoryManager(10)
-	nodes := []*common.DataNodeInfo{
+	nodes := []*common.NodeInfo{
 		{ID: "node1"},
 		{ID: "node2"},
 	}
@@ -210,28 +210,28 @@ func TestClusterStateHistoryManager_InitializeNodes(t *testing.T) {
 
 func TestClusterStateHistoryManager_GetAvailableNodesForChunk(t *testing.T) {
 	manager := newTestHistoryManager(10)
-	n1 := &common.DataNodeInfo{ID: "node1", Status: common.NodeHealthy}
-	n2 := &common.DataNodeInfo{ID: "node2", Status: common.NodeUnhealthy}
-	n3 := &common.DataNodeInfo{ID: "node3", Status: common.NodeHealthy}
+	n1 := &common.NodeInfo{ID: "node1", Status: common.NodeHealthy}
+	n2 := &common.NodeInfo{ID: "node2", Status: common.NodeUnhealthy}
+	n3 := &common.NodeInfo{ID: "node3", Status: common.NodeHealthy}
 
-	manager.InitializeNodes([]*common.DataNodeInfo{n1, n2, n3}, 3)
+	manager.InitializeNodes([]*common.NodeInfo{n1, n2, n3}, 3)
 
 	t.Run("some nodes healthy", func(t *testing.T) {
-		replicaIDs := []*common.DataNodeInfo{{ID: "node1"}, {ID: "node2"}, {ID: "node3"}}
+		replicaIDs := []*common.NodeInfo{{ID: "node1"}, {ID: "node2"}, {ID: "node3"}}
 		available, ok := manager.GetAvailableNodesForChunk(replicaIDs)
 		assert.True(t, ok)
 		assert.Len(t, available, 2)
-		assert.ElementsMatch(t, []*common.DataNodeInfo{n1, n3}, available)
+		assert.ElementsMatch(t, []*common.NodeInfo{n1, n3}, available)
 	})
 
 	t.Run("no nodes healthy", func(t *testing.T) {
-		replicaIDs := []*common.DataNodeInfo{{ID: "node2"}}
+		replicaIDs := []*common.NodeInfo{{ID: "node2"}}
 		_, ok := manager.GetAvailableNodesForChunk(replicaIDs)
 		assert.False(t, ok)
 	})
 
 	t.Run("node not in cluster", func(t *testing.T) {
-		replicaIDs := []*common.DataNodeInfo{{ID: "node4"}}
+		replicaIDs := []*common.NodeInfo{{ID: "node4"}}
 		_, ok := manager.GetAvailableNodesForChunk(replicaIDs)
 		assert.False(t, ok)
 	})
@@ -248,7 +248,7 @@ func TestClusterStateHistoryManager_Concurrency(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			manager.AddNode(&common.DataNodeInfo{ID: fmt.Sprintf("node-%d", i)})
+			manager.AddNode(&common.NodeInfo{ID: fmt.Sprintf("node-%d", i)})
 		}(i)
 	}
 	wg.Wait()
@@ -265,7 +265,7 @@ func TestClusterStateHistoryManager_Concurrency(t *testing.T) {
 			if i%2 == 0 {
 				assert.NoError(t, manager.RemoveNode(fmt.Sprintf("node-%d", i)))
 			} else {
-				node := &common.DataNodeInfo{ID: fmt.Sprintf("node-%d", i), Host: "updated"}
+				node := &common.NodeInfo{ID: fmt.Sprintf("node-%d", i), Host: "updated"}
 				assert.NoError(t, manager.UpdateNode(node))
 			}
 		}(i)
@@ -292,7 +292,7 @@ func TestClusterStateHistoryManager_Concurrency(t *testing.T) {
 
 	// Add 50 more nodes to cause history to wrap. Version will go to 250.
 	for i := 0; i < 50; i++ {
-		manager.AddNode(&common.DataNodeInfo{ID: fmt.Sprintf("new-node-%d", i)})
+		manager.AddNode(&common.NodeInfo{ID: fmt.Sprintf("new-node-%d", i)})
 	}
 	assert.Equal(t, int64(250), manager.GetCurrentVersion())
 	// Oldest version is now 250 - 200 + 1 = 51

@@ -53,7 +53,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.nodeSelector.On("SelectBestNodes", 1).Return([]*common.DataNodeInfo{
+				mocks.nodeSelector.On("SelectBestNodes", 1).Return([]*common.NodeInfo{
 					{ID: "node1", Status: common.NodeHealthy, Host: "127.0.0.1", Port: 8081},
 				}, true)
 				mocks.metadataManager.On("trackUpload", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -70,7 +70,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 					ChunkLocations: []*proto.ChunkLocation{
 						{
 							ChunkId: chunk.FormatChunkID("test.txt", 0), // The second variable is the chunk index
-							Nodes:   []*proto.DataNodeInfo{{Id: "node1", Status: proto.NodeStatus_NODE_HEALTHY, IpAddress: "127.0.0.1", Port: 8081}},
+							Nodes:   []*proto.NodeInfo{{Id: "node1", Status: proto.NodeStatus_NODE_HEALTHY, IpAddress: "127.0.0.1", Port: 8081}},
 						},
 					},
 				}
@@ -79,7 +79,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 		{
 			name: "success: 2 chunks",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.nodeSelector.On("SelectBestNodes", 2).Return([]*common.DataNodeInfo{
+				mocks.nodeSelector.On("SelectBestNodes", 2).Return([]*common.NodeInfo{
 					{ID: "node1", Status: common.NodeHealthy, Host: "127.0.0.1", Port: 8081},
 				}, true)
 				mocks.metadataManager.On("trackUpload", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -96,11 +96,11 @@ func TestCoordinator_UploadFile(t *testing.T) {
 					ChunkLocations: []*proto.ChunkLocation{
 						{
 							ChunkId: chunk.FormatChunkID("test.txt", 0), // The second variable is the chunk index
-							Nodes:   []*proto.DataNodeInfo{{Id: "node1", Status: proto.NodeStatus_NODE_HEALTHY, IpAddress: "127.0.0.1", Port: 8081}},
+							Nodes:   []*proto.NodeInfo{{Id: "node1", Status: proto.NodeStatus_NODE_HEALTHY, IpAddress: "127.0.0.1", Port: 8081}},
 						},
 						{
 							ChunkId: chunk.FormatChunkID("test.txt", 1), // The second variable is the chunk index
-							Nodes:   []*proto.DataNodeInfo{{Id: "node1", Status: proto.NodeStatus_NODE_HEALTHY, IpAddress: "127.0.0.1", Port: 8081}},
+							Nodes:   []*proto.NodeInfo{{Id: "node1", Status: proto.NodeStatus_NODE_HEALTHY, IpAddress: "127.0.0.1", Port: 8081}},
 						},
 					},
 				}
@@ -175,12 +175,12 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 					Size:       1 * 1024 * 1024,
 					ChunkCount: 1,
 					Chunks: []common.ChunkInfo{
-						{Header: common.ChunkHeader{ID: "chunk1"}, Replicas: []*common.DataNodeInfo{{ID: "node1"}}},
+						{Header: common.ChunkHeader{ID: "chunk1"}, Replicas: []*common.NodeInfo{{ID: "node1"}}},
 					},
 					CreatedAt: time.Unix(0, 0),
 					Checksum:  "test-checksum",
 				}
-				nodes := []*common.DataNodeInfo{{ID: "node1", Host: "localhost", Port: 9001, Status: common.NodeHealthy}}
+				nodes := []*common.NodeInfo{{ID: "node1", Host: "localhost", Port: 9001, Status: common.NodeHealthy}}
 				mocks.metaStore.On("GetFile", "test.txt").Return(fileInfo, nil).Once()
 				mocks.clusterStateHistoryManager.On("GetAvailableNodesForChunk", mock.Anything).Return(nodes, true).Once()
 			},
@@ -190,12 +190,12 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 					Path:       "test.txt",
 					Size:       1 * 1024 * 1024,
 					ChunkCount: 1,
-					Chunks:     []common.ChunkInfo{{Header: common.ChunkHeader{ID: "chunk1"}, Replicas: []*common.DataNodeInfo{{ID: "node1"}}}},
+					Chunks:     []common.ChunkInfo{{Header: common.ChunkHeader{ID: "chunk1"}, Replicas: []*common.NodeInfo{{ID: "node1"}}}},
 					CreatedAt:  time.Unix(0, 0),
 					Checksum:   "test-checksum",
 				}).ToProto(),
 				ChunkLocations: []*proto.ChunkLocation{
-					{ChunkId: "chunk1", Nodes: []*proto.DataNodeInfo{{Id: "node1", IpAddress: "localhost", Port: 9001, Status: proto.NodeStatus_NODE_HEALTHY}}},
+					{ChunkId: "chunk1", Nodes: []*proto.NodeInfo{{Id: "node1", IpAddress: "localhost", Port: 9001, Status: proto.NodeStatus_NODE_HEALTHY}}},
 				},
 			},
 			expectErr: false,
@@ -208,12 +208,12 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 					Size:       2 * 1024 * 1024,
 					ChunkCount: 2,
 					Chunks: []common.ChunkInfo{
-						{Header: common.ChunkHeader{ID: "chunk1"}, Replicas: []*common.DataNodeInfo{{ID: "node1"}}},
-						{Header: common.ChunkHeader{ID: "chunk2"}, Replicas: []*common.DataNodeInfo{{ID: "node1"}}},
+						{Header: common.ChunkHeader{ID: "chunk1"}, Replicas: []*common.NodeInfo{{ID: "node1"}}},
+						{Header: common.ChunkHeader{ID: "chunk2"}, Replicas: []*common.NodeInfo{{ID: "node1"}}},
 					},
 					CreatedAt: time.Unix(0, 0),
 				}
-				nodes := []*common.DataNodeInfo{{ID: "node1", Host: "localhost", Port: 9001, Status: common.NodeHealthy}}
+				nodes := []*common.NodeInfo{{ID: "node1", Host: "localhost", Port: 9001, Status: common.NodeHealthy}}
 				mocks.metaStore.On("GetFile", "test.txt").Return(fileInfo, nil).Once()
 				mocks.clusterStateHistoryManager.On("GetAvailableNodesForChunk", mock.Anything).Return(nodes, true)
 			},
@@ -224,14 +224,14 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 					Size:       2 * 1024 * 1024,
 					ChunkCount: 2,
 					Chunks: []common.ChunkInfo{
-						{Header: common.ChunkHeader{ID: "chunk1"}, Replicas: []*common.DataNodeInfo{{ID: "node1"}}},
-						{Header: common.ChunkHeader{ID: "chunk2"}, Replicas: []*common.DataNodeInfo{{ID: "node1"}}},
+						{Header: common.ChunkHeader{ID: "chunk1"}, Replicas: []*common.NodeInfo{{ID: "node1"}}},
+						{Header: common.ChunkHeader{ID: "chunk2"}, Replicas: []*common.NodeInfo{{ID: "node1"}}},
 					},
 					CreatedAt: time.Unix(0, 0),
 				}).ToProto(),
 				ChunkLocations: []*proto.ChunkLocation{
-					{ChunkId: "chunk1", Nodes: []*proto.DataNodeInfo{{Id: "node1", IpAddress: "localhost", Port: 9001, Status: proto.NodeStatus_NODE_HEALTHY}}},
-					{ChunkId: "chunk2", Nodes: []*proto.DataNodeInfo{{Id: "node1", IpAddress: "localhost", Port: 9001, Status: proto.NodeStatus_NODE_HEALTHY}}},
+					{ChunkId: "chunk1", Nodes: []*proto.NodeInfo{{Id: "node1", IpAddress: "localhost", Port: 9001, Status: proto.NodeStatus_NODE_HEALTHY}}},
+					{ChunkId: "chunk2", Nodes: []*proto.NodeInfo{{Id: "node1", IpAddress: "localhost", Port: 9001, Status: proto.NodeStatus_NODE_HEALTHY}}},
 				},
 			},
 			expectErr: false,
@@ -252,7 +252,7 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 					Path:       "test.txt",
 					Size:       1 * 1024 * 1024,
 					ChunkCount: 1,
-					Chunks:     []common.ChunkInfo{{Header: common.ChunkHeader{ID: "chunk1"}, Replicas: []*common.DataNodeInfo{{ID: "node1"}}}},
+					Chunks:     []common.ChunkInfo{{Header: common.ChunkHeader{ID: "chunk1"}, Replicas: []*common.NodeInfo{{ID: "node1"}}}},
 					CreatedAt:  time.Unix(0, 0),
 				}
 				mocks.metaStore.On("GetFile", "test.txt").Return(fileInfo, nil).Once()
@@ -368,17 +368,17 @@ func TestCoordinator_RegisterDataNode(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(mocks *serverMocks) {
-				nodeInfo := &common.DataNodeInfo{ID: "node1", Host: "127.0.0.1", Port: 9001, Status: common.NodeHealthy}
-				mocks.clusterStateHistoryManager.On("AddNode", mock.AnythingOfType("*common.DataNodeInfo")).Once()
-				mocks.clusterStateHistoryManager.On("ListNodes", mock.Anything).Return([]*common.DataNodeInfo{nodeInfo}, int64(1)).Once()
+				nodeInfo := &common.NodeInfo{ID: "node1", Host: "127.0.0.1", Port: 9001, Status: common.NodeHealthy}
+				mocks.clusterStateHistoryManager.On("AddNode", mock.AnythingOfType("*common.NodeInfo")).Once()
+				mocks.clusterStateHistoryManager.On("ListNodes", mock.Anything).Return([]*common.NodeInfo{nodeInfo}, int64(1)).Once()
 			},
 			req: &proto.RegisterDataNodeRequest{
-				NodeInfo: &proto.DataNodeInfo{Id: "node1", IpAddress: "127.0.0.1", Port: 9001, Status: proto.NodeStatus_NODE_HEALTHY},
+				NodeInfo: &proto.NodeInfo{Id: "node1", IpAddress: "127.0.0.1", Port: 9001, Status: proto.NodeStatus_NODE_HEALTHY},
 			},
 			expectedResp: &proto.RegisterDataNodeResponse{
 				Success: true,
 				Message: "Node registered successfully",
-				FullNodeList: []*proto.DataNodeInfo{
+				FullNodeList: []*proto.NodeInfo{
 					{Id: "node1", IpAddress: "127.0.0.1", Port: 9001, Status: proto.NodeStatus_NODE_HEALTHY},
 				},
 				CurrentVersion: 1,
@@ -426,7 +426,7 @@ func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(mocks *serverMocks) {
-				node := &common.DataNodeInfo{ID: "node1"}
+				node := &common.NodeInfo{ID: "node1"}
 				mocks.clusterStateHistoryManager.On("GetNode", "node1").Return(node, true).Once()
 				mocks.clusterStateHistoryManager.On("GetUpdatesSince", int64(1)).Return([]common.NodeUpdate{}, int64(1), nil).Once()
 			},
@@ -467,7 +467,7 @@ func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 		{
 			name: "error: version too old",
 			setupMocks: func(mocks *serverMocks) {
-				node := &common.DataNodeInfo{ID: "node1"}
+				node := &common.NodeInfo{ID: "node1"}
 				mocks.clusterStateHistoryManager.On("GetNode", "node1").Return(node, true).Once()
 				mocks.clusterStateHistoryManager.On("GetUpdatesSince", int64(0)).Return(nil, int64(5), assert.AnError).Once()
 			},
@@ -526,14 +526,14 @@ func TestCoordinator_ListNodes(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(mocks *serverMocks) {
-				nodes := []*common.DataNodeInfo{
+				nodes := []*common.NodeInfo{
 					{ID: "node1", Host: "localhost", Port: 9001, Status: common.NodeHealthy, LastSeen: time.Unix(0, 0)},
 				}
 				mocks.clusterStateHistoryManager.On("ListNodes", mock.Anything).Return(nodes, int64(1)).Once()
 			},
 			req: &proto.ListNodesRequest{},
 			expectedResp: &proto.ListNodesResponse{
-				Nodes: []*proto.DataNodeInfo{
+				Nodes: []*proto.NodeInfo{
 					{Id: "node1", IpAddress: "localhost", Port: 9001, Status: proto.NodeStatus_NODE_HEALTHY, LastSeen: timestamppb.New(time.Unix(0, 0))},
 				},
 				CurrentVersion: 1,
@@ -543,11 +543,11 @@ func TestCoordinator_ListNodes(t *testing.T) {
 		{
 			name: "success: no nodes",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.clusterStateHistoryManager.On("ListNodes", mock.Anything).Return([]*common.DataNodeInfo{}, int64(0)).Once()
+				mocks.clusterStateHistoryManager.On("ListNodes", mock.Anything).Return([]*common.NodeInfo{}, int64(0)).Once()
 			},
 			req: &proto.ListNodesRequest{},
 			expectedResp: &proto.ListNodesResponse{
-				Nodes:          []*proto.DataNodeInfo{},
+				Nodes:          []*proto.NodeInfo{},
 				CurrentVersion: 0,
 			},
 			expectErr: false,

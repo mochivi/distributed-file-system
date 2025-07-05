@@ -16,6 +16,6 @@ func NewMockHeartbeatController() *MockHeartbeatController {
 	}
 }
 
-func (m *MockHeartbeatController) Run(info *common.DataNodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error {
+func (m *MockHeartbeatController) Run(info *common.NodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error {
 	return m.Called(info, csm, cf).Error(0)
 }

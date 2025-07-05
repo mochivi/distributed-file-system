@@ -35,7 +35,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 		params           UploadChunkStreamParams
 		setupMocks       func(*testutils.MockBidiStreamClient)
 		expectErr        bool
-		expectedReplicas []*common.DataNodeInfo
+		expectedReplicas []*common.NodeInfo
 	}{
 		{
 			name:   "success",
@@ -51,8 +51,8 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 				s.On("CloseSend").Return(nil).Once()
 				s.On("Recv").Return(&proto.ChunkDataAck{Success: true}, nil).Once()
 
-				replicas := []*common.DataNodeInfo{{ID: "node1", Host: "localhost", Port: 9001}}
-				var protoReplicas []*proto.DataNodeInfo
+				replicas := []*common.NodeInfo{{ID: "node1", Host: "localhost", Port: 9001}}
+				var protoReplicas []*proto.NodeInfo
 				for _, r := range replicas {
 					protoReplicas = append(protoReplicas, r.ToProto())
 				}
@@ -62,7 +62,7 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 				}, nil).Once()
 			},
 			expectErr: false,
-			expectedReplicas: []*common.DataNodeInfo{
+			expectedReplicas: []*common.NodeInfo{
 				{ID: "node1", Host: "localhost", Port: 9001},
 			},
 		},

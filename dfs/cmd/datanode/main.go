@@ -71,7 +71,7 @@ func main() {
 	// Load datanode info
 	datanodeHost := utils.GetEnvString("DATANODE_HOST", "0.0.0.0")
 	datanodePort := utils.GetEnvInt("DATANODE_PORT", 8081)
-	datanodeInfo := common.DataNodeInfo{
+	datanodeInfo := common.NodeInfo{
 		ID:       uuid.NewString(),
 		Host:     datanodeHost,
 		Port:     8081,

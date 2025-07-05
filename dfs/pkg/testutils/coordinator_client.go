@@ -32,7 +32,7 @@ func NewTestCoordinatorClientWithStubServer(t *testing.T, server proto.Coordinat
 		_ = grpcServer.Serve(lis)
 	}()
 
-	nodeInfo := &common.DataNodeInfo{
+	nodeInfo := &common.NodeInfo{
 		ID:   "node-1",
 		Host: "127.0.0.1",
 		Port: func() int {
@@ -73,7 +73,7 @@ func NewTestDataNodeClientWithStubServer(t *testing.T, server proto.DataNodeServ
 		_ = grpcServer.Serve(lis)
 	}()
 
-	nodeInfo := &common.DataNodeInfo{
+	nodeInfo := &common.NodeInfo{
 		ID:   "node-1",
 		Host: "127.0.0.1",
 		Port: func() int {

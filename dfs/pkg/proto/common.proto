@@ -26,10 +26,10 @@ message ChunkHeader {
 
 message ChunkInfo {
   ChunkHeader header = 1;
-  repeated DataNodeInfo replicas = 3;  // DataNodes storing this chunk
+  repeated NodeInfo replicas = 3;  // DataNodes storing this chunk
 }  
 
-message DataNodeInfo {
+message NodeInfo {
   string id = 1;
   string ip_address = 2;
   int32 port = 3;

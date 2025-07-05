@@ -59,7 +59,7 @@ func TestCommit(t *testing.T) {
 				ms.On("PutFile", "/test/success.txt", mock.AnythingOfType("*common.FileInfo")).Return(nil).Once()
 			},
 			expectErr:     false,
-			testChunkInfo: []common.ChunkInfo{{Replicas: []*common.DataNodeInfo{{ID: "node1"}}}},
+			testChunkInfo: []common.ChunkInfo{{Replicas: []*common.NodeInfo{{ID: "node1"}}}},
 		},
 		{
 			name:          "error: session not found",
@@ -91,7 +91,7 @@ func TestCommit(t *testing.T) {
 				ms.On("PutFile", "/test/store_failure.txt", mock.AnythingOfType("*common.FileInfo")).Return(assert.AnError).Once()
 			},
 			expectErr:     true,
-			testChunkInfo: []common.ChunkInfo{{Replicas: []*common.DataNodeInfo{{ID: "node1"}}}},
+			testChunkInfo: []common.ChunkInfo{{Replicas: []*common.NodeInfo{{ID: "node1"}}}},
 		},
 	}
 

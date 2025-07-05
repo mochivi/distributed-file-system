@@ -15,7 +15,7 @@ type ClusterStateHistoryManager interface {
 	GetUpdatesSince(sinceVersion int64) ([]common.NodeUpdate, int64, error)
 	IsVersionTooOld(version int64) bool
 	GetOldestVersionInHistory() int64
-	GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool)
+	GetAvailableNodesForChunk(replicaIDs []*common.NodeInfo) ([]*common.NodeInfo, bool)
 }
 
 type ClusterStateHistoryManagerConfig struct {
@@ -43,13 +43,13 @@ func NewClusterStateHistoryManager(config ClusterStateHistoryManagerConfig) *clu
 	}
 }
 
-func (m *clusterStateHistoryManager) GetNode(nodeID string) (*common.DataNodeInfo, bool) {
+func (m *clusterStateHistoryManager) GetNode(nodeID string) (*common.NodeInfo, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.store.getNode(nodeID)
 }
 
-func (m *clusterStateHistoryManager) AddNode(node *common.DataNodeInfo) {
+func (m *clusterStateHistoryManager) AddNode(node *common.NodeInfo) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.version++
@@ -70,7 +70,7 @@ func (m *clusterStateHistoryManager) RemoveNode(nodeID string) error {
 	return nil
 }
 
-func (m *clusterStateHistoryManager) UpdateNode(node *common.DataNodeInfo) error {
+func (m *clusterStateHistoryManager) UpdateNode(node *common.NodeInfo) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	_, ok := m.store.getNode(node.ID)
@@ -83,11 +83,11 @@ func (m *clusterStateHistoryManager) UpdateNode(node *common.DataNodeInfo) error
 	return nil
 }
 
-func (m *clusterStateHistoryManager) ListNodes(n ...int) ([]*common.DataNodeInfo, int64) {
+func (m *clusterStateHistoryManager) ListNodes(n ...int) ([]*common.NodeInfo, int64) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	nodes := make([]*common.DataNodeInfo, 0, len(m.store.nodes))
+	nodes := make([]*common.NodeInfo, 0, len(m.store.nodes))
 	for _, node := range m.store.listNodes(n...) {
 		if len(n) > 0 && len(nodes) >= n[0] {
 			break
@@ -189,20 +189,20 @@ func (m *clusterStateHistoryManager) ApplyUpdates(updates []common.NodeUpdate) {
 	}
 }
 
-// Given an array of DataNodeInfo, initialize the nodes
+// Given an array of NodeInfo, initialize the nodes
 // only used by data nodes when registering with the coordinator
-func (m *clusterStateHistoryManager) InitializeNodes(nodes []*common.DataNodeInfo, currentVersion int64) {
+func (m *clusterStateHistoryManager) InitializeNodes(nodes []*common.NodeInfo, currentVersion int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.store.initializeNodes(nodes)
 	m.version = currentVersion
 }
 
-func (m *clusterStateHistoryManager) GetAvailableNodesForChunk(replicaIDs []*common.DataNodeInfo) ([]*common.DataNodeInfo, bool) {
+func (m *clusterStateHistoryManager) GetAvailableNodesForChunk(replicaIDs []*common.NodeInfo) ([]*common.NodeInfo, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	var nodes []*common.DataNodeInfo
+	var nodes []*common.NodeInfo
 	for _, replicaNode := range replicaIDs {
 		// Check if the node is still considered available
 		node, ok := m.store.getNode(replicaNode.ID)
@@ -218,7 +218,7 @@ func (m *clusterStateHistoryManager) GetAvailableNodesForChunk(replicaIDs []*com
 	return nodes, true
 }
 
-func (m *clusterStateHistoryManager) addToHistory(updateType common.NodeUpdateType, node *common.DataNodeInfo) {
+func (m *clusterStateHistoryManager) addToHistory(updateType common.NodeUpdateType, node *common.NodeInfo) {
 	update := common.NodeUpdate{
 		Version:   m.version,
 		Type:      updateType,

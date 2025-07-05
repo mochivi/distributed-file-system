@@ -37,7 +37,7 @@ message UploadResponse {
 
 message ChunkLocation {
   string chunk_id = 1;
-  repeated DataNodeInfo nodes = 2;
+  repeated NodeInfo nodes = 2;
 }
 
 // Download file request/response
@@ -79,14 +79,14 @@ message ListResponse {
 
 // Node management
 message RegisterDataNodeRequest {
-  DataNodeInfo node_info = 1;
+  NodeInfo node_info = 1;
 }
 message RegisterDataNodeResponse {
   bool success = 1;
   string message = 2;
 
   // Initial full snapshot of all nodes
-  repeated DataNodeInfo full_node_list = 3;
+  repeated NodeInfo full_node_list = 3;
 
   // Current version to track incremental updates
   int64 current_version = 4;
@@ -114,7 +114,7 @@ message HeartbeatResponse {
 message ListNodesRequest {}
 
 message ListNodesResponse {
-  repeated DataNodeInfo nodes = 1;
+  repeated NodeInfo nodes = 1;
   int64 current_version = 2;
 }
 
@@ -128,7 +128,7 @@ message NodeUpdate {
   // Monotonic version number for ordering
   int64 version = 1;
   UpdateType type = 2;
-  DataNodeInfo node = 3;
+  NodeInfo node = 3;
 
   // Timestamp for debugging/monitoring
   google.protobuf.Timestamp timestamp = 4;

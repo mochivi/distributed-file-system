@@ -11,7 +11,7 @@ import (
 )
 
 func TestNodeSelector_SelectBestNodes(t *testing.T) {
-	nodes := []*common.DataNodeInfo{
+	nodes := []*common.NodeInfo{
 		{ID: "node-1", Status: common.NodeHealthy},
 		{ID: "node-2", Status: common.NodeUnhealthy},
 		{ID: "node-3", Status: common.NodeHealthy},
@@ -22,15 +22,15 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 	testCases := []struct {
 		name          string
 		n             int
-		nodesToReturn []*common.DataNodeInfo
-		expectedNodes []*common.DataNodeInfo
+		nodesToReturn []*common.NodeInfo
+		expectedNodes []*common.NodeInfo
 		expectedOk    bool
 	}{
 		{
 			name:          "success: select 2 healthy nodes",
 			n:             2,
 			nodesToReturn: nodes,
-			expectedNodes: []*common.DataNodeInfo{
+			expectedNodes: []*common.NodeInfo{
 				{ID: "node-1", Status: common.NodeHealthy},
 				{ID: "node-3", Status: common.NodeHealthy},
 			},
@@ -40,7 +40,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 			name:          "success: select 3 healthy nodes",
 			n:             3,
 			nodesToReturn: nodes,
-			expectedNodes: []*common.DataNodeInfo{
+			expectedNodes: []*common.NodeInfo{
 				{ID: "node-1", Status: common.NodeHealthy},
 				{ID: "node-3", Status: common.NodeHealthy},
 				{ID: "node-4", Status: common.NodeHealthy},
@@ -51,7 +51,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 			name:          "Success: request more healthy nodes than available",
 			n:             6,
 			nodesToReturn: nodes,
-			expectedNodes: []*common.DataNodeInfo{
+			expectedNodes: []*common.NodeInfo{
 				{ID: "node-1", Status: common.NodeHealthy},
 				{ID: "node-3", Status: common.NodeHealthy},
 				{ID: "node-4", Status: common.NodeHealthy},
@@ -71,7 +71,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 		{
 			name: "error: no healthy nodes available",
 			n:    1,
-			nodesToReturn: []*common.DataNodeInfo{
+			nodesToReturn: []*common.NodeInfo{
 				{ID: "node-1", Status: common.NodeUnhealthy},
 				{ID: "node-2", Status: common.NodeUnhealthy},
 			},
@@ -81,7 +81,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 		{
 			name:          "error: no nodes in cluster",
 			n:             1,
-			nodesToReturn: []*common.DataNodeInfo{},
+			nodesToReturn: []*common.NodeInfo{},
 			expectedNodes: nil,
 			expectedOk:    false,
 		},

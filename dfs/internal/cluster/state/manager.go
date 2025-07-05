@@ -9,16 +9,16 @@ import (
 
 // Read-only interface
 type ClusterStateViewer interface {
-	ListNodes(n ...int) ([]*common.DataNodeInfo, int64)
-	GetNode(nodeID string) (*common.DataNodeInfo, bool)
+	ListNodes(n ...int) ([]*common.NodeInfo, int64)
+	GetNode(nodeID string) (*common.NodeInfo, bool)
 }
 
 // Write-only interface
 type ClusterStateManager interface {
-	AddNode(node *common.DataNodeInfo)
+	AddNode(node *common.NodeInfo)
 	RemoveNode(nodeID string) error
-	UpdateNode(node *common.DataNodeInfo) error
-	InitializeNodes(nodes []*common.DataNodeInfo, version int64)
+	UpdateNode(node *common.NodeInfo) error
+	InitializeNodes(nodes []*common.NodeInfo, version int64)
 	ApplyUpdates(updates []common.NodeUpdate)
 	GetCurrentVersion() int64
 }
@@ -37,19 +37,19 @@ func NewClusterStateManager() *clusterStateManager {
 	}
 }
 
-func (v *clusterStateManager) GetNode(nodeID string) (*common.DataNodeInfo, bool) {
+func (v *clusterStateManager) GetNode(nodeID string) (*common.NodeInfo, bool) {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return v.store.getNode(nodeID)
 }
 
-func (v *clusterStateManager) ListNodes(n ...int) ([]*common.DataNodeInfo, int64) {
+func (v *clusterStateManager) ListNodes(n ...int) ([]*common.NodeInfo, int64) {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return v.store.listNodes(n...), v.version
 }
 
-func (m *clusterStateManager) AddNode(node *common.DataNodeInfo) {
+func (m *clusterStateManager) AddNode(node *common.NodeInfo) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	node.LastSeen = time.Now()
@@ -67,7 +67,7 @@ func (m *clusterStateManager) RemoveNode(nodeID string) error {
 	return nil
 }
 
-func (m *clusterStateManager) UpdateNode(node *common.DataNodeInfo) error {
+func (m *clusterStateManager) UpdateNode(node *common.NodeInfo) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if err := m.store.updateNode(node); err != nil {
@@ -104,7 +104,7 @@ func (m *clusterStateManager) ApplyUpdates(updates []common.NodeUpdate) {
 	}
 }
 
-func (m *clusterStateManager) InitializeNodes(nodes []*common.DataNodeInfo, version int64) {
+func (m *clusterStateManager) InitializeNodes(nodes []*common.NodeInfo, version int64) {
 	m.store.initializeNodes(nodes)
 	m.version = version
 }

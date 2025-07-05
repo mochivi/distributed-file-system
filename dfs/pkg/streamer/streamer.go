@@ -19,7 +19,7 @@ import (
 
 type IStreamer interface {
 	SendChunkStream(ctx context.Context, stream grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck],
-		logger *slog.Logger, params UploadChunkStreamParams) ([]*common.DataNodeInfo, error)
+		logger *slog.Logger, params UploadChunkStreamParams) ([]*common.NodeInfo, error)
 	ReceiveChunkStream(ctx context.Context, stream grpc.ServerStreamingClient[proto.ChunkDataStream],
 		buffer *bytes.Buffer, logger *slog.Logger, params DownloadChunkStreamParams) error
 }
@@ -48,7 +48,7 @@ type DownloadChunkStreamParams struct {
 
 // Initiate a stream to send a chunk to a datanode
 func (s *Streamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck],
-	logger *slog.Logger, params UploadChunkStreamParams) ([]*common.DataNodeInfo, error) {
+	logger *slog.Logger, params UploadChunkStreamParams) ([]*common.NodeInfo, error) {
 
 	logger = logging.OperationLogger(logger, "stream_chunk", slog.String("session_id", params.SessionID))
 	logger.Debug("Initializing chunk data stream")

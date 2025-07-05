@@ -41,7 +41,7 @@ func (m *serverMocks) assertExpectations(t *testing.T) {
 }
 
 func TestDataNodeServer_PrepareChunkUpload(t *testing.T) {
-	defaultInfo := &common.DataNodeInfo{ID: "test-node", Capacity: 2048, Used: 1024}
+	defaultInfo := &common.NodeInfo{ID: "test-node", Capacity: 2048, Used: 1024}
 	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 
@@ -145,7 +145,7 @@ func TestDataNodeServer_PrepareChunkUpload(t *testing.T) {
 }
 
 func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
-	defaultInfo := &common.DataNodeInfo{ID: "test-node"}
+	defaultInfo := &common.NodeInfo{ID: "test-node"}
 	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 	chunkHeader := common.ChunkHeader{ID: "chunk1", Size: 1024, Checksum: "abc"}
@@ -233,7 +233,7 @@ func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 }
 
 func TestDataNodeServer_DeleteChunk(t *testing.T) {
-	defaultInfo := &common.DataNodeInfo{ID: "test-node"}
+	defaultInfo := &common.NodeInfo{ID: "test-node"}
 	defaultConfig := config.DataNodeConfig{}
 	logger := logging.NewTestLogger(slog.LevelError)
 
@@ -302,7 +302,7 @@ func TestDataNodeServer_DeleteChunk(t *testing.T) {
 }
 
 func TestDataNodeServer_UploadChunkStream(t *testing.T) {
-	defaultInfo := &common.DataNodeInfo{ID: "test-node", Capacity: 2048, Used: 1024}
+	defaultInfo := &common.NodeInfo{ID: "test-node", Capacity: 2048, Used: 1024}
 	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 
@@ -405,7 +405,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 					ExpiresAt:       time.Now().Add(1 * time.Minute),
 					logger:          logger,
 				}
-				nodes := []*common.DataNodeInfo{{ID: "node1"}, {ID: "node2"}}
+				nodes := []*common.NodeInfo{{ID: "node1"}, {ID: "node2"}}
 				m.sessionManager.On("Load", "session3").Return(session, true)
 				m.sessionManager.On("Delete", "session3").Return()
 				m.store.On("Store", session.ChunkHeader, []byte("test data!")).Return(nil)
@@ -573,7 +573,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 }
 
 func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
-	defaultInfo := &common.DataNodeInfo{ID: "test-node"}
+	defaultInfo := &common.NodeInfo{ID: "test-node"}
 	defaultConfig := config.DataNodeConfig{Session: config.StreamingSessionManagerConfig{SessionTimeout: 1 * time.Minute}}
 	logger := logging.NewTestLogger(slog.LevelError)
 

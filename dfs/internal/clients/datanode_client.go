@@ -13,10 +13,10 @@ import (
 type DataNodeClient struct {
 	client proto.DataNodeServiceClient
 	conn   *grpc.ClientConn
-	Node   *common.DataNodeInfo
+	Node   *common.NodeInfo
 }
 
-func NewDataNodeClient(node *common.DataNodeInfo, opts ...grpc.DialOption) (*DataNodeClient, error) {
+func NewDataNodeClient(node *common.NodeInfo, opts ...grpc.DialOption) (*DataNodeClient, error) {
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	conn, err := grpc.NewClient(

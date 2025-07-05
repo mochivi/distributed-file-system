@@ -11,25 +11,25 @@ import (
 
 type CoordinatorFinder interface {
 	GetCoordinator(nodeID string) (clients.ICoordinatorClient, bool)
-	AddCoordinator(node *common.DataNodeInfo)
+	AddCoordinator(node *common.NodeInfo)
 	RemoveCoordinator(nodeID string)
-	ListCoordinators() []*common.DataNodeInfo
+	ListCoordinators() []*common.NodeInfo
 	GetLeaderCoordinator() (clients.ICoordinatorClient, bool)
 	BootstrapCoordinator() error
 }
 
-type ClientConnectionFunc func(node *common.DataNodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error)
+type ClientConnectionFunc func(node *common.NodeInfo, opts ...grpc.DialOption) (clients.ICoordinatorClient, error)
 
 // Coordinator node manager
 type coordinatorFinder struct {
-	nodes                map[string]*common.DataNodeInfo // coordinator nodes
+	nodes                map[string]*common.NodeInfo // coordinator nodes
 	mu                   sync.RWMutex
 	clientConnectionFunc ClientConnectionFunc
 }
 
 func NewCoordinatorFinder() *coordinatorFinder {
 	return &coordinatorFinder{
-		nodes:                make(map[string]*common.DataNodeInfo),
+		nodes:                make(map[string]*common.NodeInfo),
 		mu:                   sync.RWMutex{},
 		clientConnectionFunc: clients.NewCoordinatorClient, // for testing
 	}
@@ -38,7 +38,7 @@ func NewCoordinatorFinder() *coordinatorFinder {
 func (m *coordinatorFinder) BootstrapCoordinator() error {
 	coordinatorHost := utils.GetEnvString("COORDINATOR_HOST", "coordinator")
 	coordinatorPort := utils.GetEnvInt("COORDINATOR_PORT", 8080)
-	coordinatorNode := &common.DataNodeInfo{
+	coordinatorNode := &common.NodeInfo{
 		ID:     "coordinator", // TODO: change to coordinator ID when implemented, should be received from some service discovery/config storage system
 		Host:   coordinatorHost,
 		Port:   coordinatorPort,
@@ -48,7 +48,7 @@ func (m *coordinatorFinder) BootstrapCoordinator() error {
 	return nil
 }
 
-func (m *coordinatorFinder) AddCoordinator(node *common.DataNodeInfo) {
+func (m *coordinatorFinder) AddCoordinator(node *common.NodeInfo) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.nodes[node.ID] = node
@@ -103,7 +103,7 @@ func (m *coordinatorFinder) GetLeaderCoordinator() (clients.ICoordinatorClient, 
 	return nil, false
 }
 
-func (m *coordinatorFinder) ListCoordinators() []*common.DataNodeInfo {
+func (m *coordinatorFinder) ListCoordinators() []*common.NodeInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -111,7 +111,7 @@ func (m *coordinatorFinder) ListCoordinators() []*common.DataNodeInfo {
 		return nil
 	}
 
-	nodes := make([]*common.DataNodeInfo, 0, len(m.nodes))
+	nodes := make([]*common.NodeInfo, 0, len(m.nodes))
 	for _, node := range m.nodes {
 		nodes = append(nodes, node)
 	}
