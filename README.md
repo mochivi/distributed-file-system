@@ -338,8 +338,10 @@ make e2e
 
 ### Debugging Tests
 ```bash
-# Enable debug logging
-export DFS_LOGGING_LEVEL=debug
+# Enable debug logging - modify in .env file
+LOG_LEVEL=info # debug, info, warn, error
+ENVIRONMENT=development # development, production
+DEBUG_E2E_TESTS=false # true, false
 
 # View specific logs
 docker logs dfs_coordinator_1
