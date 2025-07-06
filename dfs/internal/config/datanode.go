@@ -25,6 +25,7 @@ type DataNodeConfig struct {
 	Replication      ParallelReplicationServiceConfig `mapstructure:"replication" validate:"required"`
 	DiskStorage      DiskStorageConfig                `mapstructure:"disk_storage" validate:"required"`
 	Streamer         StreamerConfig                   `mapstructure:"streamer" validate:"required"`
+	BulkDelete       BulkDeleteConfig                 `mapstructure:"bulk_delete" validate:"required"`
 }
 
 func DefaultDataNodeConfig() DataNodeConfig {
@@ -33,6 +34,19 @@ func DefaultDataNodeConfig() DataNodeConfig {
 		Replication:      DefaultParallelReplicationServiceConfig(),
 		DiskStorage:      DefaultDiskStorageConfig(),
 		Streamer:         DefaultStreamerConfig(false),
+		BulkDelete:       DefaultBulkDeleteConfig(),
+	}
+}
+
+type BulkDeleteConfig struct {
+	MaxConcurrentDeletes int           `mapstructure:"max_concurrent_deletes" validate:"required,gt=0"`
+	Timeout              time.Duration `mapstructure:"timeout" validate:"required,gt=0"`
+}
+
+func DefaultBulkDeleteConfig() BulkDeleteConfig {
+	return BulkDeleteConfig{
+		MaxConcurrentDeletes: 10,
+		Timeout:              1 * time.Minute,
 	}
 }
 

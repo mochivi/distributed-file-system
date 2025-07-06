@@ -153,27 +153,24 @@ func (bcr BulkDeleteChunkRequest) ToProto() *proto.BulkDeleteChunkRequest {
 }
 
 type BulkDeleteChunkResponse struct {
-	Success    bool
-	Message    string
-	Failed     []string
-	InProgress []string
+	Success bool
+	Message string
+	Failed  []string
 }
 
 func BulkDeleteChunkResponseFromProto(pb *proto.BulkDeleteChunkResponse) BulkDeleteChunkResponse {
 	return BulkDeleteChunkResponse{
-		Success:    pb.Success,
-		Message:    pb.Message,
-		Failed:     pb.Failed,
-		InProgress: pb.InProgress,
+		Success: pb.Success,
+		Message: pb.Message,
+		Failed:  pb.Failed,
 	}
 }
 
 func (bcr BulkDeleteChunkResponse) ToProto() *proto.BulkDeleteChunkResponse {
 	return &proto.BulkDeleteChunkResponse{
-		Success:    bcr.Success,
-		Message:    bcr.Message,
-		Failed:     bcr.Failed,
-		InProgress: bcr.InProgress,
+		Success: bcr.Success,
+		Message: bcr.Message,
+		Failed:  bcr.Failed,
 	}
 }
 

@@ -78,10 +78,7 @@ message BulkDeleteChunkResponse {
   string message = 2;
   
   // ChunkIDs that failed to delete
-  repeated string failed = 3;  
-
-  // ChunkIDs in process of deletion
-  repeated string in_progress = 4;
+  repeated string failed = 3;
 }
 
 message ChunkDataStream {

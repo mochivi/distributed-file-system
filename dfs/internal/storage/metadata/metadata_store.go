@@ -45,7 +45,7 @@ func (m *MetadataDiskStorage) ListFiles(directory string, recursive bool) ([]*co
 	return nil, nil
 }
 
-func (m *MetadataDiskStorage) GetChunksForNode(nodeID string) (map[string]common.ChunkHeader, error) {
+func (m *MetadataDiskStorage) GetChunksForNode(nodeID string) (map[string]*common.ChunkHeader, error) {
 	return nil, nil
 }
 

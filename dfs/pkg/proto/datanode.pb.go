@@ -440,9 +440,7 @@ type BulkDeleteChunkResponse struct {
 	Success bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	Message string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	// ChunkIDs that failed to delete
-	Failed []string `protobuf:"bytes,3,rep,name=failed,proto3" json:"failed,omitempty"`
-	// ChunkIDs in process of deletion
-	InProgress    []string `protobuf:"bytes,4,rep,name=in_progress,json=inProgress,proto3" json:"in_progress,omitempty"`
+	Failed        []string `protobuf:"bytes,3,rep,name=failed,proto3" json:"failed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -494,13 +492,6 @@ func (x *BulkDeleteChunkResponse) GetMessage() string {
 func (x *BulkDeleteChunkResponse) GetFailed() []string {
 	if x != nil {
 		return x.Failed
-	}
-	return nil
-}
-
-func (x *BulkDeleteChunkResponse) GetInProgress() []string {
-	if x != nil {
-		return x.InProgress
 	}
 	return nil
 }
@@ -783,13 +774,11 @@ const file_datanode_proto_rawDesc = "" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"M\n" +
 	"\x16BulkDeleteChunkRequest\x12\x1b\n" +
 	"\tchunk_ids\x18\x01 \x03(\tR\bchunkIds\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x86\x01\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"e\n" +
 	"\x17BulkDeleteChunkResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x16\n" +
-	"\x06failed\x18\x03 \x03(\tR\x06failed\x12\x1f\n" +
-	"\vin_progress\x18\x04 \x03(\tR\n" +
-	"inProgress\"\xbd\x01\n" +
+	"\x06failed\x18\x03 \x03(\tR\x06failed\"\xbd\x01\n" +
 	"\x0fChunkDataStream\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x19\n" +

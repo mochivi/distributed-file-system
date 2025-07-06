@@ -73,6 +73,15 @@ func (c *DataNodeClient) DeleteChunk(ctx context.Context, req common.DeleteChunk
 	return common.DeleteChunkResponseFromProto(resp), nil
 }
 
+// client -> node
+func (c *DataNodeClient) BulkDeleteChunk(ctx context.Context, req common.BulkDeleteChunkRequest, opts ...grpc.CallOption) (common.BulkDeleteChunkResponse, error) {
+	resp, err := c.client.BulkDeleteChunk(ctx, req.ToProto(), opts...)
+	if err != nil {
+		return common.BulkDeleteChunkResponse{}, err
+	}
+	return common.BulkDeleteChunkResponseFromProto(resp), nil
+}
+
 // node -> node
 // This is a replica node that is receiving the chunk
 // This is a copy of StoreChunk, but with a different method name
