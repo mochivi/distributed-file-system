@@ -34,12 +34,18 @@ func (m *MockMetadataStore) ListFiles(directory string, recursive bool) ([]*comm
 	return args.Get(0).([]*common.FileInfo), args.Error(1)
 }
 
-func (m *MockMetadataStore) GetChunksForNode(nodeID string) (map[string]common.ChunkHeader, error) {
+func (m *MockMetadataStore) GetChunksForNode(nodeID string) (map[string]*common.ChunkHeader, error) {
 	args := m.Called(nodeID)
-	return args.Get(0).(map[string]common.ChunkHeader), args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]*common.ChunkHeader), args.Error(1)
 }
 
-func (m *MockMetadataStore) GetDeletedFiles(olderThan time.Time) ([]string, error) {
+func (m *MockMetadataStore) GetDeletedFiles(olderThan time.Time) ([]*common.FileInfo, error) {
 	args := m.Called(olderThan)
-	return args.Get(0).([]string), args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*common.FileInfo), args.Error(1)
 }

@@ -26,6 +26,8 @@ type FileInfo struct {
 	Chunks     []ChunkInfo
 	CreatedAt  time.Time
 	Checksum   string
+	Deleted    bool
+	DeletedAt  time.Time
 }
 
 func FileInfoFromProto(pb *proto.FileInfo) FileInfo {
@@ -40,6 +42,8 @@ func FileInfoFromProto(pb *proto.FileInfo) FileInfo {
 		Chunks:     chunks,
 		CreatedAt:  pb.CreatedAt.AsTime(),
 		Checksum:   pb.Checksum,
+		Deleted:    pb.Deleted,
+		DeletedAt:  pb.DeletedAt.AsTime(),
 	}
 }
 
@@ -56,6 +60,8 @@ func (fi FileInfo) ToProto() *proto.FileInfo {
 		Chunks:     protoChunks,
 		CreatedAt:  timestamppb.New(fi.CreatedAt),
 		Checksum:   fi.Checksum,
+		Deleted:    fi.Deleted,
+		DeletedAt:  timestamppb.New(fi.DeletedAt),
 	}
 }
 

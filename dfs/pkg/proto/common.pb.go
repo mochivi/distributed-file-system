@@ -79,7 +79,9 @@ type FileInfo struct {
 	ChunkCount    int32                  `protobuf:"varint,3,opt,name=chunk_count,json=chunkCount,proto3" json:"chunk_count,omitempty"`
 	Chunks        []*ChunkInfo           `protobuf:"bytes,4,rep,name=chunks,proto3" json:"chunks,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	Checksum      string                 `protobuf:"bytes,6,opt,name=checksum,proto3" json:"checksum,omitempty"`
+	Deleted       bool                   `protobuf:"varint,6,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	DeletedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
+	Checksum      string                 `protobuf:"bytes,8,opt,name=checksum,proto3" json:"checksum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -145,6 +147,20 @@ func (x *FileInfo) GetChunks() []*ChunkInfo {
 func (x *FileInfo) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *FileInfo) GetDeleted() bool {
+	if x != nil {
+		return x.Deleted
+	}
+	return false
+}
+
+func (x *FileInfo) GetDeletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DeletedAt
 	}
 	return nil
 }
@@ -432,7 +448,7 @@ var File_common_proto protoreflect.FileDescriptor
 
 const file_common_proto_rawDesc = "" +
 	"\n" +
-	"\fcommon.proto\x12\x03dfs\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd2\x01\n" +
+	"\fcommon.proto\x12\x03dfs\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa7\x02\n" +
 	"\bFileInfo\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x1f\n" +
@@ -440,8 +456,11 @@ const file_common_proto_rawDesc = "" +
 	"chunkCount\x12&\n" +
 	"\x06chunks\x18\x04 \x03(\v2\x0e.dfs.ChunkInfoR\x06chunks\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1a\n" +
-	"\bchecksum\x18\x06 \x01(\tR\bchecksum\"}\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x18\n" +
+	"\adeleted\x18\x06 \x01(\bR\adeleted\x129\n" +
+	"\n" +
+	"deleted_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tdeletedAt\x12\x1a\n" +
+	"\bchecksum\x18\b \x01(\tR\bchecksum\"}\n" +
 	"\vChunkHeader\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\rR\aversion\x12\x14\n" +
@@ -495,17 +514,18 @@ var file_common_proto_goTypes = []any{
 var file_common_proto_depIdxs = []int32{
 	3, // 0: dfs.FileInfo.chunks:type_name -> dfs.ChunkInfo
 	6, // 1: dfs.FileInfo.created_at:type_name -> google.protobuf.Timestamp
-	2, // 2: dfs.ChunkInfo.header:type_name -> dfs.ChunkHeader
-	4, // 3: dfs.ChunkInfo.replicas:type_name -> dfs.NodeInfo
-	0, // 4: dfs.NodeInfo.status:type_name -> dfs.NodeStatus
-	6, // 5: dfs.NodeInfo.last_seen:type_name -> google.protobuf.Timestamp
-	0, // 6: dfs.HealthStatus.status:type_name -> dfs.NodeStatus
-	6, // 7: dfs.HealthStatus.last_seen:type_name -> google.protobuf.Timestamp
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	6, // 2: dfs.FileInfo.deleted_at:type_name -> google.protobuf.Timestamp
+	2, // 3: dfs.ChunkInfo.header:type_name -> dfs.ChunkHeader
+	4, // 4: dfs.ChunkInfo.replicas:type_name -> dfs.NodeInfo
+	0, // 5: dfs.NodeInfo.status:type_name -> dfs.NodeStatus
+	6, // 6: dfs.NodeInfo.last_seen:type_name -> google.protobuf.Timestamp
+	0, // 7: dfs.HealthStatus.status:type_name -> dfs.NodeStatus
+	6, // 8: dfs.HealthStatus.last_seen:type_name -> google.protobuf.Timestamp
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_common_proto_init() }

@@ -49,6 +49,6 @@ func (m *MetadataDiskStorage) GetChunksForNode(nodeID string) (map[string]common
 	return nil, nil
 }
 
-func (m *MetadataDiskStorage) GetDeletedFiles(olderThan time.Time) ([]string, error) {
+func (m *MetadataDiskStorage) GetDeletedFiles(olderThan time.Time) ([]*common.FileInfo, error) {
 	return nil, nil
 }
