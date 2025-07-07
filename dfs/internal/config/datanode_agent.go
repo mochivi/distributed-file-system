@@ -43,6 +43,7 @@ func DefaultClusterStateHistoryManagerConfig() *ClusterStateHistoryManagerConfig
 
 type OrphanedChunksGCControllerConfig struct {
 	InventoryScanInterval time.Duration `mapstructure:"inventory_scan_interval" validate:"required,gt=0"`
+	Timeout               time.Duration `mapstructure:"timeout" validate:"required,gt=0"`
 	CleanupBatchSize      int           `mapstructure:"cleanup_batch_size" validate:"required,gt=0"`
 	MaxConcurrentDeletes  int           `mapstructure:"max_concurrent_deletes" validate:"required,gt=0"`
 }
@@ -50,6 +51,7 @@ type OrphanedChunksGCControllerConfig struct {
 func DefaultOrphanedChunksGCControllerConfig() *OrphanedChunksGCControllerConfig {
 	return &OrphanedChunksGCControllerConfig{
 		InventoryScanInterval: 15 * time.Minute,
+		Timeout:               5 * time.Minute,
 		CleanupBatchSize:      50,
 		MaxConcurrentDeletes:  10,
 	}

@@ -24,7 +24,9 @@ type DeletedFilesGCController struct {
 	logger  *slog.Logger
 }
 
-func NewDeletedFilesGCController(ctx context.Context, scanner shared.MetadataScannerProvider, config *config.DeletedFilesGCControllerConfig, logger *slog.Logger) *DeletedFilesGCController {
+func NewDeletedFilesGCController(ctx context.Context, scanner shared.MetadataScannerProvider,
+	config *config.DeletedFilesGCControllerConfig, logger *slog.Logger) *DeletedFilesGCController {
+
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	return &DeletedFilesGCController{
@@ -44,12 +46,12 @@ func (c *DeletedFilesGCController) Run() error {
 	for {
 		select {
 		case <-c.ctx.Done():
-			return nil
+			return c.ctx.Err()
 		case <-ticker.C:
-			c.logger.Info("Garbage collection controller running")
+			c.logger.Info("DeletedFilesGCController cycle starting")
 			cycleCtx, cycleCancel := context.WithTimeout(c.ctx, c.config.Timeout)
 			if err := c.run(cycleCtx); err != nil {
-				c.logger.Error("Garbage collection controller failed", "error", err)
+				c.logger.Error("DeletedFilesGCController failed", slog.Any("error", err))
 			}
 			cycleCancel()
 		}
@@ -61,13 +63,13 @@ func (c *DeletedFilesGCController) Run() error {
 // 3. Send bulk delete requests to the datanodes
 func (c *DeletedFilesGCController) run(ctx context.Context) error {
 	if c.running {
+		c.logger.Error("Tried to start GC cycle while already running")
 		return nil
 	}
-
 	c.running = true
 	defer func() { c.running = false }()
 
-	files, err := c.scanner.GetDeletedFiles(time.Now().Add(-c.config.RecoveryTimeout))
+	files, err := c.scanner.GetDeletedFiles(ctx, time.Now().Add(-c.config.RecoveryTimeout))
 	if err != nil {
 		c.logger.Error("Failed to get deleted files", "error", err)
 		return err

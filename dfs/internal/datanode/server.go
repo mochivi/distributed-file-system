@@ -85,7 +85,7 @@ func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.Dow
 		return nil, status.Errorf(codes.NotFound, "chunk not found")
 	}
 
-	chunkHeader, err := s.store.GetChunkHeader(req.ChunkID)
+	chunkHeader, err := s.store.GetHeader(req.ChunkID)
 	if err != nil {
 		logger.Error("Failed to get chunk info", slog.String("error", err.Error()))
 		return nil, status.Errorf(codes.Internal, "failed to get chunk info: %v", err)
@@ -379,7 +379,7 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 
 	// Retrieve the full chunk data
 	// TODO: this should be a io.Reader of size configurable ChunkStreamSize
-	chunkData, err := s.store.GetChunkData(session.ChunkHeader.ID)
+	chunkData, err := s.store.GetData(session.ChunkHeader.ID)
 	if err != nil {
 		logger.Error("Could not retrieve chunk", slog.String("error", err.Error()))
 		return status.Errorf(codes.Internal, "could not retrieve chunk %s: %v", session.ChunkHeader.ID, err)
