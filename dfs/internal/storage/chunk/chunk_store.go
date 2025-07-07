@@ -136,14 +136,17 @@ func (d *ChunkDiskStorage) GetHeader(chunkID string) (common.ChunkHeader, error)
 
 // Reads all headers for provided chunkIDs, maps them
 // Returns all headers if chunkIDs is not provided
-// TODO: maybe move into a worker pool design, if too many chunks are attemped to be deleted
-// TODO: it could cause a lot of goroutines to just stand around
+// TODO: move into a worker pool design to handle larger loads more effectively
 func (d *ChunkDiskStorage) GetHeaders(ctx context.Context) (map[string]common.ChunkHeader, error) {
 	maxWorkers := 10
 
 	// Queue work into channel
 	paths := make([]string, 0, maxWorkers)
 	if err := filepath.Walk(d.config.RootDir, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			d.logger.Warn("Corrupted file", slog.String("path", path), slog.String("error", err.Error()))
+			return nil
+		}
 		if info.IsDir() {
 			return nil
 		}
