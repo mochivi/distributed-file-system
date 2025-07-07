@@ -19,7 +19,7 @@ type OrphanedChunksGCController struct {
 	cancel  context.CancelCauseFunc
 	scanner shared.MetadataScannerProvider
 	store   storage.ChunkStorage // maybe abstract later
-	running bool
+	running bool                 // No need for mutex as a single goroutine runs the GC
 	config  *config.OrphanedChunksGCControllerConfig
 	nodeID  string // Must be replaced with some reader of nodeInformation, which could be updated, nodeID should be immutable but it is a good pattern
 	logger  *slog.Logger
@@ -56,7 +56,7 @@ func (c *OrphanedChunksGCController) Run() error {
 				}
 				c.logger.Error("Failed to delete orphaned chunks", slog.Any("error", err))
 			}
-			// Handle failed or leftover items: queue, log, report, decide
+			// TODO: Handle failed or leftover items: queue, log, report, decide
 			handleFailed(failed)
 
 			cycleCancel()
@@ -81,10 +81,7 @@ func (c *OrphanedChunksGCController) run(ctx context.Context) ([]string, error) 
 	}
 
 	// Compare expected vs actual
-	orphaned, err := findOrphanedChunks(expectedChunks, actualChunks)
-	if err != nil {
-		return nil, err
-	}
+	orphaned := findOrphanedChunks(expectedChunks, actualChunks)
 
 	// Delegate deletion
 	failed, err := c.store.BulkDelete(ctx, c.config.MaxConcurrentDeletes, orphaned)
@@ -136,7 +133,7 @@ func getChunks(ctx context.Context, nodeID string, scanner shared.MetadataScanne
 }
 
 func findOrphanedChunks(expectedChunks map[string]*common.ChunkHeader,
-	actualChunks map[string]common.ChunkHeader) ([]string, error) {
+	actualChunks map[string]common.ChunkHeader) []string {
 
 	orphaned := make([]string, 0, len(actualChunks))
 	for id := range actualChunks {
@@ -144,6 +141,5 @@ func findOrphanedChunks(expectedChunks map[string]*common.ChunkHeader,
 			orphaned = append(orphaned, id)
 		}
 	}
-
-	return orphaned, nil
+	return orphaned
 }

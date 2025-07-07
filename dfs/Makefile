@@ -35,7 +35,7 @@ e2e-down:
 # Run tests
 test:
 	@echo "Running tests..."
-	@go test -v $$(go list ./... | grep -v 'tests/e2e') -race
+	@go test $(if $(V),-v) $$(go list ./... | grep -v 'tests/e2e') -race
 
 # Install dependencies
 deps:

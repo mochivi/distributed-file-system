@@ -136,12 +136,17 @@ func (d *ChunkDiskStorage) GetHeader(chunkID string) (common.ChunkHeader, error)
 
 // Reads all headers for provided chunkIDs, maps them
 // Returns all headers if chunkIDs is not provided
+// TODO: maybe move into a worker pool design, if too many chunks are attemped to be deleted
+// TODO: it could cause a lot of goroutines to just stand around
 func (d *ChunkDiskStorage) GetHeaders(ctx context.Context) (map[string]common.ChunkHeader, error) {
 	maxWorkers := 10
 
 	// Queue work into channel
-	paths := make([]string, maxWorkers)
+	paths := make([]string, 0, maxWorkers)
 	if err := filepath.Walk(d.config.RootDir, func(path string, info fs.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
 		paths = append(paths, path)
 		return nil
 	}); err != nil {
@@ -156,7 +161,7 @@ func (d *ChunkDiskStorage) GetHeaders(ctx context.Context) (map[string]common.Ch
 		header common.ChunkHeader
 		err    error
 	}
-	resultCh := make(chan result, maxWorkers)
+	resultCh := make(chan result, len(paths))
 
 	// Read chunk headers
 	for _, path := range paths {
@@ -187,8 +192,11 @@ func (d *ChunkDiskStorage) GetHeaders(ctx context.Context) (map[string]common.Ch
 			resultCh <- result{header: header}
 		}(path)
 	}
-	wg.Wait()
-	close(resultCh)
+
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
 
 	// Inneficient, would be best to know how many files are stored first and adding capacity
 	headers := make(map[string]common.ChunkHeader, 0)
@@ -261,7 +269,7 @@ func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes 
 		id  string
 		err error
 	}
-	resultCh := make(chan result, maxConcurrentDeletes)
+	resultCh := make(chan result, len(chunkIDs))
 
 	// Launch all goroutines - not the best
 	for _, chunkID := range chunkIDs {
