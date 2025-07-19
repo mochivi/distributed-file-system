@@ -2,6 +2,7 @@ package coordinator_controllers
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -58,6 +59,12 @@ func (c *DeletedFilesGCController) Run() error {
 	}
 }
 
+// Create batched work items
+type deleteWork struct {
+	client   *clients.DataNodeClient
+	chunkIDs []string
+}
+
 // 1. Retrieve the list of files that are marked for deletion using the metadata scanner
 // 2. Aggregate the list of chunks for each node
 // 3. Send bulk delete requests to the datanodes
@@ -75,6 +82,31 @@ func (c *DeletedFilesGCController) run(ctx context.Context) error {
 		return err
 	}
 
+	// From each file, retrieve what chunkIDs each datanode holds + a grpc connection to each datanode
+	nodeToChunks, nodeToClient := prepareChunkMappings(files, c.logger)
+
+	// Queue work using a buffered channel
+	workCh := make(chan *deleteWork, c.config.ConcurrentRequests)
+	go queueWork(workCh, nodeToClient, nodeToChunks, c.config.BatchSize)
+
+	// Run worker pool
+	wg := sync.WaitGroup{}
+
+	for i := 0; i < c.config.ConcurrentRequests; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := doWork(ctx, workCh); err != nil {
+				c.logger.Error("Failed to bulk delete chunks", "error", err)
+			}
+		}()
+	}
+
+	wg.Wait()
+	return nil
+}
+
+func prepareChunkMappings(files []*common.FileInfo, logger *slog.Logger) (map[string][]string, map[string]*clients.DataNodeClient) {
 	// Group chunks by node FIRST, then create work items
 	nodeToChunks := make(map[string][]string)
 	nodeToClient := make(map[string]*clients.DataNodeClient)
@@ -86,11 +118,10 @@ func (c *DeletedFilesGCController) run(ctx context.Context) error {
 
 		for _, chunk := range file.Chunks {
 			for _, node := range chunk.Replicas {
-				// Create client once per node
-				if nodeToClient[node.ID] == nil {
+				if _, ok := nodeToClient[node.ID]; !ok {
 					client, err := clients.NewDataNodeClient(node)
 					if err != nil {
-						c.logger.Error("Failed to create client", "error", err)
+						logger.Error("Failed to create client", "error", err)
 						continue
 					}
 					nodeToClient[node.ID] = client
@@ -105,62 +136,52 @@ func (c *DeletedFilesGCController) run(ctx context.Context) error {
 		}
 	}
 
-	// Create batched work items
-	type Work struct {
-		client   *clients.DataNodeClient
-		chunkIDs []string
-	}
+	return nodeToChunks, nodeToClient
+}
 
-	// Queue work
-	works := make(chan *Work)
-	go func() {
-		defer close(works)
+func queueWork(workCh chan<- *deleteWork, nodeToClient map[string]*clients.DataNodeClient,
+	nodeToChunks map[string][]string, batchSize int) {
 
-		for nodeID, allChunks := range nodeToChunks {
-			client := nodeToClient[nodeID]
+	defer close(workCh)
 
-			// Create properly sized batches
-			for start := 0; start < len(allChunks); start += c.config.BatchSize {
-				end := start + c.config.BatchSize
-				if end > len(allChunks) {
-					end = len(allChunks)
-				}
+	for nodeID, allChunks := range nodeToChunks {
 
-				works <- &Work{
-					client:   client,
-					chunkIDs: allChunks[start:end],
-				}
+		// Limit the amount of chunkIDs that can be requested in a single request to the same node
+		// TODO: however, in the processWork section, requests to the same node still might be sent by different workers
+		// TODO: without any time limit between them, making batching useless, somehow we should improve this
+		for start := 0; start < len(allChunks); start += batchSize {
+			end := min(start+batchSize, len(allChunks))
+
+			// Blocks if the channel is full
+			workCh <- &deleteWork{
+				client:   nodeToClient[nodeID],
+				chunkIDs: allChunks[start:end],
 			}
 		}
-	}()
-
-	// Run worker pool
-	sem := make(chan struct{}, c.config.ConcurrentRequests)
-	wg := sync.WaitGroup{}
-
-	for work := range works {
-		wg.Add(1)
-		go func(w *Work) {
-			defer wg.Done()
-			select {
-			case <-ctx.Done():
-				return
-			case sem <- struct{}{}:
-				defer func() { <-sem }()
-				break
-			}
-
-			// Simple single request per work item
-			req := common.BulkDeleteChunkRequest{ChunkIDs: w.chunkIDs}
-			_, err := w.client.BulkDeleteChunk(ctx, req)
-			if err != nil {
-				c.logger.Error("Failed to bulk delete chunks",
-					"chunk_count", len(w.chunkIDs), "error", err)
-			}
-			w.client.Close()
-		}(work)
 	}
+}
 
-	wg.Wait()
+func doWork(ctx context.Context, workCh <-chan *deleteWork) error {
+	for {
+		select {
+		case work, ok := <-workCh:
+			if !ok { // channel closed, all items processed, no more work, return
+				return nil
+			}
+			if err := processWork(ctx, work); err != nil {
+				return fmt.Errorf("failed to delete %d chunks: %w", len(work.chunkIDs), err)
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func processWork(ctx context.Context, work *deleteWork) error {
+	defer work.client.Close()
+	req := common.BulkDeleteChunkRequest{ChunkIDs: work.chunkIDs}
+	if _, err := work.client.BulkDeleteChunk(ctx, req); err != nil {
+		return err
+	}
 	return nil
 }
