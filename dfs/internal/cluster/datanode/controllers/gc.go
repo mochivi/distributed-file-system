@@ -34,6 +34,7 @@ func NewOrphanedChunksGCController(ctx context.Context, scanner shared.MetadataS
 		scanner: scanner,
 		store:   store,
 		config:  config,
+		nodeID:  nodeID,
 		logger:  logger,
 	}
 }
