@@ -435,7 +435,7 @@ func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([
 	}
 
 	// Create clients
-	var replicationClients []*clients.DataNodeClient
+	var replicationClients []clients.IDataNodeClient
 	for _, node := range nodes {
 		client, err := clients.NewDataNodeClient(node)
 		if err != nil {

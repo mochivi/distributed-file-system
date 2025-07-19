@@ -22,7 +22,7 @@ type DownloaderConfig struct {
 
 type DownloadWork struct {
 	chunkHeader common.ChunkHeader
-	client      *clients.DataNodeClient
+	client      clients.IDataNodeClient
 	sessionID   string
 	logger      *slog.Logger
 }

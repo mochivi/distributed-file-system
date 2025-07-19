@@ -58,7 +58,7 @@ func NewTestCoordinatorClientWithStubServer(t *testing.T, server proto.Coordinat
 
 // NewTestDataNodeClientWithStubServer starts a stubDataNodeServer listening on a free TCP port and
 // returns the data node client and a cleanup function.
-func NewTestDataNodeClientWithStubServer(t *testing.T, server proto.DataNodeServiceServer) (*clients.DataNodeClient, func()) {
+func NewTestDataNodeClientWithStubServer(t *testing.T, server proto.DataNodeServiceServer) (clients.IDataNodeClient, func()) {
 	t.Helper()
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")

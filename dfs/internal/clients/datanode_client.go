@@ -9,11 +9,25 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// IDataNodeClient defines the interface for interacting with a DataNode.
+type IDataNodeClient interface {
+	StoreChunk(ctx context.Context, req common.ChunkHeader, opts ...grpc.CallOption) (common.NodeReady, error)
+	PrepareChunkDownload(ctx context.Context, req common.DownloadChunkRequest, opts ...grpc.CallOption) (common.DownloadReady, error)
+	DeleteChunk(ctx context.Context, req common.DeleteChunkRequest, opts ...grpc.CallOption) (common.DeleteChunkResponse, error)
+	BulkDeleteChunk(ctx context.Context, req common.BulkDeleteChunkRequest, opts ...grpc.CallOption) (common.BulkDeleteChunkResponse, error)
+	ReplicateChunk(ctx context.Context, req common.ChunkHeader, opts ...grpc.CallOption) (common.NodeReady, error)
+	UploadChunkStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck], error)
+	DownloadChunkStream(ctx context.Context, req common.DownloadStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[proto.ChunkDataStream], error)
+	HealthCheck(ctx context.Context, req common.HealthCheckRequest, opts ...grpc.CallOption) (common.HealthCheckResponse, error)
+	Close() error
+	Node() *common.NodeInfo
+}
+
 // Wrapper over the proto.DataNodeServiceClient interface
 type DataNodeClient struct {
 	client proto.DataNodeServiceClient
 	conn   *grpc.ClientConn
-	Node   *common.NodeInfo
+	node   *common.NodeInfo
 }
 
 func NewDataNodeClient(node *common.NodeInfo, opts ...grpc.DialOption) (*DataNodeClient, error) {
@@ -32,7 +46,7 @@ func NewDataNodeClient(node *common.NodeInfo, opts ...grpc.DialOption) (*DataNod
 	return &DataNodeClient{
 		client: client,
 		conn:   conn,
-		Node:   node,
+		node:   node,
 	}, nil
 }
 
@@ -121,4 +135,8 @@ func (c *DataNodeClient) HealthCheck(ctx context.Context, req common.HealthCheck
 // Close closes the underlying connection
 func (c *DataNodeClient) Close() error {
 	return c.conn.Close()
+}
+
+func (c *DataNodeClient) Node() *common.NodeInfo {
+	return c.node
 }

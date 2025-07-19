@@ -49,38 +49,52 @@ func (c *DeletedFilesGCController) Run() error {
 		case <-c.ctx.Done():
 			return c.ctx.Err()
 		case <-ticker.C:
-			c.logger.Info("DeletedFilesGCController cycle starting")
-			cycleCtx, cycleCancel := context.WithTimeout(c.ctx, c.config.Timeout)
-			if err := c.run(cycleCtx); err != nil {
-				c.logger.Error("DeletedFilesGCController failed", slog.Any("error", err))
+			if c.running {
+				c.logger.Error("Tried to start GC cycle while already running")
+				continue
 			}
-			cycleCancel()
+
+			if err := c.tryRun(); err != nil {
+				c.logger.Error("Error while trying to start deleted files GC cycle", slog.Any("error", err.Error()))
+			}
 		}
 	}
 }
 
 // Create batched work items
 type deleteWork struct {
-	client   *clients.DataNodeClient
+	client   clients.IDataNodeClient
 	chunkIDs []string
+}
+
+func (c *DeletedFilesGCController) tryRun() error {
+	c.logger.Info("DeletedFilesGCController cycle starting")
+
+	cycleCtx, cycleCancel := context.WithTimeout(c.ctx, c.config.Timeout)
+	defer cycleCancel()
+
+	files, err := c.scanner.GetDeletedFiles(cycleCtx, time.Now().Add(-c.config.RecoveryTimeout))
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		c.logger.Info("No deleted files to clean up")
+		return nil
+	}
+
+	// At the moment, the cycle doesn't report or take actions on errors
+	// It just logs them
+	c.run(cycleCtx, files)
+	return nil
 }
 
 // 1. Retrieve the list of files that are marked for deletion using the metadata scanner
 // 2. Aggregate the list of chunks for each node
 // 3. Send bulk delete requests to the datanodes
-func (c *DeletedFilesGCController) run(ctx context.Context) error {
-	if c.running {
-		c.logger.Error("Tried to start GC cycle while already running")
-		return nil
-	}
+func (c *DeletedFilesGCController) run(ctx context.Context, files []*common.FileInfo) {
 	c.running = true
 	defer func() { c.running = false }()
-
-	files, err := c.scanner.GetDeletedFiles(ctx, time.Now().Add(-c.config.RecoveryTimeout))
-	if err != nil {
-		c.logger.Error("Failed to get deleted files", "error", err)
-		return err
-	}
 
 	// From each file, retrieve what chunkIDs each datanode holds + a grpc connection to each datanode
 	nodeToChunks, nodeToClient := prepareChunkMappings(files, c.logger)
@@ -103,13 +117,12 @@ func (c *DeletedFilesGCController) run(ctx context.Context) error {
 	}
 
 	wg.Wait()
-	return nil
 }
 
-func prepareChunkMappings(files []*common.FileInfo, logger *slog.Logger) (map[string][]string, map[string]*clients.DataNodeClient) {
+func prepareChunkMappings(files []*common.FileInfo, logger *slog.Logger) (map[string][]string, map[string]clients.IDataNodeClient) {
 	// Group chunks by node FIRST, then create work items
 	nodeToChunks := make(map[string][]string)
-	nodeToClient := make(map[string]*clients.DataNodeClient)
+	nodeToClient := make(map[string]clients.IDataNodeClient)
 
 	for _, file := range files {
 		if !file.Deleted {
@@ -139,7 +152,7 @@ func prepareChunkMappings(files []*common.FileInfo, logger *slog.Logger) (map[st
 	return nodeToChunks, nodeToClient
 }
 
-func queueWork(workCh chan<- *deleteWork, nodeToClient map[string]*clients.DataNodeClient,
+func queueWork(workCh chan<- *deleteWork, nodeToClient map[string]clients.IDataNodeClient,
 	nodeToChunks map[string][]string, batchSize int) {
 
 	defer close(workCh)
@@ -167,6 +180,9 @@ func doWork(ctx context.Context, workCh <-chan *deleteWork) error {
 		case work, ok := <-workCh:
 			if !ok { // channel closed, all items processed, no more work, return
 				return nil
+			}
+			if ctx.Err() != nil {
+				return ctx.Err()
 			}
 			if err := processWork(ctx, work); err != nil {
 				return fmt.Errorf("failed to delete %d chunks: %w", len(work.chunkIDs), err)

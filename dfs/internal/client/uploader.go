@@ -46,7 +46,7 @@ type UploaderWork struct {
 	clientPool  *ClientPool
 }
 
-func (w *UploaderWork) GetClient() (*clients.DataNodeClient, error) {
+func (w *UploaderWork) GetClient() (clients.IDataNodeClient, error) {
 	client, sessionID, err := w.clientPool.GetClient(w.chunkHeader)
 	if err != nil {
 		return nil, err
@@ -57,17 +57,17 @@ func (w *UploaderWork) GetClient() (*clients.DataNodeClient, error) {
 
 type ClientPool struct {
 	index   int
-	clients []*clients.DataNodeClient
+	clients []clients.IDataNodeClient
 	mu      sync.Mutex
 }
 
-func NewClientPool(clients []*clients.DataNodeClient) *ClientPool {
+func NewClientPool(clients []clients.IDataNodeClient) *ClientPool {
 	return &ClientPool{
 		clients: clients,
 	}
 }
 
-func (c *ClientPool) GetClient(chunkHeader common.ChunkHeader) (*clients.DataNodeClient, string, error) {
+func (c *ClientPool) GetClient(chunkHeader common.ChunkHeader) (clients.IDataNodeClient, string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -103,7 +103,7 @@ func (c *ClientPool) RotateClient() {
 	c.mu.Unlock()
 }
 
-func (c *ClientPool) AddClient(client *clients.DataNodeClient) {
+func (c *ClientPool) AddClient(client clients.IDataNodeClient) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.clients = append(c.clients, client)
@@ -218,7 +218,7 @@ func (u *Uploader) QueueWork(ctx context.Context, session *uploadSession, file *
 			Checksum: checksum,
 		}
 
-		clientPool := NewClientPool(make([]*clients.DataNodeClient, 0, len(chunkUploadLocation.Nodes)))
+		clientPool := NewClientPool(make([]clients.IDataNodeClient, 0, len(chunkUploadLocation.Nodes)))
 		for _, node := range chunkUploadLocation.Nodes {
 			client, err := clients.NewDataNodeClient(node)
 			if err != nil {

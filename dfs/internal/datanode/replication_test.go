@@ -191,7 +191,7 @@ func TestReplicationManager_paralellReplicate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test clients with stub servers
-			var testClients []*clients.DataNodeClient
+			var testClients []clients.IDataNodeClient
 			var cleanups []func()
 			for i := 0; i < tt.nClients; i++ {
 				client, cleanup := testutils.NewTestDataNodeClientWithStubServer(t, &stubDataNodeReplicationServer{
