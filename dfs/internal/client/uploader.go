@@ -279,6 +279,7 @@ func (u *Uploader) uploadChunk(work UploaderWork, session *uploadSession) ([]*co
 		workLogger.Error("Failed to get client", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to get client: %w", err)
 	}
+	defer client.Close() // cleanup connection
 
 	stream, err := client.UploadChunkStream(session.ctx)
 	if err != nil {

@@ -50,7 +50,7 @@ func newMetadataUploadSession(sessionID string, exp time.Duration, fileInfo *com
 func (m *metadataSessionManager) trackUpload(sessionID string, req common.UploadRequest, numChunks int) {
 	// Create chunk info array
 	chunkInfos := make([]common.ChunkInfo, numChunks)
-	for i := 0; i < numChunks; i++ {
+	for i := range numChunks {
 		chunkID := chunk.FormatChunkID(req.Path, i)
 		chunkInfos[i] = common.ChunkInfo{
 			Header: common.ChunkHeader{

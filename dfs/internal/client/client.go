@@ -93,3 +93,26 @@ func (c *Client) DownloadFile(ctx context.Context, path string) (string, error) 
 
 	return tempFile, nil
 }
+
+func (c *Client) DeleteFile(ctx context.Context, path string) error {
+	logger := logging.ExtendLogger(c.logger, slog.String("operation", "delete_file"), slog.String("path", path))
+
+	deleteResponse, err := c.coordinatorClient.DeleteFile(ctx, common.DeleteRequest{Path: path})
+	if err != nil {
+		logger.Error("Failed to delete file", slog.String("error", err.Error()))
+		return fmt.Errorf("failed to delete file %s: %w", path, err)
+	}
+
+	if !deleteResponse.Success {
+		logger.Error("Failed to delete file", slog.String("message", deleteResponse.Message))
+		return fmt.Errorf("failed to delete file %s", path)
+	}
+
+	logger.Info("File deleted successfully", slog.String("path", path))
+
+	return nil
+}
+
+func (c *Client) Close() error {
+	return c.coordinatorClient.Close()
+}

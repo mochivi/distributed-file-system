@@ -47,7 +47,7 @@ func NewMetadataScannerService(ctx context.Context, store storage.MetadataStore,
 func (s *MetadataScannerService) GetDeletedFiles(ctx context.Context, olderThan time.Time) ([]*common.FileInfo, error) {
 	files, err := s.store.GetDeletedFiles(olderThan)
 	if err != nil {
-		s.logger.Error("Failed to list files", "error", err)
+		s.logger.Error("Failed to get deleted files", "error", err)
 		return nil, err
 	}
 	if ctx.Err() != nil {

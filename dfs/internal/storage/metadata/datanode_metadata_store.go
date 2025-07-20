@@ -33,12 +33,12 @@ func (m *DatanodeMetadataStore) ListFiles(directory string, recursive bool) ([]*
 	return nil, nil
 }
 
-func (d *DatanodeMetadataStore) GetChunksForNode(nodeID string) (map[string]*common.ChunkHeader, error) {
+func (m *DatanodeMetadataStore) GetChunksForNode(nodeID string) (map[string]*common.ChunkHeader, error) {
 	return nil, nil
 }
 
 // Noop -> datanode does not need to retrieve the deleted files
 // It is the coordinator's responsibility to retrieve the deleted files and send bulk delete requests to the datanodes
-func (d *DatanodeMetadataStore) GetDeletedFiles(olderThan time.Time) ([]*common.FileInfo, error) {
+func (m *DatanodeMetadataStore) GetDeletedFiles(olderThan time.Time) ([]*common.FileInfo, error) {
 	return nil, nil
 }

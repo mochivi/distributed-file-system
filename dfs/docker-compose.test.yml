@@ -131,7 +131,7 @@ services:
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
       - ENVIRONMENT=development
-      - LOG_LEVEL=info
+      - LOG_LEVEL=error
       - DEBUG=${DEBUG_E2E_TESTS:-false}
     depends_on:
       - coordinator

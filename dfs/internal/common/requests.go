@@ -467,7 +467,11 @@ type ListRequest struct {
 }
 
 func ListRequestFromProto(pb *proto.ListRequest) ListRequest {
-	return ListRequest{Directory: pb.Directory}
+	directory := pb.Directory
+	if directory == "" {
+		directory = "/"
+	}
+	return ListRequest{Directory: directory}
 }
 
 func (dr ListRequest) ToProto() *proto.ListRequest {
@@ -475,13 +479,14 @@ func (dr ListRequest) ToProto() *proto.ListRequest {
 }
 
 type ListResponse struct {
-	Files []FileInfo
+	Files []*FileInfo
 }
 
 func ListResponseFromProto(pb *proto.ListResponse) ListResponse {
-	files := make([]FileInfo, 0, len(pb.Files))
+	files := make([]*FileInfo, 0, len(pb.Files))
 	for _, file := range pb.Files {
-		files = append(files, FileInfoFromProto(file))
+		info := FileInfoFromProto(file)
+		files = append(files, &info)
 	}
 	return ListResponse{Files: files}
 }

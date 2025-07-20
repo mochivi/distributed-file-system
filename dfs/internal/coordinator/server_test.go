@@ -301,6 +301,59 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 	}
 }
 
+func TestCoordinator_DeleteFile(t *testing.T) {
+	cfg := config.DefaultCoordinatorConfig()
+	logger := logging.NewTestLogger(slog.LevelError)
+
+	testCases := []struct {
+		name         string
+		setupMocks   func(*serverMocks)
+		req          *proto.DeleteRequest
+		expectedResp *proto.DeleteResponse
+		expectErr    bool
+	}{
+		{
+			name: "success",
+			setupMocks: func(mocks *serverMocks) {
+				mocks.metaStore.On("DeleteFile", "test.txt").Return(nil).Once()
+			},
+			req:          &proto.DeleteRequest{Path: "test.txt"},
+			expectedResp: &proto.DeleteResponse{Success: true},
+			expectErr:    false,
+		},
+		{
+			name: "error: delete fails",
+			setupMocks: func(mocks *serverMocks) {
+				mocks.metaStore.On("DeleteFile", "test.txt").Return(assert.AnError).Once()
+			},
+			req:          &proto.DeleteRequest{Path: "test.txt"},
+			expectedResp: nil,
+			expectErr:    true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mocks := &serverMocks{
+				metaStore: new(metadata.MockMetadataStore),
+			}
+			tc.setupMocks(mocks)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
+
+			resp, err := coordinator.DeleteFile(context.Background(), tc.req)
+
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedResp, resp)
+			}
+			mocks.metaStore.AssertExpectations(t)
+		})
+	}
+}
+
 func TestCoordinator_ConfirmUpload(t *testing.T) {
 	cfg := config.DefaultCoordinatorConfig()
 	logger := logging.NewTestLogger(slog.LevelError)
