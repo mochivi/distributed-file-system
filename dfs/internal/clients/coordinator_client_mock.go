@@ -62,7 +62,13 @@ func (c *MockCoordinatorClient) DataNodeHeartbeat(ctx context.Context, req commo
 	args := c.Called(ctx, req, opts)
 	return args.Get(0).(common.HeartbeatResponse), args.Error(1)
 }
+
 func (c *MockCoordinatorClient) ListNodes(ctx context.Context, rqe common.ListNodesRequest, opts ...grpc.CallOption) (common.ListNodesResponse, error) {
 	args := c.Called(ctx, rqe, opts)
 	return args.Get(0).(common.ListNodesResponse), args.Error(1)
+}
+
+func (c *MockCoordinatorClient) GetChunksForNode(ctx context.Context, req common.GetChunksForNodeRequest, opts ...grpc.CallOption) (common.GetChunksForNodeResponse, error) {
+	args := c.Called(ctx, req, opts)
+	return args.Get(0).(common.GetChunksForNodeResponse), args.Error(1)
 }

@@ -41,7 +41,7 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 	c.logger.Debug("Selected nodes for chunk distribution", slog.Int("num_nodes", len(nodes)))
 
 	assignments := make([]common.ChunkLocation, numChunks)
-	for i := 0; i < numChunks; i++ {
+	for i := range numChunks {
 		chunkID := chunk.FormatChunkID(req.Path, i)
 
 		// Randomly select a node from the available nodes
@@ -107,15 +107,41 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 	}.ToProto(), nil
 }
 
-// // Client request to list files from some directory
-// func (c *Coordinator) ListFiles(ctx context.Context, pb *proto.ListRequest) (*proto.ListResponse, error) {
-// 	return nil, nil
-// }
+// Client request to list files from some directory
+func (c *Coordinator) ListFiles(ctx context.Context, pb *proto.ListRequest) (*proto.ListResponse, error) {
+	req := common.ListRequestFromProto(pb)
+	c.logger.Debug("Received ListRequest from client", slog.String("directory", req.Directory))
 
-// // Client request to delete a file
-// func (c *Coordinator) DeleteFile(ctx context.Context, pb *proto.DeleteRequest) (*proto.DeleteResponse, error) {
-// 	return nil, nil
-// }
+	files, err := c.metaStore.ListFiles(req.Directory, true) // hardcoded to always recursive for now
+	if err != nil {
+		c.logger.Error("Failed to list files", slog.String("error", err.Error()))
+		return nil, status.Error(codes.Internal, "failed to list files")
+	}
+
+	c.logger.Debug("Replying to client with list of files", slog.Int("num_files", len(files)))
+	return common.ListResponse{
+		Files: files,
+	}.ToProto(), nil
+}
+
+// Client request to delete a file
+// 1. Client sends delete request to coordinator
+// 2. Coordinator deletes the file from metadata store
+// 3. Coordinator replies with success or error
+// 4. Background gc process deletes the files from storage
+func (c *Coordinator) DeleteFile(ctx context.Context, pb *proto.DeleteRequest) (*proto.DeleteResponse, error) {
+	req := common.DeleteRequestFromProto(pb)
+	c.logger.Debug("Received DeleteRequest from client", slog.String("file_path", req.Path))
+
+	if err := c.metaStore.DeleteFile(req.Path); err != nil {
+		c.logger.Error("Failed to delete file", slog.String("error", err.Error()))
+		return nil, status.Error(codes.Internal, "failed to delete file")
+	}
+
+	return common.DeleteResponse{
+		Success: true,
+	}.ToProto(), nil
+}
 
 func (c *Coordinator) ConfirmUpload(ctx context.Context, pb *proto.ConfirmUploadRequest) (*proto.ConfirmUploadResponse, error) {
 	req := common.ConfirmUploadRequestFromProto(pb)
@@ -202,4 +228,8 @@ func (c *Coordinator) ListNodes(ctx context.Context, req *proto.ListNodesRequest
 		Nodes:          nodes,
 		CurrentVersion: version,
 	}.ToProto(), nil
+}
+
+func (c *Coordinator) GetChunksForNode(ctx context.Context, pb *proto.GetChunksForNodeRequest) (*proto.GetChunksForNodeResponse, error) {
+	return nil, nil
 }

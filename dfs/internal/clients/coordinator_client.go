@@ -18,6 +18,7 @@ type ICoordinatorClient interface {
 	RegisterDataNode(ctx context.Context, req common.RegisterDataNodeRequest, opts ...grpc.CallOption) (common.RegisterDataNodeResponse, error)
 	DataNodeHeartbeat(ctx context.Context, req common.HeartbeatRequest, opts ...grpc.CallOption) (common.HeartbeatResponse, error)
 	ListNodes(ctx context.Context, rqe common.ListNodesRequest, opts ...grpc.CallOption) (common.ListNodesResponse, error)
+	GetChunksForNode(ctx context.Context, req common.GetChunksForNodeRequest, opts ...grpc.CallOption) (common.GetChunksForNodeResponse, error)
 	Node() *common.NodeInfo
 	Close() error
 }
@@ -116,6 +117,14 @@ func (c *CoordinatorClient) ListNodes(ctx context.Context, rqe common.ListNodesR
 		return common.ListNodesResponse{}, err
 	}
 	return common.ListNodesResponseFromProto(resp), nil
+}
+
+func (c *CoordinatorClient) GetChunksForNode(ctx context.Context, req common.GetChunksForNodeRequest, opts ...grpc.CallOption) (common.GetChunksForNodeResponse, error) {
+	resp, err := c.client.GetChunksForNode(ctx, req.ToProto(), opts...)
+	if err != nil {
+		return common.GetChunksForNodeResponse{}, err
+	}
+	return common.GetChunksForNodeResponseFromProto(resp), nil
 }
 
 // Other methods not related to the gRPC server

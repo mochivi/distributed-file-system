@@ -10,12 +10,6 @@ type MockCoordinatorFinder struct {
 	mock.Mock
 }
 
-func NewMockCoordinatorFinder() *MockCoordinatorFinder {
-	return &MockCoordinatorFinder{
-		Mock: mock.Mock{},
-	}
-}
-
 func (m *MockCoordinatorFinder) GetCoordinator(nodeID string) (clients.ICoordinatorClient, bool) {
 	args := m.Called(nodeID)
 	if args.Get(0) == nil {

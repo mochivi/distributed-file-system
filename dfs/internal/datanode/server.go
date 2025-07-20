@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
+	"sync"
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
@@ -83,7 +85,7 @@ func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.Dow
 		return nil, status.Errorf(codes.NotFound, "chunk not found")
 	}
 
-	chunkHeader, err := s.store.GetChunkHeader(req.ChunkID)
+	chunkHeader, err := s.store.GetHeader(req.ChunkID)
 	if err != nil {
 		logger.Error("Failed to get chunk info", slog.String("error", err.Error()))
 		return nil, status.Errorf(codes.Internal, "failed to get chunk info: %v", err)
@@ -129,6 +131,88 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 	return common.DeleteChunkResponse{
 		Success: true,
 		Message: "chunk deleted",
+	}.ToProto(), nil
+}
+
+func (s *DataNodeServer) BulkDeleteChunk(ctx context.Context, pb *proto.BulkDeleteChunkRequest) (*proto.BulkDeleteChunkResponse, error) {
+	req := common.BulkDeleteChunkRequestFromProto(pb)
+
+	logger := logging.OperationLogger(s.logger, "bulk_delete_chunk", slog.String("chunk_id", strings.Join(req.ChunkIDs, ",")))
+	logger.Info("Received BulkDeleteChunk request")
+
+	ctx, cancel := context.WithTimeout(ctx, s.config.BulkDelete.Timeout)
+	defer cancel()
+
+	type result struct {
+		chunkID string
+		success bool
+		err     error
+	}
+
+	sem := make(chan struct{}, s.config.BulkDelete.MaxConcurrentDeletes)
+	results := make(chan result, len(req.ChunkIDs))
+	var wg sync.WaitGroup
+
+	// Delete chunks in parallel
+	for _, chunkID := range req.ChunkIDs {
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				results <- result{chunkID: id, success: false, err: ctx.Err()}
+				return
+			}
+
+			if !s.store.Exists(id) {
+				results <- result{chunkID: id, success: false, err: fmt.Errorf("chunk not found")}
+				return
+			}
+
+			if ctx.Err() != nil {
+				results <- result{chunkID: id, success: false, err: ctx.Err()}
+				return
+			}
+
+			if err := s.store.Delete(id); err != nil {
+				results <- result{chunkID: id, success: false, err: err}
+				return
+			}
+
+			results <- result{chunkID: id, success: true, err: nil}
+		}(chunkID)
+	}
+
+	// Ensure the context is cancelled only after all work is done
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect results
+	var failures []string
+	var successCount int
+
+	for result := range results {
+		if result.success {
+			successCount++
+			continue
+		}
+		logger.Error("Failed to delete chunk", slog.String("chunk_id", result.chunkID), slog.String("error", result.err.Error()))
+		failures = append(failures, result.chunkID)
+	}
+
+	success := len(failures) == 0
+	logger.Info("Bulk delete completed", slog.Int("success_count", successCount), slog.Int("failure_count", len(failures)), slog.Bool("success", success))
+
+	return common.BulkDeleteChunkResponse{
+		Success: success,
+		Message: "Bulk delete chunk request completed",
+		Failed:  failures,
 	}.ToProto(), nil
 }
 
@@ -295,7 +379,7 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 
 	// Retrieve the full chunk data
 	// TODO: this should be a io.Reader of size configurable ChunkStreamSize
-	chunkData, err := s.store.GetChunkData(session.ChunkHeader.ID)
+	chunkData, err := s.store.GetData(session.ChunkHeader.ID)
 	if err != nil {
 		logger.Error("Could not retrieve chunk", slog.String("error", err.Error()))
 		return status.Errorf(codes.Internal, "could not retrieve chunk %s: %v", session.ChunkHeader.ID, err)
@@ -351,7 +435,7 @@ func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([
 	}
 
 	// Create clients
-	var replicationClients []*clients.DataNodeClient
+	var replicationClients []clients.IDataNodeClient
 	for _, node := range nodes {
 		client, err := clients.NewDataNodeClient(node)
 		if err != nil {

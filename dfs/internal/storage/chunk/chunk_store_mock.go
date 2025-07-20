@@ -1,6 +1,8 @@
 package chunk
 
 import (
+	"context"
+
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/stretchr/testify/mock"
 )
@@ -14,12 +16,12 @@ func (m *MockChunkStore) Store(chunkHeader common.ChunkHeader, data []byte) erro
 	return args.Error(0)
 }
 
-func (m *MockChunkStore) GetChunk(chunkID string) (common.ChunkHeader, []byte, error) {
+func (m *MockChunkStore) Get(chunkID string) (common.ChunkHeader, []byte, error) {
 	args := m.Called(chunkID)
 	return args.Get(0).(common.ChunkHeader), args.Get(1).([]byte), args.Error(2)
 }
 
-func (m *MockChunkStore) GetChunkData(chunkID string) ([]byte, error) {
+func (m *MockChunkStore) GetData(chunkID string) ([]byte, error) {
 	args := m.Called(chunkID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -27,14 +29,30 @@ func (m *MockChunkStore) GetChunkData(chunkID string) ([]byte, error) {
 	return args.Get(0).([]byte), args.Error(1)
 }
 
-func (m *MockChunkStore) GetChunkHeader(chunkID string) (common.ChunkHeader, error) {
+func (m *MockChunkStore) GetHeader(chunkID string) (common.ChunkHeader, error) {
 	args := m.Called(chunkID)
 	return args.Get(0).(common.ChunkHeader), args.Error(1)
+}
+
+func (m *MockChunkStore) GetHeaders(ctx context.Context) (map[string]common.ChunkHeader, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]common.ChunkHeader), args.Error(1)
 }
 
 func (m *MockChunkStore) Delete(chunkID string) error {
 	args := m.Called(chunkID)
 	return args.Error(0)
+}
+
+func (m *MockChunkStore) BulkDelete(ctx context.Context, maxConcurrentDeletes int, chunkIDs []string) ([]string, error) {
+	args := m.Called(ctx, maxConcurrentDeletes, chunkIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
 }
 
 func (m *MockChunkStore) Exists(chunkID string) bool {

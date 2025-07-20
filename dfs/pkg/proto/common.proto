@@ -13,7 +13,9 @@ message FileInfo {
   int32 chunk_count = 3;
   repeated ChunkInfo chunks = 4;
   google.protobuf.Timestamp created_at = 5;
-  string checksum = 6;
+  bool deleted = 6;
+  google.protobuf.Timestamp deleted_at = 7;
+  string checksum = 8;
 }
 
 message ChunkHeader {
@@ -27,7 +29,7 @@ message ChunkHeader {
 message ChunkInfo {
   ChunkHeader header = 1;
   repeated NodeInfo replicas = 3;  // DataNodes storing this chunk
-}  
+}
 
 message NodeInfo {
   string id = 1;

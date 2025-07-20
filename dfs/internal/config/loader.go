@@ -14,7 +14,7 @@ func LoadDatanodeConfig(path string) (*DatanodeAppConfig, error) {
 	// Set defaults
 	datanodeDefaults := DefaultDatanodeAppConfig()
 	v.SetDefault("node", datanodeDefaults.Node)
-	v.SetDefault("cluster", datanodeDefaults.Agent)
+	v.SetDefault("agent", datanodeDefaults.Agent)
 
 	// Configure file reading
 	// v.SetConfigName("datanode") // a file named `datanode.yaml` can be used
@@ -51,7 +51,9 @@ func LoadCoordinatorConfig(path string) (*CoordinatorAppConfig, error) {
 	v := viper.New()
 
 	// Set defaults
-	v.SetDefault("coordinator", DefaultCoordinatorConfig())
+	coordinatorDefaults := DefaultCoordinatorAppConfig()
+	v.SetDefault("coordinator", coordinatorDefaults.Coordinator)
+	v.SetDefault("agent", coordinatorDefaults.Agent)
 
 	// // Configure file reading
 	// v.SetConfigName("coordinator") // a file named `coordinator.yaml` can be used

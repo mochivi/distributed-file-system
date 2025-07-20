@@ -133,6 +133,47 @@ func (dcr DeleteChunkResponse) ToProto() *proto.DeleteChunkResponse {
 	}
 }
 
+type BulkDeleteChunkRequest struct {
+	ChunkIDs []string
+	Reason   string
+}
+
+func BulkDeleteChunkRequestFromProto(pb *proto.BulkDeleteChunkRequest) BulkDeleteChunkRequest {
+	return BulkDeleteChunkRequest{
+		ChunkIDs: pb.ChunkIds,
+		Reason:   pb.Reason,
+	}
+}
+
+func (bcr BulkDeleteChunkRequest) ToProto() *proto.BulkDeleteChunkRequest {
+	return &proto.BulkDeleteChunkRequest{
+		ChunkIds: bcr.ChunkIDs,
+		Reason:   bcr.Reason,
+	}
+}
+
+type BulkDeleteChunkResponse struct {
+	Success bool
+	Message string
+	Failed  []string
+}
+
+func BulkDeleteChunkResponseFromProto(pb *proto.BulkDeleteChunkResponse) BulkDeleteChunkResponse {
+	return BulkDeleteChunkResponse{
+		Success: pb.Success,
+		Message: pb.Message,
+		Failed:  pb.Failed,
+	}
+}
+
+func (bcr BulkDeleteChunkResponse) ToProto() *proto.BulkDeleteChunkResponse {
+	return &proto.BulkDeleteChunkResponse{
+		Success: bcr.Success,
+		Message: bcr.Message,
+		Failed:  bcr.Failed,
+	}
+}
+
 type ChunkDataStream struct {
 	SessionID       string
 	ChunkID         string
@@ -426,7 +467,11 @@ type ListRequest struct {
 }
 
 func ListRequestFromProto(pb *proto.ListRequest) ListRequest {
-	return ListRequest{Directory: pb.Directory}
+	directory := pb.Directory
+	if directory == "" {
+		directory = "/"
+	}
+	return ListRequest{Directory: directory}
 }
 
 func (dr ListRequest) ToProto() *proto.ListRequest {
@@ -434,13 +479,14 @@ func (dr ListRequest) ToProto() *proto.ListRequest {
 }
 
 type ListResponse struct {
-	Files []FileInfo
+	Files []*FileInfo
 }
 
 func ListResponseFromProto(pb *proto.ListResponse) ListResponse {
-	files := make([]FileInfo, 0, len(pb.Files))
+	files := make([]*FileInfo, 0, len(pb.Files))
 	for _, file := range pb.Files {
-		files = append(files, FileInfoFromProto(file))
+		info := FileInfoFromProto(file)
+		files = append(files, &info)
 	}
 	return ListResponse{Files: files}
 }
@@ -630,4 +676,28 @@ func (cs *ChunkLocation) ToProto() *proto.ChunkLocation {
 		ChunkId: cs.ChunkID,
 		Nodes:   nodes,
 	}
+}
+
+type GetChunksForNodeRequest struct {
+	NodeID string
+}
+
+func GetChunksForNodeRequestFromProto(pb *proto.GetChunksForNodeRequest) GetChunksForNodeRequest {
+	return GetChunksForNodeRequest{NodeID: pb.NodeId}
+}
+
+func (gcr GetChunksForNodeRequest) ToProto() *proto.GetChunksForNodeRequest {
+	return &proto.GetChunksForNodeRequest{NodeId: gcr.NodeID}
+}
+
+type GetChunksForNodeResponse struct {
+	ChunkIDs []string
+}
+
+func GetChunksForNodeResponseFromProto(pb *proto.GetChunksForNodeResponse) GetChunksForNodeResponse {
+	return GetChunksForNodeResponse{ChunkIDs: pb.ChunkIds}
+}
+
+func (gcr GetChunksForNodeResponse) ToProto() *proto.GetChunksForNodeResponse {
+	return &proto.GetChunksForNodeResponse{ChunkIds: gcr.ChunkIDs}
 }

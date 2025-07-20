@@ -12,16 +12,32 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 )
 
-// Implements the proto.DataNodeServiceServer interface
-type DataNodeServer struct {
-	proto.UnimplementedDataNodeServiceServer
-
+type container struct {
 	store              storage.ChunkStorage
 	replicationManager ReplicationProvider
 	sessionManager     SessionManager
 	clusterViewer      state.ClusterStateViewer
 	coordinatorFinder  state.CoordinatorFinder
 	selector           cluster.NodeSelector
+}
+
+func NewContainer(store storage.ChunkStorage, replicationManager ReplicationProvider, sessionManager SessionManager,
+	clusterViewer state.ClusterStateViewer, coordinatorFinder state.CoordinatorFinder, selector cluster.NodeSelector) *container {
+
+	return &container{
+		store:              store,
+		replicationManager: replicationManager,
+		sessionManager:     sessionManager,
+		clusterViewer:      clusterViewer,
+		coordinatorFinder:  coordinatorFinder,
+		selector:           selector,
+	}
+}
+
+// Implements the proto.DataNodeServiceServer interface
+type DataNodeServer struct {
+	proto.UnimplementedDataNodeServiceServer
+	*container
 
 	info   *common.NodeInfo
 	config config.DataNodeConfig
@@ -29,20 +45,13 @@ type DataNodeServer struct {
 	logger *slog.Logger
 }
 
-func NewDataNodeServer(info *common.NodeInfo, config config.DataNodeConfig, store storage.ChunkStorage, replicationManager ReplicationProvider,
-	sessionManager SessionManager, clusterViewer state.ClusterStateViewer, coordinatorFinder state.CoordinatorFinder,
-	selector cluster.NodeSelector, logger *slog.Logger) *DataNodeServer {
+func NewDataNodeServer(info *common.NodeInfo, config config.DataNodeConfig, container *container, logger *slog.Logger) *DataNodeServer {
 
 	datanodeLogger := logging.ExtendLogger(logger, slog.String("component", "datanode_server"))
 	return &DataNodeServer{
-		store:              store,
-		replicationManager: replicationManager,
-		sessionManager:     sessionManager,
-		clusterViewer:      clusterViewer,
-		coordinatorFinder:  coordinatorFinder,
-		selector:           selector,
-		info:               info,
-		config:             config,
-		logger:             datanodeLogger,
+		container: container,
+		info:      info,
+		config:    config,
+		logger:    datanodeLogger,
 	}
 }

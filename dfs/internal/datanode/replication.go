@@ -15,7 +15,7 @@ import (
 )
 
 type ReplicationProvider interface {
-	Replicate(clients []*clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.NodeInfo, error)
+	Replicate(clients []clients.IDataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.NodeInfo, error)
 }
 
 type ReplicatedNodes struct {
@@ -51,7 +51,7 @@ func NewParalellReplicationService(config config.ParallelReplicationServiceConfi
 }
 
 // Replicate replicates the chunk to the given nodes in parallel
-func (rm *ParalellReplicationService) Replicate(clients []*clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.NodeInfo, error) {
+func (rm *ParalellReplicationService) Replicate(clients []clients.IDataNodeClient, chunkHeader common.ChunkHeader, data []byte, requiredReplicas int) ([]*common.NodeInfo, error) {
 	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", chunkHeader.ID))
 	if len(clients) == 0 {
 		return nil, fmt.Errorf("no clients provided")
@@ -77,7 +77,7 @@ func (rm *ParalellReplicationService) Replicate(clients []*clients.DataNodeClien
 	errChan := make(chan error, len(clients))
 
 	for _, client := range clients {
-		clientLogger := logging.ExtendLogger(logger, slog.String("client_id", client.Node.ID), slog.String("client_address", client.Node.Endpoint()))
+		clientLogger := logging.ExtendLogger(logger, slog.String("client_id", client.Node().ID), slog.String("client_address", client.Node().Endpoint()))
 		// Stop starting new goroutines if we already have enough replicas
 		if int(acceptedCount.Load()) >= requiredReplicas {
 			break
@@ -94,10 +94,10 @@ func (rm *ParalellReplicationService) Replicate(clients []*clients.DataNodeClien
 			}()
 
 			if err := rm.replicate(context.Background(), client, chunkHeader, data, clientLogger); err != nil {
-				errChan <- fmt.Errorf("replication failed for client %s: %v", client.Node.Endpoint(), err)
+				errChan <- fmt.Errorf("replication failed for client %s: %v", client.Node().Endpoint(), err)
 				return
 			}
-			replicatedNodes.AddNode(client.Node)
+			replicatedNodes.AddNode(client.Node())
 			acceptedCount.Add(1)
 			clientLogger.Debug("Replication succeeded")
 		}()
@@ -121,7 +121,7 @@ func (rm *ParalellReplicationService) Replicate(clients []*clients.DataNodeClien
 	return replicatedNodes.GetNodes(), nil
 }
 
-func (rm *ParalellReplicationService) replicate(ctx context.Context, client *clients.DataNodeClient, chunkHeader common.ChunkHeader, data []byte, clientLogger *slog.Logger) error {
+func (rm *ParalellReplicationService) replicate(ctx context.Context, client clients.IDataNodeClient, chunkHeader common.ChunkHeader, data []byte, clientLogger *slog.Logger) error {
 	// Request replication session
 	resp, err := client.ReplicateChunk(ctx, chunkHeader)
 	if err != nil {

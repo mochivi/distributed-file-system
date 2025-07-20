@@ -130,7 +130,8 @@ func TestCoordinator_UploadFile(t *testing.T) {
 				metadataManager:            new(MockMetadataSessionManager),
 			}
 			tc.setupMocks(mocks)
-			coordinator := NewCoordinator(cfg, mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 
 			resp, err := coordinator.UploadFile(context.Background(), tc.req)
 			time.Sleep(1 * time.Second) // wait for metadataManager goroutine to start and finish, this is a hack to avoid race conditions
@@ -269,9 +270,12 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 			mocks := &serverMocks{
 				clusterStateHistoryManager: new(state.MockClusterStateHistoryManager),
 				metaStore:                  new(metadata.MockMetadataStore),
+				metadataManager:            new(MockMetadataSessionManager),
+				nodeSelector:               new(cluster.MockNodeSelector),
 			}
 			tc.setupMocks(mocks)
-			coordinator := NewCoordinator(cfg, mocks.metaStore, nil, mocks.clusterStateHistoryManager, nil, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 
 			resp, err := coordinator.DownloadFile(context.Background(), tc.req)
 
@@ -293,6 +297,59 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 
 			mocks.metaStore.AssertExpectations(t)
 			mocks.clusterStateHistoryManager.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCoordinator_DeleteFile(t *testing.T) {
+	cfg := config.DefaultCoordinatorConfig()
+	logger := logging.NewTestLogger(slog.LevelError)
+
+	testCases := []struct {
+		name         string
+		setupMocks   func(*serverMocks)
+		req          *proto.DeleteRequest
+		expectedResp *proto.DeleteResponse
+		expectErr    bool
+	}{
+		{
+			name: "success",
+			setupMocks: func(mocks *serverMocks) {
+				mocks.metaStore.On("DeleteFile", "test.txt").Return(nil).Once()
+			},
+			req:          &proto.DeleteRequest{Path: "test.txt"},
+			expectedResp: &proto.DeleteResponse{Success: true},
+			expectErr:    false,
+		},
+		{
+			name: "error: delete fails",
+			setupMocks: func(mocks *serverMocks) {
+				mocks.metaStore.On("DeleteFile", "test.txt").Return(assert.AnError).Once()
+			},
+			req:          &proto.DeleteRequest{Path: "test.txt"},
+			expectedResp: nil,
+			expectErr:    true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mocks := &serverMocks{
+				metaStore: new(metadata.MockMetadataStore),
+			}
+			tc.setupMocks(mocks)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
+
+			resp, err := coordinator.DeleteFile(context.Background(), tc.req)
+
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedResp, resp)
+			}
+			mocks.metaStore.AssertExpectations(t)
 		})
 	}
 }
@@ -339,8 +396,8 @@ func TestCoordinator_ConfirmUpload(t *testing.T) {
 				metadataManager: new(MockMetadataSessionManager),
 			}
 			tc.setupMocks(mocks)
-
-			coordinator := NewCoordinator(cfg, mocks.metaStore, mocks.metadataManager, nil, nil, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 			resp, err := coordinator.ConfirmUpload(context.Background(), tc.req)
 
 			if tc.expectErr {
@@ -393,7 +450,8 @@ func TestCoordinator_RegisterDataNode(t *testing.T) {
 				clusterStateHistoryManager: new(state.MockClusterStateHistoryManager),
 			}
 			tc.setupMocks(mocks)
-			coordinator := NewCoordinator(cfg, nil, nil, mocks.clusterStateHistoryManager, nil, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 			resp, err := coordinator.RegisterDataNode(context.Background(), tc.req)
 
 			if tc.expectErr {
@@ -494,7 +552,8 @@ func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 				clusterStateHistoryManager: new(state.MockClusterStateHistoryManager),
 			}
 			tc.setupMocks(mocks)
-			coordinator := NewCoordinator(cfg, nil, nil, mocks.clusterStateHistoryManager, nil, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 			resp, err := coordinator.DataNodeHeartbeat(context.Background(), tc.req)
 
 			if tc.expectErr {
@@ -560,7 +619,8 @@ func TestCoordinator_ListNodes(t *testing.T) {
 				clusterStateHistoryManager: new(state.MockClusterStateHistoryManager),
 			}
 			tc.setupMocks(mocks)
-			coordinator := NewCoordinator(cfg, nil, nil, mocks.clusterStateHistoryManager, nil, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 			resp, err := coordinator.ListNodes(context.Background(), tc.req)
 
 			if tc.expectErr {

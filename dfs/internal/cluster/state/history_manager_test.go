@@ -7,11 +7,12 @@ import (
 	"testing"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 
 func newTestHistoryManager(maxHistory int) *clusterStateHistoryManager {
-	return NewClusterStateHistoryManager(ClusterStateHistoryManagerConfig{
+	return NewClusterStateHistoryManager(config.ClusterStateHistoryManagerConfig{
 		MaxHistorySize: maxHistory,
 	})
 }
@@ -27,7 +28,7 @@ func TestNewClusterStateHistoryManager(t *testing.T) {
 	})
 
 	t.Run("with zero history size", func(t *testing.T) {
-		manager := NewClusterStateHistoryManager(ClusterStateHistoryManagerConfig{MaxHistorySize: 0})
+		manager := NewClusterStateHistoryManager(config.ClusterStateHistoryManagerConfig{MaxHistorySize: 0})
 		assert.Equal(t, 100, manager.config.MaxHistorySize, "should use default size")
 		assert.Len(t, manager.history, 100)
 	})

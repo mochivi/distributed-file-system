@@ -17,6 +17,7 @@ import (
 type agentMocks struct {
 	coordinator *state.MockCoordinatorFinder
 	heartbeat   *datanode_controllers.MockHeartbeatController
+	gc          *datanode_controllers.MockOrphanedChunksGCController
 	register    *datanode_services.MockRegisterService
 	csm         *state.MockClusterStateManager
 }
@@ -24,10 +25,11 @@ type agentMocks struct {
 // newAgentMocks initializes all mocks.
 func newAgentMocks() agentMocks {
 	return agentMocks{
-		coordinator: state.NewMockCoordinatorFinder(),
-		heartbeat:   datanode_controllers.NewMockHeartbeatController(),
-		register:    datanode_services.NewMockRegisterService(),
-		csm:         state.NewMockClusterStateManager(),
+		coordinator: &state.MockCoordinatorFinder{},
+		heartbeat:   &datanode_controllers.MockHeartbeatController{},
+		gc:          &datanode_controllers.MockOrphanedChunksGCController{},
+		register:    &datanode_services.MockRegisterService{},
+		csm:         &state.MockClusterStateManager{},
 	}
 }
 
@@ -35,6 +37,7 @@ func newAgentMocks() agentMocks {
 func (m *agentMocks) AssertExpectations(t *testing.T) {
 	m.coordinator.AssertExpectations(t)
 	m.heartbeat.AssertExpectations(t)
+	m.gc.AssertExpectations(t)
 	m.register.AssertExpectations(t)
 	m.csm.AssertExpectations(t)
 }
@@ -52,6 +55,7 @@ func TestNodeAgent_Run(t *testing.T) {
 			setupMocks: func(agent *NodeAgent, mocks *agentMocks) {
 				mocks.coordinator.On("BootstrapCoordinator").Return(nil).Once()
 				mocks.heartbeat.On("Run", agent.info, agent.clusterStateManager, agent.services.Coordinator).Return(nil).Once()
+				mocks.gc.On("Run").Return(nil).Once()
 				mocks.register.On("RegisterWithCoordinator", agent.ctx, agent.info, agent.clusterStateManager, agent.services.Coordinator).Return(nil).Once()
 			},
 			expectError: false,
@@ -74,10 +78,11 @@ func TestNodeAgent_Run(t *testing.T) {
 				ctx:                 context.Background(),
 				info:                nodeInfo,
 				clusterStateManager: mocks.csm,
-				controllers: datanode_controllers.NodeAgentControllers{
-					Heartbeat: mocks.heartbeat,
+				controllers: &datanode_controllers.NodeAgentControllers{
+					Heartbeat:        mocks.heartbeat,
+					GarbageCollector: mocks.gc,
 				},
-				services: datanode_services.NodeAgentServices{
+				services: &datanode_services.NodeAgentServices{
 					Coordinator: mocks.coordinator,
 					Register:    mocks.register,
 				},

@@ -39,19 +39,21 @@ func NewTestLogger(logLevel slog.Level) *slog.Logger {
 func InitLogger() (*slog.Logger, error) {
 	var logger *slog.Logger
 
-	logLevelStr := utils.GetEnvString("LOG_LEVEL", "info")
+	logLevelStr := utils.GetEnvString("LOG_LEVEL", "warn")
+	var logLevel slog.Level
 	switch logLevelStr {
 	case "debug":
-		logger = SetupTextLogger(slog.LevelDebug)
+		logLevel = slog.LevelDebug
 	case "info":
-		logger = SetupTextLogger(slog.LevelInfo)
+		logLevel = slog.LevelInfo
 	case "warn":
-		logger = SetupTextLogger(slog.LevelWarn)
+		logLevel = slog.LevelWarn
 	case "error":
-		logger = SetupTextLogger(slog.LevelError)
+		logLevel = slog.LevelError
 	default:
 		return nil, errors.New("invalid log level")
 	}
+	logger = SetupTextLogger(logLevel)
 
 	if logger == nil {
 		return nil, errors.New("logger is nil")

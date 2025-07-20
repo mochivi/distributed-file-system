@@ -381,6 +381,121 @@ func (x *DeleteChunkResponse) GetMessage() string {
 	return ""
 }
 
+// Bulk delete chunks
+type BulkDeleteChunkRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	ChunkIds []string               `protobuf:"bytes,1,rep,name=chunk_ids,json=chunkIds,proto3" json:"chunk_ids,omitempty"`
+	// gc, rebalance
+	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BulkDeleteChunkRequest) Reset() {
+	*x = BulkDeleteChunkRequest{}
+	mi := &file_datanode_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BulkDeleteChunkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BulkDeleteChunkRequest) ProtoMessage() {}
+
+func (x *BulkDeleteChunkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_datanode_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BulkDeleteChunkRequest.ProtoReflect.Descriptor instead.
+func (*BulkDeleteChunkRequest) Descriptor() ([]byte, []int) {
+	return file_datanode_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *BulkDeleteChunkRequest) GetChunkIds() []string {
+	if x != nil {
+		return x.ChunkIds
+	}
+	return nil
+}
+
+func (x *BulkDeleteChunkRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type BulkDeleteChunkResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Success bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	// ChunkIDs that failed to delete
+	Failed        []string `protobuf:"bytes,3,rep,name=failed,proto3" json:"failed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BulkDeleteChunkResponse) Reset() {
+	*x = BulkDeleteChunkResponse{}
+	mi := &file_datanode_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BulkDeleteChunkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BulkDeleteChunkResponse) ProtoMessage() {}
+
+func (x *BulkDeleteChunkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_datanode_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BulkDeleteChunkResponse.ProtoReflect.Descriptor instead.
+func (*BulkDeleteChunkResponse) Descriptor() ([]byte, []int) {
+	return file_datanode_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *BulkDeleteChunkResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *BulkDeleteChunkResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *BulkDeleteChunkResponse) GetFailed() []string {
+	if x != nil {
+		return x.Failed
+	}
+	return nil
+}
+
 type ChunkDataStream struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	SessionId       string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
@@ -395,7 +510,7 @@ type ChunkDataStream struct {
 
 func (x *ChunkDataStream) Reset() {
 	*x = ChunkDataStream{}
-	mi := &file_datanode_proto_msgTypes[7]
+	mi := &file_datanode_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -407,7 +522,7 @@ func (x *ChunkDataStream) String() string {
 func (*ChunkDataStream) ProtoMessage() {}
 
 func (x *ChunkDataStream) ProtoReflect() protoreflect.Message {
-	mi := &file_datanode_proto_msgTypes[7]
+	mi := &file_datanode_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -420,7 +535,7 @@ func (x *ChunkDataStream) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChunkDataStream.ProtoReflect.Descriptor instead.
 func (*ChunkDataStream) Descriptor() ([]byte, []int) {
-	return file_datanode_proto_rawDescGZIP(), []int{7}
+	return file_datanode_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ChunkDataStream) GetSessionId() string {
@@ -479,7 +594,7 @@ type ChunkDataAck struct {
 
 func (x *ChunkDataAck) Reset() {
 	*x = ChunkDataAck{}
-	mi := &file_datanode_proto_msgTypes[8]
+	mi := &file_datanode_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -491,7 +606,7 @@ func (x *ChunkDataAck) String() string {
 func (*ChunkDataAck) ProtoMessage() {}
 
 func (x *ChunkDataAck) ProtoReflect() protoreflect.Message {
-	mi := &file_datanode_proto_msgTypes[8]
+	mi := &file_datanode_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -504,7 +619,7 @@ func (x *ChunkDataAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChunkDataAck.ProtoReflect.Descriptor instead.
 func (*ChunkDataAck) Descriptor() ([]byte, []int) {
-	return file_datanode_proto_rawDescGZIP(), []int{8}
+	return file_datanode_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ChunkDataAck) GetSessionId() string {
@@ -558,7 +673,7 @@ type HealthCheckRequest struct {
 
 func (x *HealthCheckRequest) Reset() {
 	*x = HealthCheckRequest{}
-	mi := &file_datanode_proto_msgTypes[9]
+	mi := &file_datanode_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -570,7 +685,7 @@ func (x *HealthCheckRequest) String() string {
 func (*HealthCheckRequest) ProtoMessage() {}
 
 func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_datanode_proto_msgTypes[9]
+	mi := &file_datanode_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -583,7 +698,7 @@ func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
 func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
-	return file_datanode_proto_rawDescGZIP(), []int{9}
+	return file_datanode_proto_rawDescGZIP(), []int{11}
 }
 
 type HealthCheckResponse struct {
@@ -595,7 +710,7 @@ type HealthCheckResponse struct {
 
 func (x *HealthCheckResponse) Reset() {
 	*x = HealthCheckResponse{}
-	mi := &file_datanode_proto_msgTypes[10]
+	mi := &file_datanode_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -607,7 +722,7 @@ func (x *HealthCheckResponse) String() string {
 func (*HealthCheckResponse) ProtoMessage() {}
 
 func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_datanode_proto_msgTypes[10]
+	mi := &file_datanode_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -620,7 +735,7 @@ func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
 func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
-	return file_datanode_proto_rawDescGZIP(), []int{10}
+	return file_datanode_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HealthCheckResponse) GetStatus() *HealthStatus {
@@ -656,7 +771,14 @@ const file_datanode_proto_rawDesc = "" +
 	"\bchunk_id\x18\x01 \x01(\tR\achunkId\"I\n" +
 	"\x13DeleteChunkResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xbd\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"M\n" +
+	"\x16BulkDeleteChunkRequest\x12\x1b\n" +
+	"\tchunk_ids\x18\x01 \x03(\tR\bchunkIds\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"e\n" +
+	"\x17BulkDeleteChunkResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x16\n" +
+	"\x06failed\x18\x03 \x03(\tR\x06failed\"\xbd\x01\n" +
 	"\x0fChunkDataStream\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x19\n" +
@@ -675,13 +797,14 @@ const file_datanode_proto_rawDesc = "" +
 	"\breplicas\x18\x06 \x03(\v2\r.dfs.NodeInfoR\breplicas\"\x14\n" +
 	"\x12HealthCheckRequest\"@\n" +
 	"\x13HealthCheckResponse\x12)\n" +
-	"\x06status\x18\x01 \x01(\v2\x11.dfs.HealthStatusR\x06status2\xa8\x03\n" +
+	"\x06status\x18\x01 \x01(\v2\x11.dfs.HealthStatusR\x06status2\xf6\x03\n" +
 	"\x0fDataNodeService\x12=\n" +
 	"\x12PrepareChunkUpload\x12\x17.dfs.UploadChunkRequest\x1a\x0e.dfs.NodeReady\x12E\n" +
 	"\x14PrepareChunkDownload\x12\x19.dfs.DownloadChunkRequest\x1a\x12.dfs.DownloadReady\x12@\n" +
 	"\x11UploadChunkStream\x12\x14.dfs.ChunkDataStream\x1a\x11.dfs.ChunkDataAck(\x010\x01\x12I\n" +
 	"\x13DownloadChunkStream\x12\x1a.dfs.DownloadStreamRequest\x1a\x14.dfs.ChunkDataStream0\x01\x12@\n" +
-	"\vDeleteChunk\x12\x17.dfs.DeleteChunkRequest\x1a\x18.dfs.DeleteChunkResponse\x12@\n" +
+	"\vDeleteChunk\x12\x17.dfs.DeleteChunkRequest\x1a\x18.dfs.DeleteChunkResponse\x12L\n" +
+	"\x0fBulkDeleteChunk\x12\x1b.dfs.BulkDeleteChunkRequest\x1a\x1c.dfs.BulkDeleteChunkResponse\x12@\n" +
 	"\vHealthCheck\x12\x17.dfs.HealthCheckRequest\x1a\x18.dfs.HealthCheckResponseB\vZ\tpkg/protob\x06proto3"
 
 var (
@@ -696,43 +819,47 @@ func file_datanode_proto_rawDescGZIP() []byte {
 	return file_datanode_proto_rawDescData
 }
 
-var file_datanode_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_datanode_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_datanode_proto_goTypes = []any{
-	(*UploadChunkRequest)(nil),    // 0: dfs.UploadChunkRequest
-	(*NodeReady)(nil),             // 1: dfs.NodeReady
-	(*DownloadReady)(nil),         // 2: dfs.DownloadReady
-	(*DownloadChunkRequest)(nil),  // 3: dfs.DownloadChunkRequest
-	(*DownloadStreamRequest)(nil), // 4: dfs.DownloadStreamRequest
-	(*DeleteChunkRequest)(nil),    // 5: dfs.DeleteChunkRequest
-	(*DeleteChunkResponse)(nil),   // 6: dfs.DeleteChunkResponse
-	(*ChunkDataStream)(nil),       // 7: dfs.ChunkDataStream
-	(*ChunkDataAck)(nil),          // 8: dfs.ChunkDataAck
-	(*HealthCheckRequest)(nil),    // 9: dfs.HealthCheckRequest
-	(*HealthCheckResponse)(nil),   // 10: dfs.HealthCheckResponse
-	(*ChunkHeader)(nil),           // 11: dfs.ChunkHeader
-	(*NodeInfo)(nil),              // 12: dfs.NodeInfo
-	(*HealthStatus)(nil),          // 13: dfs.HealthStatus
+	(*UploadChunkRequest)(nil),      // 0: dfs.UploadChunkRequest
+	(*NodeReady)(nil),               // 1: dfs.NodeReady
+	(*DownloadReady)(nil),           // 2: dfs.DownloadReady
+	(*DownloadChunkRequest)(nil),    // 3: dfs.DownloadChunkRequest
+	(*DownloadStreamRequest)(nil),   // 4: dfs.DownloadStreamRequest
+	(*DeleteChunkRequest)(nil),      // 5: dfs.DeleteChunkRequest
+	(*DeleteChunkResponse)(nil),     // 6: dfs.DeleteChunkResponse
+	(*BulkDeleteChunkRequest)(nil),  // 7: dfs.BulkDeleteChunkRequest
+	(*BulkDeleteChunkResponse)(nil), // 8: dfs.BulkDeleteChunkResponse
+	(*ChunkDataStream)(nil),         // 9: dfs.ChunkDataStream
+	(*ChunkDataAck)(nil),            // 10: dfs.ChunkDataAck
+	(*HealthCheckRequest)(nil),      // 11: dfs.HealthCheckRequest
+	(*HealthCheckResponse)(nil),     // 12: dfs.HealthCheckResponse
+	(*ChunkHeader)(nil),             // 13: dfs.ChunkHeader
+	(*NodeInfo)(nil),                // 14: dfs.NodeInfo
+	(*HealthStatus)(nil),            // 15: dfs.HealthStatus
 }
 var file_datanode_proto_depIdxs = []int32{
-	11, // 0: dfs.UploadChunkRequest.chunk_header:type_name -> dfs.ChunkHeader
+	13, // 0: dfs.UploadChunkRequest.chunk_header:type_name -> dfs.ChunkHeader
 	1,  // 1: dfs.DownloadReady.ready:type_name -> dfs.NodeReady
-	11, // 2: dfs.DownloadReady.chunk_header:type_name -> dfs.ChunkHeader
-	12, // 3: dfs.ChunkDataAck.replicas:type_name -> dfs.NodeInfo
-	13, // 4: dfs.HealthCheckResponse.status:type_name -> dfs.HealthStatus
+	13, // 2: dfs.DownloadReady.chunk_header:type_name -> dfs.ChunkHeader
+	14, // 3: dfs.ChunkDataAck.replicas:type_name -> dfs.NodeInfo
+	15, // 4: dfs.HealthCheckResponse.status:type_name -> dfs.HealthStatus
 	0,  // 5: dfs.DataNodeService.PrepareChunkUpload:input_type -> dfs.UploadChunkRequest
 	3,  // 6: dfs.DataNodeService.PrepareChunkDownload:input_type -> dfs.DownloadChunkRequest
-	7,  // 7: dfs.DataNodeService.UploadChunkStream:input_type -> dfs.ChunkDataStream
+	9,  // 7: dfs.DataNodeService.UploadChunkStream:input_type -> dfs.ChunkDataStream
 	4,  // 8: dfs.DataNodeService.DownloadChunkStream:input_type -> dfs.DownloadStreamRequest
 	5,  // 9: dfs.DataNodeService.DeleteChunk:input_type -> dfs.DeleteChunkRequest
-	9,  // 10: dfs.DataNodeService.HealthCheck:input_type -> dfs.HealthCheckRequest
-	1,  // 11: dfs.DataNodeService.PrepareChunkUpload:output_type -> dfs.NodeReady
-	2,  // 12: dfs.DataNodeService.PrepareChunkDownload:output_type -> dfs.DownloadReady
-	8,  // 13: dfs.DataNodeService.UploadChunkStream:output_type -> dfs.ChunkDataAck
-	7,  // 14: dfs.DataNodeService.DownloadChunkStream:output_type -> dfs.ChunkDataStream
-	6,  // 15: dfs.DataNodeService.DeleteChunk:output_type -> dfs.DeleteChunkResponse
-	10, // 16: dfs.DataNodeService.HealthCheck:output_type -> dfs.HealthCheckResponse
-	11, // [11:17] is the sub-list for method output_type
-	5,  // [5:11] is the sub-list for method input_type
+	7,  // 10: dfs.DataNodeService.BulkDeleteChunk:input_type -> dfs.BulkDeleteChunkRequest
+	11, // 11: dfs.DataNodeService.HealthCheck:input_type -> dfs.HealthCheckRequest
+	1,  // 12: dfs.DataNodeService.PrepareChunkUpload:output_type -> dfs.NodeReady
+	2,  // 13: dfs.DataNodeService.PrepareChunkDownload:output_type -> dfs.DownloadReady
+	10, // 14: dfs.DataNodeService.UploadChunkStream:output_type -> dfs.ChunkDataAck
+	9,  // 15: dfs.DataNodeService.DownloadChunkStream:output_type -> dfs.ChunkDataStream
+	6,  // 16: dfs.DataNodeService.DeleteChunk:output_type -> dfs.DeleteChunkResponse
+	8,  // 17: dfs.DataNodeService.BulkDeleteChunk:output_type -> dfs.BulkDeleteChunkResponse
+	12, // 18: dfs.DataNodeService.HealthCheck:output_type -> dfs.HealthCheckResponse
+	12, // [12:19] is the sub-list for method output_type
+	5,  // [5:12] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name
@@ -750,7 +877,7 @@ func file_datanode_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_datanode_proto_rawDesc), len(file_datanode_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

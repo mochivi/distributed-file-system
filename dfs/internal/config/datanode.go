@@ -9,15 +9,45 @@ import (
 
 // DatanodeAppConfig is the root configuration for the Datanode service.
 type DatanodeAppConfig struct {
-	Node  DataNodeConfig  `mapstructure:"node" validate:"required"`
-	Agent NodeAgentConfig `mapstructure:"cluster" validate:"required"`
+	Node  DataNodeConfig      `mapstructure:"node" validate:"required"`
+	Agent DatanodeAgentConfig `mapstructure:"agent" validate:"required"`
+}
+
+func DefaultDatanodeAppConfig() DatanodeAppConfig {
+	return DatanodeAppConfig{
+		Node:  DefaultDataNodeConfig(),
+		Agent: DefaultDatanodeAgentConfig(),
+	}
 }
 
 type DataNodeConfig struct {
-	Session     StreamingSessionManagerConfig    `mapstructure:"session" validate:"required"`
-	Replication ParallelReplicationServiceConfig `mapstructure:"replication" validate:"required"`
-	DiskStorage DiskStorageConfig                `mapstructure:"disk_storage" validate:"required"`
-	Streamer    StreamerConfig                   `mapstructure:"streamer" validate:"required"`
+	StreamingSession StreamingSessionManagerConfig    `mapstructure:"streaming_session" validate:"required"`
+	Replication      ParallelReplicationServiceConfig `mapstructure:"replication" validate:"required"`
+	DiskStorage      DiskStorageConfig                `mapstructure:"disk_storage" validate:"required"`
+	Streamer         StreamerConfig                   `mapstructure:"streamer" validate:"required"`
+	BulkDelete       BulkDeleteConfig                 `mapstructure:"bulk_delete" validate:"required"`
+}
+
+func DefaultDataNodeConfig() DataNodeConfig {
+	return DataNodeConfig{
+		StreamingSession: DefaultStreamingSessionManagerConfig(),
+		Replication:      DefaultParallelReplicationServiceConfig(),
+		DiskStorage:      DefaultDiskStorageConfig(),
+		Streamer:         DefaultStreamerConfig(false),
+		BulkDelete:       DefaultBulkDeleteConfig(),
+	}
+}
+
+type BulkDeleteConfig struct {
+	MaxConcurrentDeletes int           `mapstructure:"max_concurrent_deletes" validate:"required,gt=0"`
+	Timeout              time.Duration `mapstructure:"timeout" validate:"required,gt=0"`
+}
+
+func DefaultBulkDeleteConfig() BulkDeleteConfig {
+	return BulkDeleteConfig{
+		MaxConcurrentDeletes: 10,
+		Timeout:              1 * time.Minute,
+	}
 }
 
 type StreamingSessionManagerConfig struct {
@@ -48,7 +78,6 @@ type DiskStorageConfig struct {
 
 func DefaultDiskStorageConfig() DiskStorageConfig {
 	baseDir := utils.GetEnvString("DISK_STORAGE_BASE_DIR", "/app")
-
 	return DiskStorageConfig{
 		Enabled: true,
 		Kind:    "block",
@@ -68,19 +97,5 @@ func DefaultStreamerConfig(waitReplicas bool) StreamerConfig {
 		MaxChunkRetries: 3,
 		ChunkStreamSize: 256 * 1024,
 		WaitReplicas:    waitReplicas,
-	}
-}
-
-func DefaultDatanodeAppConfig() DatanodeAppConfig {
-	return DatanodeAppConfig{
-		Node: DataNodeConfig{
-			Session:     DefaultStreamingSessionManagerConfig(),
-			Replication: DefaultParallelReplicationServiceConfig(),
-			DiskStorage: DefaultDiskStorageConfig(),
-			Streamer:    DefaultStreamerConfig(false),
-		},
-		Agent: NodeAgentConfig{
-			Heartbeat: DefaultHeartbeatControllerConfig(),
-		},
 	}
 }
