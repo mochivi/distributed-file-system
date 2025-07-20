@@ -31,16 +31,6 @@ func DefaultHeartbeatControllerConfig() *HeartbeatControllerConfig {
 	}
 }
 
-type ClusterStateHistoryManagerConfig struct {
-	MaxHistorySize int
-}
-
-func DefaultClusterStateHistoryManagerConfig() *ClusterStateHistoryManagerConfig {
-	return &ClusterStateHistoryManagerConfig{
-		MaxHistorySize: 1000,
-	}
-}
-
 type OrphanedChunksGCControllerConfig struct {
 	InventoryScanInterval time.Duration `mapstructure:"inventory_scan_interval" validate:"required,gt=0"`
 	Timeout               time.Duration `mapstructure:"timeout" validate:"required,gt=0"`

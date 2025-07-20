@@ -89,7 +89,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockViewer := state.NewMockClusterStateManager()
+			mockViewer := &state.MockClusterStateManager{}
 			mockViewer.On("ListNodes", mock.Anything).Return(tc.nodesToReturn, int64(len(tc.nodesToReturn))).Maybe()
 
 			selector := cluster.NewNodeSelector(mockViewer)

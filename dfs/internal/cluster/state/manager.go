@@ -13,8 +13,9 @@ type ClusterStateViewer interface {
 	GetNode(nodeID string) (*common.NodeInfo, bool)
 }
 
-// Write-only interface
+// Complete interface
 type ClusterStateManager interface {
+	ClusterStateViewer
 	AddNode(node *common.NodeInfo)
 	RemoveNode(nodeID string) error
 	UpdateNode(node *common.NodeInfo) error

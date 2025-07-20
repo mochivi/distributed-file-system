@@ -124,7 +124,8 @@ func TestDataNodeServer_PrepareChunkUpload(t *testing.T) {
 			}
 			tc.setupMocks(mocks)
 
-			server := NewDataNodeServer(defaultInfo, defaultConfig, mocks.store, mocks.replication, mocks.sessionManager, mocks.clusterViewer, mocks.coordinatorFinder, mocks.selector, logger)
+			container := NewContainer(mocks.store, mocks.replication, mocks.sessionManager, mocks.clusterViewer, mocks.coordinatorFinder, mocks.selector)
+			server := NewDataNodeServer(defaultInfo, defaultConfig, container, logger)
 
 			resp, err := server.PrepareChunkUpload(context.Background(), tc.req)
 
@@ -216,7 +217,9 @@ func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 			}
 			tc.setupMocks(mocks)
 
-			server := NewDataNodeServer(defaultInfo, defaultConfig, mocks.store, mocks.replication, mocks.sessionManager, mocks.clusterViewer, mocks.coordinatorFinder, mocks.selector, logger)
+			container := NewContainer(mocks.store, mocks.replication, mocks.sessionManager, mocks.clusterViewer, mocks.coordinatorFinder, mocks.selector)
+			server := NewDataNodeServer(defaultInfo, defaultConfig, container, logger)
+
 			resp, err := server.PrepareChunkDownload(context.Background(), tc.req)
 
 			if tc.expectErr {
@@ -286,7 +289,9 @@ func TestDataNodeServer_DeleteChunk(t *testing.T) {
 			}
 			tc.setupMocks(mocks)
 
-			server := NewDataNodeServer(defaultInfo, defaultConfig, mocks.store, mocks.replication, mocks.sessionManager, mocks.clusterViewer, mocks.coordinatorFinder, mocks.selector, logger)
+			container := NewContainer(mocks.store, mocks.replication, mocks.sessionManager, mocks.clusterViewer, mocks.coordinatorFinder, mocks.selector)
+			server := NewDataNodeServer(defaultInfo, defaultConfig, container, logger)
+
 			resp, err := server.DeleteChunk(context.Background(), tc.req)
 
 			if tc.expectErr {
@@ -552,7 +557,8 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 			tc.setupMocks(mocks, stream)
 			tc.setupStreams(stream)
 
-			server := NewDataNodeServer(defaultInfo, defaultConfig, mocks.store, mocks.replication, mocks.sessionManager, mocks.clusterViewer, mocks.coordinatorFinder, mocks.selector, logger)
+			container := NewContainer(mocks.store, mocks.replication, mocks.sessionManager, mocks.clusterViewer, mocks.coordinatorFinder, mocks.selector)
+			server := NewDataNodeServer(defaultInfo, defaultConfig, container, logger)
 			err := server.UploadChunkStream(stream)
 
 			if tc.expectErr {
@@ -706,7 +712,8 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 			tc.setupMocks(mocks, stream)
 			tc.setupStreams(stream)
 
-			server := NewDataNodeServer(defaultInfo, defaultConfig, mocks.store, mocks.replication, mocks.sessionManager, mocks.clusterViewer, mocks.coordinatorFinder, mocks.selector, logger)
+			container := NewContainer(mocks.store, mocks.replication, mocks.sessionManager, mocks.clusterViewer, mocks.coordinatorFinder, mocks.selector)
+			server := NewDataNodeServer(defaultInfo, defaultConfig, container, logger)
 			err := server.DownloadChunkStream(tc.req, stream)
 
 			if tc.expectErr {

@@ -1,11 +1,13 @@
 package datanode_controllers
 
 type NodeAgentControllers struct {
-	Heartbeat HeartbeatProvider
+	Heartbeat        HeartbeatProvider
+	GarbageCollector OrphanedChunksGCProvider
 }
 
-func NewNodeAgentControllers(heartbeatController HeartbeatProvider) NodeAgentControllers {
+func NewNodeAgentControllers(heartbeatController HeartbeatProvider, garbageCollector OrphanedChunksGCProvider) NodeAgentControllers {
 	return NodeAgentControllers{
-		Heartbeat: heartbeatController,
+		Heartbeat:        heartbeatController,
+		GarbageCollector: garbageCollector,
 	}
 }

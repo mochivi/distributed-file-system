@@ -14,6 +14,10 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/storage"
 )
 
+type OrphanedChunksGCProvider interface {
+	Run() error
+}
+
 type OrphanedChunksGCController struct {
 	ctx     context.Context
 	cancel  context.CancelCauseFunc
@@ -57,6 +61,7 @@ func (c *OrphanedChunksGCController) Run() error {
 				}
 				c.logger.Error("Failed to delete orphaned chunks", slog.Any("error", err))
 			}
+
 			// TODO: Handle failed or leftover items: queue, log, report, decide
 			handleFailed(failed)
 

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"sync"
 
+	coordinator_controllers "github.com/mochivi/distributed-file-system/internal/cluster/coordinator/controllers"
 	datanode_controllers "github.com/mochivi/distributed-file-system/internal/cluster/datanode/controllers"
 	datanode_services "github.com/mochivi/distributed-file-system/internal/cluster/datanode/services"
 	"github.com/mochivi/distributed-file-system/internal/cluster/state"
@@ -25,15 +26,14 @@ type NodeAgent struct {
 	logger              *slog.Logger
 
 	// services provide some functionality to the cluster node
-	services datanode_services.NodeAgentServices
+	services *datanode_services.NodeAgentServices
 
 	// controllers implement some watch loop to manage the cluster node
-	controllers datanode_controllers.NodeAgentControllers
+	controllers *datanode_controllers.NodeAgentControllers
 }
 
-func NewNodeAgent(config *config.DatanodeAgentConfig, info *common.NodeInfo, clusterStateManager state.ClusterStateManager,
-	coordinatorFinder state.CoordinatorFinder, services datanode_services.NodeAgentServices, controllers datanode_controllers.NodeAgentControllers, logger *slog.Logger) *NodeAgent {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewNodeAgent(ctx context.Context, cancel context.CancelFunc, config *config.DatanodeAgentConfig, info *common.NodeInfo, clusterStateManager state.ClusterStateManager,
+	services *datanode_services.NodeAgentServices, controllers *datanode_controllers.NodeAgentControllers, logger *slog.Logger) *NodeAgent {
 
 	return &NodeAgent{
 		ctx:                 ctx,
@@ -47,50 +47,29 @@ func NewNodeAgent(config *config.DatanodeAgentConfig, info *common.NodeInfo, clu
 	}
 }
 
-type CoordinatorNodeAgentServices struct {
-	// consensus *consensus.ConsensusService // TODO: implement this
-}
-
-type CoordinatorNodeAgentControllers struct {
-}
-
 type CoordinatorNodeAgent struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	config              *config.DatanodeAgentConfig
-	clusterStateManager state.ClusterStateManager
-	logger              *slog.Logger
+	config *config.CoordinatorAgentConfig
+	// clusterStateManager state.ClusterStateManager
+	logger *slog.Logger
 
-	services    CoordinatorNodeAgentServices
-	controllers CoordinatorNodeAgentControllers
+	// services    CoordinatorNodeAgentServices
+	controllers *coordinator_controllers.CoordinatorNodeAgentControllers
 }
 
-func NewCoordinatorNodeAgent(config *config.DatanodeAgentConfig, info *common.NodeInfo, clusterStateManager state.ClusterStateManager,
-	coordinatorFinder state.CoordinatorFinder, logger *slog.Logger) *CoordinatorNodeAgent {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewCoordinatorNodeAgent(ctx context.Context, cancel context.CancelFunc, config *config.CoordinatorAgentConfig, info *common.NodeInfo,
+	controllers *coordinator_controllers.CoordinatorNodeAgentControllers, logger *slog.Logger) *CoordinatorNodeAgent {
 
 	return &CoordinatorNodeAgent{
-		ctx:                 ctx,
-		cancel:              cancel,
-		config:              config,
-		clusterStateManager: clusterStateManager,
-		logger:              logger,
-		services:            CoordinatorNodeAgentServices{},
-		controllers:         CoordinatorNodeAgentControllers{},
+		ctx:    ctx,
+		cancel: cancel,
+		config: config,
+		// clusterStateManager: clusterStateManager,
+		logger:      logger,
+		controllers: controllers,
+		// services:            CoordinatorNodeAgentServices{},
 	}
 }
-
-// type ClusterCoordinatorNode struct {
-// 	ClusterNode // besides doing everything a ClusterNode does plus coordinator-specific functionality
-
-// 	controllers struct {
-// 		gc       *GarbageCollectionController
-// 		register *RegisterController
-// 	}
-// }
-
-// // Register controller
-// type RegisterController struct {
-// }

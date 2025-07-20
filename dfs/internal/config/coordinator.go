@@ -21,12 +21,13 @@ func DefaultCoordinatorAppConfig() CoordinatorAppConfig {
 
 // Configuration for the coordinator node itself
 type CoordinatorConfig struct {
-	ID          string            `mapstructure:"id"`
-	Host        string            `mapstructure:"host" validate:"required,hostname_rfc1123"`
-	Port        int               `mapstructure:"port" validate:"required,gt=0,lt=65536"`
-	ChunkSize   int               `mapstructure:"chunk_size" validate:"required,gt=0"`
-	Replication ReplicationConfig `mapstructure:"replication" validate:"required"`
-	Metadata    MetadataConfig    `mapstructure:"metadata" validate:"required"`
+	ID          string                           `mapstructure:"id"`
+	Host        string                           `mapstructure:"host" validate:"required,hostname_rfc1123"`
+	Port        int                              `mapstructure:"port" validate:"required,gt=0,lt=65536"`
+	ChunkSize   int                              `mapstructure:"chunk_size" validate:"required,gt=0"`
+	Replication ReplicationConfig                `mapstructure:"replication" validate:"required"`
+	Metadata    MetadataConfig                   `mapstructure:"metadata" validate:"required"`
+	State       ClusterStateHistoryManagerConfig `mapstructure:"state" validate:"required"`
 }
 
 func DefaultCoordinatorConfig() CoordinatorConfig {
@@ -37,6 +38,7 @@ func DefaultCoordinatorConfig() CoordinatorConfig {
 		ChunkSize:   8 * 1024 * 1024, // 8MB default chunksize
 		Replication: DefaultReplicationConfig(),
 		Metadata:    DefaultMetadataConfig(),
+		State:       DefaultClusterStateHistoryManagerConfig(),
 	}
 }
 
@@ -57,5 +59,15 @@ type ReplicationConfig struct {
 func DefaultReplicationConfig() ReplicationConfig {
 	return ReplicationConfig{
 		Factor: 3,
+	}
+}
+
+type ClusterStateHistoryManagerConfig struct {
+	MaxHistorySize int `mapstructure:"maxHistorySize" validate:"required,gte=1"`
+}
+
+func DefaultClusterStateHistoryManagerConfig() ClusterStateHistoryManagerConfig {
+	return ClusterStateHistoryManagerConfig{
+		MaxHistorySize: 1000,
 	}
 }

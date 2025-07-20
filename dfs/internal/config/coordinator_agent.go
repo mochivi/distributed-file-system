@@ -15,7 +15,7 @@ func DefaultCoordinatorAgentConfig() CoordinatorAgentConfig {
 
 type DeletedFilesGCControllerConfig struct {
 	Interval           time.Duration `mapstructure:"interval" validate:"required,gt=0"`
-	Timeout            time.Duration `mapstructure:"timeout" validate:"required,gt=0"` // Timeout until will pause the GC cycle, work resumes in next cycle
+	Timeout            time.Duration `mapstructure:"timeout" validate:"required,gt=0"` // Timeout until automatically pausing the GC cycle, work resumes in next cycle
 	RecoveryTimeout    time.Duration `mapstructure:"recovery_timeout" validate:"required,gt=0"`
 	BatchSize          int           `mapstructure:"batch_size" validate:"required,gt=0"`
 	ConcurrentRequests int           `mapstructure:"concurrent_requests" validate:"required,gt=0"`
@@ -23,7 +23,8 @@ type DeletedFilesGCControllerConfig struct {
 
 func DefaultDeletedFilesGCControllerConfig() DeletedFilesGCControllerConfig {
 	return DeletedFilesGCControllerConfig{
-		Interval:           1 * time.Hour,
+		Interval:           1 * time.Hour,   // Time in between cycles
+		Timeout:            1 * time.Minute, // Time spent sending requests to datanodes
 		RecoveryTimeout:    2 * time.Hour,
 		BatchSize:          1000,
 		ConcurrentRequests: 5,

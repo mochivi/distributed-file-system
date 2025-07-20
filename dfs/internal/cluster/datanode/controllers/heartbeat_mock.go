@@ -10,12 +10,6 @@ type MockHeartbeatController struct {
 	mock.Mock
 }
 
-func NewMockHeartbeatController() *MockHeartbeatController {
-	return &MockHeartbeatController{
-		Mock: mock.Mock{},
-	}
-}
-
 func (m *MockHeartbeatController) Run(info *common.NodeInfo, csm state.ClusterStateManager, cf state.CoordinatorFinder) error {
 	return m.Called(info, csm, cf).Error(0)
 }

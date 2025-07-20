@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/config"
 )
 
 type ClusterStateHistoryManager interface {
@@ -18,21 +19,17 @@ type ClusterStateHistoryManager interface {
 	GetAvailableNodesForChunk(replicaIDs []*common.NodeInfo) ([]*common.NodeInfo, bool)
 }
 
-type ClusterStateHistoryManagerConfig struct {
-	MaxHistorySize int
-}
-
 type clusterStateHistoryManager struct {
 	store  *nodeStore
 	mu     sync.RWMutex
-	config ClusterStateHistoryManagerConfig
+	config config.ClusterStateHistoryManagerConfig
 
 	version      int64
 	history      []common.NodeUpdate // Circular buffer for recent updates
 	historyIndex int                 // Current position in circular buffer
 }
 
-func NewClusterStateHistoryManager(config ClusterStateHistoryManagerConfig) *clusterStateHistoryManager {
+func NewClusterStateHistoryManager(config config.ClusterStateHistoryManagerConfig) *clusterStateHistoryManager {
 	if config.MaxHistorySize <= 0 {
 		config.MaxHistorySize = 100 // Default value
 	}

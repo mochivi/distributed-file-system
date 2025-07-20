@@ -130,7 +130,8 @@ func TestCoordinator_UploadFile(t *testing.T) {
 				metadataManager:            new(MockMetadataSessionManager),
 			}
 			tc.setupMocks(mocks)
-			coordinator := NewCoordinator(cfg, mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 
 			resp, err := coordinator.UploadFile(context.Background(), tc.req)
 			time.Sleep(1 * time.Second) // wait for metadataManager goroutine to start and finish, this is a hack to avoid race conditions
@@ -269,9 +270,12 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 			mocks := &serverMocks{
 				clusterStateHistoryManager: new(state.MockClusterStateHistoryManager),
 				metaStore:                  new(metadata.MockMetadataStore),
+				metadataManager:            new(MockMetadataSessionManager),
+				nodeSelector:               new(cluster.MockNodeSelector),
 			}
 			tc.setupMocks(mocks)
-			coordinator := NewCoordinator(cfg, mocks.metaStore, nil, mocks.clusterStateHistoryManager, nil, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 
 			resp, err := coordinator.DownloadFile(context.Background(), tc.req)
 
@@ -339,8 +343,8 @@ func TestCoordinator_ConfirmUpload(t *testing.T) {
 				metadataManager: new(MockMetadataSessionManager),
 			}
 			tc.setupMocks(mocks)
-
-			coordinator := NewCoordinator(cfg, mocks.metaStore, mocks.metadataManager, nil, nil, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 			resp, err := coordinator.ConfirmUpload(context.Background(), tc.req)
 
 			if tc.expectErr {
@@ -393,7 +397,8 @@ func TestCoordinator_RegisterDataNode(t *testing.T) {
 				clusterStateHistoryManager: new(state.MockClusterStateHistoryManager),
 			}
 			tc.setupMocks(mocks)
-			coordinator := NewCoordinator(cfg, nil, nil, mocks.clusterStateHistoryManager, nil, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 			resp, err := coordinator.RegisterDataNode(context.Background(), tc.req)
 
 			if tc.expectErr {
@@ -494,7 +499,8 @@ func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 				clusterStateHistoryManager: new(state.MockClusterStateHistoryManager),
 			}
 			tc.setupMocks(mocks)
-			coordinator := NewCoordinator(cfg, nil, nil, mocks.clusterStateHistoryManager, nil, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 			resp, err := coordinator.DataNodeHeartbeat(context.Background(), tc.req)
 
 			if tc.expectErr {
@@ -560,7 +566,8 @@ func TestCoordinator_ListNodes(t *testing.T) {
 				clusterStateHistoryManager: new(state.MockClusterStateHistoryManager),
 			}
 			tc.setupMocks(mocks)
-			coordinator := NewCoordinator(cfg, nil, nil, mocks.clusterStateHistoryManager, nil, logger)
+			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)
+			coordinator := NewCoordinator(&cfg, container, logger)
 			resp, err := coordinator.ListNodes(context.Background(), tc.req)
 
 			if tc.expectErr {

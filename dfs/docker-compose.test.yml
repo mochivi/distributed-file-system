@@ -7,6 +7,9 @@ services:
       dockerfile: ./deploy/docker/coordinator.Dockerfile
     ports:
       - "8080:8080"
+    environment:
+      - COORDINATOR_HOST=coordinator
+      - COORDINATOR_PORT=8080
     networks:
       - dfs-network
 
