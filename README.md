@@ -31,6 +31,7 @@ A **distributed file system** written in Go that demonstrates chunk-based storag
 * **Streaming Protocol**: Bidirectional gRPC streams with back-pressure control and SHA-256 checksums
 * **Node Management**: Automatic registration, heartbeat monitoring, and cluster state management
 * **Session Management**: Dual session types (streaming + metadata) ensuring operation atomicity
+* **Delete & List Operations**: Implemented file deletion (with GC) and recursive directory listing APIs
 
 ### Architecture Highlights
 * **Coordinator Service**: Metadata-only service (file → chunk mapping, cluster membership)
@@ -40,7 +41,6 @@ A **distributed file system** written in Go that demonstrates chunk-based storag
 * **Docker Integration**: Full e2e test environment with 1 coordinator + 6 datanodes
 
 ### Planned Features 🚧
-* **File Operations**: Delete and list operations (APIs defined, implementation in progress)
 * **Persistent Metadata**: etcd-based coordinator storage (currently in-memory)
 * **API Gateway**: HTTP/REST interface with authentication and authorization
 * **Enhanced Security**: TLS, JWT authentication, RBAC access control
