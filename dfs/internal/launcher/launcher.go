@@ -3,7 +3,6 @@ package launcher
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net"
 	"os"
@@ -111,11 +110,6 @@ func launchServer(ctx context.Context, wg *sync.WaitGroup, errChan chan error, g
 			default:
 				errChan <- fmt.Errorf("gRPC server failed: %w", err)
 			}
-		}
-
-		defer wg.Done()
-		if err := grpcServer.Serve(listener); err != nil {
-			log.Fatalf("Failed to serve: %v", err)
 		}
 	}()
 }
