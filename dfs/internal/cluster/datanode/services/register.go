@@ -36,7 +36,7 @@ func (s *RegisterService) RegisterWithCoordinator(ctx context.Context, nodeInfo 
 	logger := logging.OperationLogger(s.logger, "register", slog.String("coordinator_address", coordinatorClient.Node().Endpoint()))
 	logger.Info("Registering with coordinator")
 
-	req := common.RegisterDataNodeRequest{NodeInfo: *nodeInfo}
+	req := common.RegisterDataNodeRequest{NodeInfo: nodeInfo}
 	resp, err := coordinatorClient.RegisterDataNode(ctx, req)
 	if err != nil {
 		logger.Error("Failed to register datanode with coordinator", slog.String("error", err.Error()))

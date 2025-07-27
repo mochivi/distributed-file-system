@@ -3,6 +3,7 @@ package testutils
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"math/big"
 	"net"
 	"strconv"
 	"testing"
@@ -73,8 +74,12 @@ func NewTestDataNodeClientWithStubServer(t *testing.T, server proto.DataNodeServ
 		_ = grpcServer.Serve(lis)
 	}()
 
+	nodeNumber, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		t.Fatalf("failed to generate random number: %v", err)
+	}
 	nodeInfo := &common.NodeInfo{
-		ID:   "node-1",
+		ID:   "node-" + strconv.Itoa(int(nodeNumber.Int64())),
 		Host: "127.0.0.1",
 		Port: func() int {
 			host, port, _ := net.SplitHostPort(lis.Addr().String())

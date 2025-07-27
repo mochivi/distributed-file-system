@@ -34,8 +34,9 @@ message UploadRequest {
   string checksum = 4;
 }
 message UploadResponse {
-  repeated ChunkLocation chunk_locations = 1;
-  string session_id = 2;
+  repeated string chunk_ids = 1;
+  repeated NodeInfo nodes = 2;
+  string session_id = 3;
 }
 
 message ChunkLocation {

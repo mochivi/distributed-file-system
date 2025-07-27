@@ -3,14 +3,12 @@ package datanode
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
 	"strings"
 	"sync"
 
-	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -30,7 +28,7 @@ const (
 func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.UploadChunkRequest) (*proto.NodeReady, error) {
 	req := common.UploadChunkRequestFromProto(pb)
 
-	logger := logging.OperationLogger(s.logger, "chunk_upload", slog.String("chunk_id", req.ChunkHeader.ID))
+	logger := logging.OperationLogger(s.logger, "prepare_chunk_upload", slog.String("chunk_id", req.ChunkHeader.ID))
 	logger.Info("Received PrepareChunkUpload request")
 
 	// Validate request
@@ -50,21 +48,21 @@ func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.Uploa
 	}
 
 	if existing, ok := s.sessionManager.LoadByChunk(req.ChunkHeader.ID); ok {
-		switch existing.Status {
-		case SessionCompleted, SessionFailed, SessionExpired:
-			s.sessionManager.Delete(existing.SessionID) // purge zombie
-		default: // SessionActive
-			return common.NodeReady{
-				Accept:  false,
-				Message: "session still active",
-			}.ToProto(), nil
+		if !existing.Status.IsValid() {
+			s.sessionManager.Delete(existing.SessionID)
 		}
+
+		// If is valid session, return early
+		return common.NodeReady{
+			Accept:    true,
+			Message:   "session already active",
+			SessionID: existing.SessionID,
+		}.ToProto(), nil
 	}
 	session := s.sessionManager.NewSession(req.ChunkHeader, req.Propagate)
 	if err := s.sessionManager.Store(session.SessionID, session); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to store streaming session: %v", err)
 	}
-	session.logger.Info("Streaming session created")
 
 	return common.NodeReady{
 		Accept:    true,
@@ -77,11 +75,11 @@ func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.Uploa
 func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.DownloadChunkRequest) (*proto.DownloadReady, error) {
 	req := common.DownloadChunkRequestFromProto(pb)
 
-	logger := logging.OperationLogger(s.logger, "chunk_download", slog.String("chunk_id", req.ChunkID))
+	logger := logging.OperationLogger(s.logger, "prepare_chunk_download", slog.String("chunk_id", req.ChunkID))
 	logger.Info("Received PrepareChunkDownload request")
 
 	if !s.store.Exists(req.ChunkID) {
-		logger.Error("Chunk not found")
+		logger.Error("Chunk not found", slog.String("chunk_id", req.ChunkID))
 		return nil, status.Errorf(codes.NotFound, "chunk not found")
 	}
 
@@ -95,7 +93,7 @@ func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.Dow
 	if err := s.sessionManager.Store(session.SessionID, session); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to store streaming session: %v", err)
 	}
-	session.logger.Info("Streaming session created")
+	logger.Info("Streaming session created", slog.String("session_id", session.SessionID))
 
 	return common.DownloadReady{
 		NodeReady: common.NodeReady{
@@ -218,147 +216,55 @@ func (s *DataNodeServer) BulkDeleteChunk(ctx context.Context, pb *proto.BulkDele
 
 // This is the side that is responsible for receiving the chunk data from some peer (client or another node)
 // TODO: not taking into account the partialChecksum on each chunk, so it would be a good idea to ask for a retry in case that any stream frame fails.
+// TODO: context awareness for cancelling upload request?
 func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
-	var session *StreamingSession
-	var buffer *bytes.Buffer
-	var totalReceived int
+	streamProcessor := s.serverStreamerFactory(s.sessionManager, s.config.Streamer)
+	logger := logging.OperationLogger(s.logger, "upload_streaming_session")
 
-	for {
-		chunkpb, err := stream.Recv()
-		if err == io.EOF {
-			if session != nil {
-				session.logger.Debug("Received EOF, closing session")
-			}
-			break
-		}
-		if err != nil {
-			if session != nil {
-				session.logger.Error("Failed to receive chunk data", slog.String("error", err.Error()))
-			}
-			session.Status = SessionFailed
-			return status.Errorf(codes.Internal, "failed to receive chunk data: %v", err)
-		}
+	session, err := streamProcessor.HandleFirstChunk(stream)
+	if err != nil {
+		logger.Error("Failed to receive first chunk", slog.String("error", err.Error()))
+		return status.Errorf(codes.Internal, "failed to receive first chunk: %v", err)
+	}
+	logger = logging.ExtendLogger(logger, slog.String("session_id", session.SessionID))
+	defer s.sessionManager.Delete(session.SessionID)
 
-		// Convert to internal struct
-		chunk := common.ChunkDataStreamFromProto(chunkpb)
-
-		// First chunk establishes session
-		if session == nil {
-			var exists bool
-			session, exists = s.getStreamingSession(chunk.SessionID)
-			if !exists {
-				return status.Errorf(codes.NotFound, "invalid session")
-			}
-			defer func() {
-				session.logger.Info("Deleting session", slog.String("session_id", session.SessionID))
-				s.sessionManager.Delete(session.SessionID)
-			}()
-
-			// Create buffer with pre-defined capacity for performance
-			buf := make([]byte, 0, session.ChunkHeader.Size)
-			buffer = bytes.NewBuffer(buf)
-		}
-
-		// Verify data integrity and ordering
-		if chunk.Offset != totalReceived {
-			session.logger.Error("Data out of order", slog.Int("expected", chunk.Offset), slog.Int("got", totalReceived))
-			session.Status = SessionFailed
-			return status.Errorf(codes.Internal, "data out of order")
-		}
-
-		// Write to buffer/temp file, update checksum
-		// session.logger.Debug("Writing chunk data to buffer", slog.Int("offset", chunk.Offset), slog.Int("chunk_size", len(chunk.Data)))
-		buffer.Write(chunk.Data)
-		session.RunningChecksum.Write(chunk.Data)
-		totalReceived += len(chunk.Data)
-
-		// TODO: implement flushing buffer to disk whenever it hits the threshold
-		// TODO: must setup temporary state materialization in some special folder
-		// TODO: Ideally, we should avoid flushing to disk if there is enough available RAM
-		// Flush to disk if buffer gets too big
-		// if buffer.Len() >= int(s.config.FlushSize) {
-		// 	if err := s.flushBufferToDisk(session, &buffer); err != nil {
-		// 		return err
-		// 	}
-		// }
-
-		// // Flow control decision
-		// readyForNext := buffer.Len() < int(s.config.BufferThreshold)
-
-		// Send acknowledgment with flow control
-		ack := &common.ChunkDataAck{
-			SessionID:     chunk.SessionID,
-			Success:       true,
-			BytesReceived: totalReceived,
-			ReadyForNext:  true, // Requires flushing to be setup to work
-		}
-
-		// session.logger.Debug("Sending acknowledgment", slog.Int("bytes_received", totalReceived))
-		if err := stream.Send(ack.ToProto()); err != nil {
-			session.logger.Error("Failed to send acknowledgment", slog.String("error", err.Error()))
-			session.Status = SessionFailed
-			return status.Errorf(codes.Internal, "failed to send acknowledgment: %v", err)
-		}
-
-		// Handle final chunk
-		if chunk.IsFinal {
-			// Verify checksum immediately
-			computedHash := session.RunningChecksum.Sum(nil)
-			expectedHash, _ := hex.DecodeString(session.Checksum)
-
-			if !bytes.Equal(computedHash, expectedHash) {
-				session.logger.Error("Checksum mismatch", slog.String("expected", session.Checksum), slog.String("computed", hex.EncodeToString(computedHash)))
-				session.Status = SessionFailed
-				return status.Errorf(codes.Internal, "checksum mismatch")
-			}
-
-			// Store the chunk immediately
-			err := s.store.Store(session.ChunkHeader, buffer.Bytes())
-			if err != nil {
-				session.logger.Error("Failed to store chunk", slog.String("error", err.Error()))
-				session.Status = SessionFailed
-				return status.Errorf(codes.Internal, "failed to store chunk: %v", err)
-			}
-
-			// Send final ack with verification result
-			finalAck := common.ChunkDataAck{
-				SessionID:     chunk.SessionID,
-				Success:       true,
-				Message:       "Chunk stored successfully",
-				BytesReceived: totalReceived,
-			}
-			if err := stream.Send(finalAck.ToProto()); err != nil {
-				session.logger.Error("Failed to send final acknowledgment", slog.String("error", err.Error()))
-				session.Status = SessionFailed
-				return status.Errorf(codes.Internal, "failed to send final acknowledgment: %v", err)
-			}
-		}
+	chunkData, err := streamProcessor.ReceiveChunks(session, stream)
+	if err != nil {
+		logger.Error("Failed to receive chunks", slog.String("error", err.Error()))
+		session.Fail()
+		return status.Errorf(codes.Internal, "failed to receive chunks: %v", err)
 	}
 
-	session.logger.Debug("Received chunk data stream successfully")
+	// TODO: implement flushing at session level, not here
+	// TODO: for now, storing entire chunk in buffer and writing all at once
+	logger.Debug("Storing chunk", slog.String("chunk_id", session.ChunkHeader.ID), slog.Int("size", len(chunkData)))
+	if err = s.store.Store(session.ChunkHeader, chunkData); err != nil {
+		logger.Error("Failed to store chunk", slog.String("error", err.Error()))
+		session.Fail()
+		return status.Errorf(codes.Internal, "failed to store chunk: %v", err)
+	}
+	logger.Debug("Chunk stored successfully", slog.String("chunk_id", session.ChunkHeader.ID))
 
-	// Propagate the chunk to other nodes if the flag is set
+	// If receiving node is primary node, must replicate to other nodes
 	if session.Propagate {
-		replicaNodes, err := s.replicate(session.ChunkHeader, buffer.Bytes())
+		replicaNodes, err := s.replicate(session.ChunkHeader, chunkData)
 		if err != nil {
-			session.logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
-			session.Status = SessionFailed
+			logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
+			session.Fail()
 			return status.Errorf(codes.Internal, "failed to replicate chunk: %v", err)
 		}
-		session.logger.Info("Chunk replicated successfully", slog.Any("replica_nodes", replicaNodes))
+		logger.Debug("Chunk replicated successfully", slog.Any("replica_nodes", replicaNodes))
 
-		if err := stream.Send(common.ChunkDataAck{
-			SessionID: session.SessionID,
-			Success:   true,
-			Message:   "Chunk replicated successfully",
-			Replicas:  replicaNodes,
-		}.ToProto()); err != nil {
-			session.logger.Error("Failed to send chunk data ack with replicas", slog.String("error", err.Error()))
-			session.Status = SessionFailed
-			return status.Errorf(codes.Internal, "failed to send chunk data ack with replicas: %v", err)
+		if err := streamProcessor.SendFinalReplicasAck(session, replicaNodes, stream); err != nil {
+			logger.Error("Failed to send chunk data ack with replicas", slog.String("error", err.Error()))
+			session.Fail()
+			return status.Errorf(codes.Internal, "failed to send final acknowledgement with replica information: %v", err)
 		}
+		logger.Debug("Final replicas ack sent successfully")
 	}
-	session.Status = SessionCompleted
+
+	session.Complete()
 
 	return nil
 }
@@ -368,11 +274,11 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid download stream request: %v", err)
 	}
-	logger := logging.OperationLogger(s.logger, "download_stream", slog.String("session_id", req.SessionID))
+	logger := logging.OperationLogger(s.logger, "download_streaming_session", slog.String("session_id", req.SessionID))
 
-	session, exists := s.getStreamingSession(req.SessionID)
+	session, exists := s.sessionManager.GetSession(req.SessionID)
 	if !exists {
-		logger.Error("Invalid download session")
+		logger.Error("Invalid download session", slog.String("received", req.SessionID))
 		return status.Errorf(codes.NotFound, "invalid download session for ID: %s", req.SessionID)
 	}
 	defer s.sessionManager.Delete(session.SessionID) // Clean up
@@ -388,14 +294,14 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 	buffer := make([]byte, req.ChunkStreamSize)
 	offset := int64(0)
 
-	session.logger.Info("Starting to stream chunk to client")
+	logger.Info("Starting to stream chunk to client")
 	for {
 		n, err := reader.Read(buffer)
 		if err == io.EOF {
 			break // We've sent the entire file.
 		}
 		if err != nil {
-			session.logger.Error("Failed to read from chunk source", slog.String("error", err.Error()))
+			logger.Error("Failed to read from chunk source", slog.String("error", err.Error()))
 			return status.Errorf(codes.Internal, "failed to read from chunk source: %v", err)
 		}
 
@@ -406,14 +312,14 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 			Offset:    offset,
 			IsFinal:   offset+int64(n) >= int64(len(chunkData)),
 		}); err != nil {
-			session.logger.Error("Failed to send data frame to client", slog.String("error", err.Error()))
+			logger.Error("Failed to send data frame to client", slog.String("error", err.Error()))
 			return err
 		}
 
 		offset += int64(n)
 	}
 
-	session.logger.Info("Successfully completed streaming chunk to client")
+	logger.Info("Successfully completed streaming chunk to client")
 	return nil
 }
 
@@ -424,33 +330,26 @@ func (s *DataNodeServer) HealthCheck(ctx context.Context, pb *proto.HealthCheckR
 }
 
 // Actually replicates the chunk to the given nodes in parallel
-func (s *DataNodeServer) replicate(chunkInfo common.ChunkHeader, data []byte) ([]*common.NodeInfo, error) {
-	logger := logging.OperationLogger(s.logger, "replicate_chunk", slog.String("chunk_id", chunkInfo.ID))
+func (s *DataNodeServer) replicate(chunkHeader common.ChunkHeader, data []byte) ([]*common.NodeInfo, error) {
+	logger := logging.OperationLogger(s.logger, "replicate_chunk", slog.String("chunk_id", chunkHeader.ID))
 
 	// Select N_NODES possible nodes to replicate to, excluding the current node
-	nodes, ok := s.selector.SelectBestNodes(N_NODES)
+	nodes, ok := s.selector.SelectBestNodes(N_NODES, s.info)
 	if !ok {
 		logger.Error("Not enough nodes to replicate to")
 		return nil, fmt.Errorf("not enough nodes to replicate to")
 	}
 
 	// Create clients
-	var replicationClients []clients.IDataNodeClient
-	for _, node := range nodes {
-		client, err := clients.NewDataNodeClient(node)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create client for %s - [%s]  %v", node.ID, node.Endpoint(), err)
-		}
-		if client == nil {
-			return nil, fmt.Errorf("client for %v is nil", node)
-		}
-		replicationClients = append(replicationClients, client)
+	clientPool, err := s.clientPoolFactory(nodes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client pool: %v", err)
 	}
+	defer clientPool.Close()
 
 	// Replicate to N_REPLICAS nodes
-	replicaNodes, err := s.replicationManager.Replicate(replicationClients, chunkInfo, data, N_REPLICAS-1)
+	replicaNodes, err := s.replicationManager.Replicate(clientPool, chunkHeader, data, N_REPLICAS-1)
 	if err != nil {
-		logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to replicate chunk: %v", err)
 	}
 	replicaNodes = append(replicaNodes, s.info) // Add self to the list of replica nodes

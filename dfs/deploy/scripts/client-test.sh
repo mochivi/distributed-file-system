@@ -9,9 +9,18 @@ echo "Creating large test file..."
     for i in $(seq 1 50000); do
         printf "Line %06d: This is a test line... Timestamp: %s\n" $i "$timestamp"
     done
-} > ${TEST_FILES_DIR}/test.txt
+} > ${TEST_FILES_DIR}/structured_test.txt
 
-echo "Test file created: $(ls -lh ${TEST_FILES_DIR}/test.txt | awk '{print $5}')"
+# Create a small, structured test file for chunking tests
+echo "Creating small, structured test file..."
+{   
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    for i in $(seq 1 1000); do
+        printf "Line %06d: This is a test line... Timestamp: %s\n" $i "$timestamp"
+    done
+} > ${TEST_FILES_DIR}/small_structured_test.txt
+
+echo "Test file created: $(ls -lh ${TEST_FILES_DIR}/small_structured_test.txt | awk '{print $5}')"
 
 echo "Creating additional test files of different sizes..."
 

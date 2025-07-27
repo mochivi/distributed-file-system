@@ -56,7 +56,7 @@ type StreamingSessionManagerConfig struct {
 
 func DefaultStreamingSessionManagerConfig() StreamingSessionManagerConfig {
 	return StreamingSessionManagerConfig{
-		SessionTimeout: 1 * time.Minute,
+		SessionTimeout: 5 * time.Minute,
 	}
 }
 

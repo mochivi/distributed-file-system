@@ -25,7 +25,7 @@ A **distributed file system** written in Go that demonstrates chunk-based storag
 ## Features
 
 ### Core Functionality ✅
-* **Upload/Download Operations**: Complete file transfer with chunking and parallel processing
+* **Upload/Download Operations**: Complete file transfer with chunking and parallel processing *(refactored – see `internal/client/uploader` & `downloader` packages)*
 * **Chunk-based Storage**: 8MB default chunks with configurable sizes up to 64MB
 * **Data Replication**: Default factor of 3 (1 primary + 2 replicas) with parallel replication
 * **Streaming Protocol**: Bidirectional gRPC streams with back-pressure control and SHA-256 checksums
@@ -36,7 +36,7 @@ A **distributed file system** written in Go that demonstrates chunk-based storag
 ### Architecture Highlights
 * **Coordinator Service**: Metadata-only service (file → chunk mapping, cluster membership)
 * **DataNode Service**: Distributed storage nodes with peer-to-peer replication
-* **Client SDK**: Go SDK with parallel upload/download and intelligent replica selection
+* **Client SDK**: Go SDK with parallel upload/download **(new rotating client-pool & checksum-verified streaming)**
 * **Protocol Buffers**: Efficient serialization over gRPC (HTTP/2)
 * **Docker Integration**: Full e2e test environment with 1 coordinator + 6 datanodes
 
@@ -238,6 +238,9 @@ The system uses **environment variables** for service discovery and **YAML files
 # Coordinator location (required by all nodes)
 COORDINATOR_HOST=coordinator
 COORDINATOR_PORT=8080
+
+# New: global log level (default=error, dev=info)
+LOG_LEVEL=info
 
 # Node registration (required by datanodes)  
 DATANODE_HOST=datanode1

@@ -217,8 +217,7 @@ type ChunkDataAck struct {
 func ChunkDataAckFromProto(pb *proto.ChunkDataAck) ChunkDataAck {
 	replicas := make([]*NodeInfo, len(pb.Replicas))
 	for i, replica := range pb.Replicas {
-		replicaInfo := NodeInfoFromProto(replica)
-		replicas[i] = &replicaInfo
+		replicas[i] = NodeInfoFromProto(replica)
 	}
 	return ChunkDataAck{
 		SessionID:     pb.SessionId,
@@ -235,6 +234,10 @@ func (cda ChunkDataAck) ToProto() *proto.ChunkDataAck {
 	for i, replica := range cda.Replicas {
 		replicas[i] = replica.ToProto()
 	}
+	if len(replicas) == 0 {
+		replicas = nil
+	}
+
 	return &proto.ChunkDataAck{
 		SessionId:     cda.SessionID,
 		Success:       cda.Success,
@@ -283,11 +286,10 @@ type NodeUpdate struct {
 }
 
 func NodeUpdateFromProto(pb *proto.NodeUpdate) NodeUpdate {
-	node := NodeInfoFromProto(pb.Node)
 	return NodeUpdate{
 		Version:   pb.Version,
 		Type:      NodeUpdateType(pb.Type),
-		Node:      &node,
+		Node:      NodeInfoFromProto(pb.Node),
 		Timestamp: pb.Timestamp.AsTime(),
 	}
 }
@@ -296,7 +298,7 @@ func (nu NodeUpdate) ToProto() *proto.NodeUpdate {
 	return &proto.NodeUpdate{
 		Version:   nu.Version,
 		Type:      proto.NodeUpdate_UpdateType(nu.Type),
-		Node:      (*nu.Node).ToProto(),
+		Node:      nu.Node.ToProto(),
 		Timestamp: timestamppb.New(nu.Timestamp),
 	}
 }
@@ -329,26 +331,31 @@ func (ur UploadRequest) ToProto() *proto.UploadRequest {
 }
 
 type UploadResponse struct {
-	ChunkLocations []ChunkLocation
-	SessionID      string
+	ChunkIDs  []string
+	Nodes     []*NodeInfo
+	SessionID string
 }
 
 func UploadResponseFromProto(pb *proto.UploadResponse) UploadResponse {
-	chunkLocations := make([]ChunkLocation, 0, len(pb.ChunkLocations))
-	for _, chunkLocation := range pb.ChunkLocations {
-		chunkLocations = append(chunkLocations, ChunkLocationFromProto(chunkLocation))
+	nodes := make([]*NodeInfo, 0, len(pb.Nodes))
+	for _, node := range pb.Nodes {
+		nodes = append(nodes, NodeInfoFromProto(node))
 	}
-	return UploadResponse{ChunkLocations: chunkLocations, SessionID: pb.SessionId}
+	return UploadResponse{
+		ChunkIDs:  pb.ChunkIds,
+		Nodes:     nodes,
+		SessionID: pb.SessionId}
 }
 
 func (ur UploadResponse) ToProto() *proto.UploadResponse {
-	chunkLocations := make([]*proto.ChunkLocation, 0, len(ur.ChunkLocations))
-	for _, item := range ur.ChunkLocations {
-		chunkLocations = append(chunkLocations, item.ToProto())
+	protoNodes := make([]*proto.NodeInfo, 0, len(ur.Nodes))
+	for _, node := range ur.Nodes {
+		protoNodes = append(protoNodes, node.ToProto())
 	}
 	return &proto.UploadResponse{
-		ChunkLocations: chunkLocations,
-		SessionId:      ur.SessionID,
+		ChunkIds:  ur.ChunkIDs,
+		Nodes:     protoNodes,
+		SessionId: ur.SessionID,
 	}
 }
 
@@ -501,7 +508,7 @@ func (lr ListResponse) ToProto() *proto.ListResponse {
 
 // Data nodes registration
 type RegisterDataNodeRequest struct {
-	NodeInfo NodeInfo
+	NodeInfo *NodeInfo
 }
 
 func RegisterDataNodeRequestFromProto(pb *proto.RegisterDataNodeRequest) RegisterDataNodeRequest {
@@ -522,8 +529,7 @@ type RegisterDataNodeResponse struct {
 func RegisterDataNodeResponseFromProto(pb *proto.RegisterDataNodeResponse) RegisterDataNodeResponse {
 	fullNodeList := make([]*NodeInfo, 0, len(pb.FullNodeList))
 	for _, protoNode := range pb.FullNodeList {
-		node := NodeInfoFromProto(protoNode)
-		fullNodeList = append(fullNodeList, &node)
+		fullNodeList = append(fullNodeList, NodeInfoFromProto(protoNode))
 	}
 
 	return RegisterDataNodeResponse{
@@ -629,8 +635,7 @@ type ListNodesResponse struct {
 func ListNodesResponseFromProto(pb *proto.ListNodesResponse) ListNodesResponse {
 	nodes := make([]*NodeInfo, 0, len(pb.Nodes))
 	for _, node := range pb.Nodes {
-		nodeInfo := NodeInfoFromProto(node)
-		nodes = append(nodes, &nodeInfo)
+		nodes = append(nodes, NodeInfoFromProto(node))
 	}
 	return ListNodesResponse{
 		Nodes:          nodes,
@@ -658,8 +663,7 @@ type ChunkLocation struct {
 func ChunkLocationFromProto(pb *proto.ChunkLocation) ChunkLocation {
 	nodes := make([]*NodeInfo, 0, len(pb.Nodes))
 	for _, node := range pb.Nodes {
-		nodeInfo := NodeInfoFromProto(node)
-		nodes = append(nodes, &nodeInfo)
+		nodes = append(nodes, NodeInfoFromProto(node))
 	}
 	return ChunkLocation{
 		ChunkID: pb.ChunkId,

@@ -24,10 +24,12 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
+	"github.com/mochivi/distributed-file-system/pkg/client_pool"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
-	"github.com/mochivi/distributed-file-system/pkg/streamer"
+	"github.com/mochivi/distributed-file-system/pkg/streaming"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
+	"github.com/spf13/afero"
 	"google.golang.org/grpc"
 )
 
@@ -35,10 +37,12 @@ type container struct {
 	// shared or grpc server dependencies
 	chunkStore          storage.ChunkStorage
 	replicationManager  datanode.ReplicationProvider
-	sessionManager      datanode.SessionManager
+	sessionManager      streaming.SessionManager
 	clusterStateManager state.ClusterStateManager
 	coordinatorFinder   state.CoordinatorFinder
 	nodeSelector        cluster.NodeSelector
+	streamerFactory     streaming.ServerStreamerFactory
+	clientPoolFactory   client_pool.ClientPoolFactory
 
 	// Node Agent dependencies
 	metadataStore   storage.MetadataStore
@@ -47,16 +51,16 @@ type container struct {
 
 func setupDependencies(ctx context.Context, cfg *config.DatanodeAppConfig, logger *slog.Logger) *container {
 	chunkSerializer := encoding.NewProtoSerializer()
-	chunkStore, err := chunk.NewChunkDiskStorage(cfg.Node.DiskStorage, chunkSerializer, logger)
+	chunkStore, err := chunk.NewChunkDiskStorage(afero.NewOsFs(), cfg.Node.DiskStorage, chunkSerializer, logger)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
 	clusterStateManager := state.NewClusterStateManager()
 	nodeSelector := cluster.NewNodeSelector(clusterStateManager)
-	streamer := streamer.NewStreamer(cfg.Node.Streamer)
+	streamer := streaming.NewClientStreamer(cfg.Node.Streamer)
 	replicationManager := datanode.NewParalellReplicationService(cfg.Node.Replication, streamer, logger)
-	sessionManager := datanode.NewStreamingSessionManager(cfg.Node.StreamingSession, logger)
+	sessionManager := streaming.NewStreamingSessionManager(cfg.Node.StreamingSession, logger)
 	coordinatorFinder := state.NewCoordinatorFinder()
 
 	// Node Agent dependencies
@@ -77,6 +81,14 @@ func setupDependencies(ctx context.Context, cfg *config.DatanodeAppConfig, logge
 	metadataStore := metadata.NewDatanodeMetadataStore(coordinatorClient)
 	metadataScanner := shared.NewMetadataScannerService(ctx, metadataStore, logger)
 
+	streamerFactory := func(sessionManager streaming.SessionManager, config config.StreamerConfig) streaming.ServerStreamer {
+		return streaming.NewServerStreamer(sessionManager, config)
+	}
+
+	clientPoolFactory := func(nodes []*common.NodeInfo) (client_pool.ClientPool, error) {
+		return client_pool.NewRotatingClientPool(nodes)
+	}
+
 	return &container{
 		chunkStore:          chunkStore,
 		replicationManager:  replicationManager,
@@ -84,9 +96,10 @@ func setupDependencies(ctx context.Context, cfg *config.DatanodeAppConfig, logge
 		clusterStateManager: clusterStateManager,
 		coordinatorFinder:   coordinatorFinder,
 		nodeSelector:        nodeSelector,
-
-		metadataStore:   metadataStore,
-		metadataScanner: metadataScanner,
+		streamerFactory:     streamerFactory,
+		clientPoolFactory:   clientPoolFactory,
+		metadataStore:       metadataStore,
+		metadataScanner:     metadataScanner,
 	}
 }
 
@@ -144,7 +157,7 @@ func main() {
 	// Setup gRPC server
 	setupGrpcFunc := func(wg *sync.WaitGroup, errChan chan error) (*grpc.Server, net.Listener) {
 		serverContainer := datanode.NewContainer(container.chunkStore, container.replicationManager, container.sessionManager,
-			container.clusterStateManager, container.coordinatorFinder, container.nodeSelector)
+			container.clusterStateManager, container.coordinatorFinder, container.nodeSelector, container.streamerFactory, container.clientPoolFactory)
 		server := datanode.NewDataNodeServer(&datanodeInfo, appConfig.Node, serverContainer, logger)
 
 		grpcServer := grpc.NewServer()

@@ -30,36 +30,22 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		chunkSize = c.config.ChunkSize * 1024 * 1024
 	}
 	numChunks := (req.Size + chunkSize - 1) / chunkSize
-	c.logger.Debug(fmt.Sprintf("File will be split into %d chunks of %dMB", numChunks, chunkSize/(1024*1024)))
+	c.logger.Debug(fmt.Sprintf("File will be split into %d chunks of %dMB", numChunks, chunkSize/(1024*1024)), slog.Int("file_size", req.Size), slog.Int("chunk_size", chunkSize))
 
-	// Get a list of the best nodes to upload to
-	nodes, ok := c.selector.SelectBestNodes(numChunks)
+	// Select some nodes for the client to upload to
+	nodes, ok := c.selector.SelectBestNodes(numChunks, &common.NodeInfo{ID: "coordinator"}) // TODO: this has to be updated
 	if !ok {
-		c.logger.Error("Not enough nodes to upload to", slog.Int("num_nodes", len(nodes)), slog.Int("num_chunks", numChunks))
+		c.logger.Error("No available nodes to upload")
 		return nil, status.Error(codes.NotFound, "no available nodes")
 	}
 	c.logger.Debug("Selected nodes for chunk distribution", slog.Int("num_nodes", len(nodes)))
 
-	assignments := make([]common.ChunkLocation, numChunks)
+	chunkPrefix := chunk.HashFilepath(req.Path)
+
+	chunkIDs := make([]string, numChunks)
 	for i := range numChunks {
-		chunkID := chunk.FormatChunkID(req.Path, i)
-
-		// Randomly select a node from the available nodes
-		selectedNodes := make([]*common.NodeInfo, 0, 3)
-		count := 0
-		for _, node := range nodes {
-			selectedNodes = append(selectedNodes, node)
-			count++
-			if count >= 3 {
-				break
-			}
-		}
-
-		// Add chunk location to assignment
-		assignments[i] = common.ChunkLocation{
-			ChunkID: chunkID,
-			Nodes:   selectedNodes,
-		}
+		chunkID := fmt.Sprintf("%s_%d", chunkPrefix, i)
+		chunkIDs[i] = chunkID
 	}
 
 	// Create metadata commit session for the upload
@@ -68,8 +54,9 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 	c.logger.Debug("Created upload session", slog.String("session_id", sessionID), slog.String("file_path", req.Path))
 
 	return common.UploadResponse{
-		ChunkLocations: assignments,
-		SessionID:      sessionID,
+		ChunkIDs:  chunkIDs,
+		Nodes:     nodes,
+		SessionID: sessionID,
 	}.ToProto(), nil
 }
 
@@ -103,7 +90,7 @@ func (c *Coordinator) DownloadFile(ctx context.Context, req *proto.DownloadReque
 	return common.DownloadResponse{
 		FileInfo:       *fileInfo,
 		ChunkLocations: chunkLocations,
-		SessionID:      uuid.NewString(), // TODO: this should be a session id that is used to track the download
+		SessionID:      uuid.NewString(), // TODO: this should be a session id that is used to track the download, not used for now
 	}.ToProto(), nil
 }
 
@@ -168,7 +155,7 @@ func (c *Coordinator) RegisterDataNode(ctx context.Context, pb *proto.RegisterDa
 	c.logger.Debug("Received RegisterDataNodeRequest from data node", slog.String("node_id", nodeInfo.ID))
 	nodeInfo.LastSeen = time.Now()
 
-	c.clusterStateHistoryManager.AddNode(&nodeInfo)
+	c.clusterStateHistoryManager.AddNode(nodeInfo)
 	nodes, version := c.clusterStateHistoryManager.ListNodes()
 
 	c.logger.Debug("Registered datanode, replying with current node list and version", slog.Int("num_nodes", len(nodes)), slog.Int("version", int(version)))
@@ -183,7 +170,7 @@ func (c *Coordinator) RegisterDataNode(ctx context.Context, pb *proto.RegisterDa
 // DataNodes periodically communicate their status to the coordinator
 func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, pb *proto.HeartbeatRequest) (*proto.HeartbeatResponse, error) {
 	req := common.HeartbeatRequestFromProto(pb)
-	c.logger.Debug("Received HeartbeatRequest from data node", slog.String("node_id", req.NodeID))
+	// c.logger.Debug("Received HeartbeatRequest from data node", slog.String("node_id", req.NodeID))
 
 	node, exists := c.clusterStateHistoryManager.GetNode(req.NodeID)
 	if !exists {
@@ -209,7 +196,7 @@ func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, pb *proto.Heartbeat
 		}.ToProto(), nil
 	}
 
-	c.logger.Debug("Replying to data node with updates", slog.Int("num_updates", len(updates)))
+	// c.logger.Debug("Replying to data node with updates", slog.Int("num_updates", len(updates)))
 	return common.HeartbeatResponse{
 		Success:            true,
 		Message:            "ok",

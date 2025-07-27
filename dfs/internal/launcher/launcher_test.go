@@ -43,7 +43,7 @@ func mockAgentLaunch(sendError bool) AgentLaunchFunc {
 }
 
 func TestLaunch(t *testing.T) {
-	logger := logging.NewTestLogger(slog.LevelError)
+	logger := logging.NewTestLogger(slog.LevelError, true)
 
 	testCases := []struct {
 		name                    string

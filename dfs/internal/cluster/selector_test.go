@@ -31,31 +31,26 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 			n:             2,
 			nodesToReturn: nodes,
 			expectedNodes: []*common.NodeInfo{
-				{ID: "node-1", Status: common.NodeHealthy},
 				{ID: "node-3", Status: common.NodeHealthy},
+				{ID: "node-4", Status: common.NodeHealthy},
 			},
 			expectedOk: true,
 		},
 		{
-			name:          "success: select 3 healthy nodes",
+			name:          "success: select 3 healthy nodes except self",
 			n:             3,
 			nodesToReturn: nodes,
 			expectedNodes: []*common.NodeInfo{
-				{ID: "node-1", Status: common.NodeHealthy},
 				{ID: "node-3", Status: common.NodeHealthy},
 				{ID: "node-4", Status: common.NodeHealthy},
 			},
 			expectedOk: true,
 		},
 		{
-			name:          "Success: request more healthy nodes than available",
+			name:          "success: request 6 nodes, but only 2 are healthy",
 			n:             6,
 			nodesToReturn: nodes,
 			expectedNodes: []*common.NodeInfo{
-				{ID: "node-1", Status: common.NodeHealthy},
-				{ID: "node-3", Status: common.NodeHealthy},
-				{ID: "node-4", Status: common.NodeHealthy},
-				{ID: "node-1", Status: common.NodeHealthy},
 				{ID: "node-3", Status: common.NodeHealthy},
 				{ID: "node-4", Status: common.NodeHealthy},
 			},
@@ -93,7 +88,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 			mockViewer.On("ListNodes", mock.Anything).Return(tc.nodesToReturn, int64(len(tc.nodesToReturn))).Maybe()
 
 			selector := cluster.NewNodeSelector(mockViewer)
-			selectedNodes, ok := selector.SelectBestNodes(tc.n)
+			selectedNodes, ok := selector.SelectBestNodes(tc.n, &common.NodeInfo{ID: "node-1"})
 
 			assert.Equal(t, tc.expectedOk, ok)
 			assert.ElementsMatch(t, tc.expectedNodes, selectedNodes)

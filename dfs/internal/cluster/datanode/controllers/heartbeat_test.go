@@ -146,7 +146,7 @@ func TestHeartbeatController_RunLoop(t *testing.T) {
 			controller := NewHeartbeatController(ctx, &config.HeartbeatControllerConfig{
 				Interval: 100 * time.Millisecond,
 				Timeout:  10 * time.Second,
-			}, logging.NewTestLogger(slog.LevelError))
+			}, logging.NewTestLogger(slog.LevelError, true))
 
 			// Mock heartbeat function
 			controller.heartbeatFunc = func(ctx context.Context, req common.HeartbeatRequest, client clients.ICoordinatorClient) ([]common.NodeUpdate, error) {
@@ -330,7 +330,7 @@ func TestHeartbeatController_heartbeat(t *testing.T) {
 					Interval: 1 * time.Second,
 					Timeout:  10 * time.Second,
 				},
-				logger: logging.NewTestLogger(slog.LevelError),
+				logger: logging.NewTestLogger(slog.LevelError, true),
 			}
 
 			coordinatorClient, cleanup := testutils.NewTestCoordinatorClientWithStubServer(t, &stubCoordinatorHeartbeatServer{hbResp: tc.heartbeatResponse, hbErr: tc.expectedError})

@@ -134,7 +134,7 @@ func TestOrphanedChunksGCController_run(t *testing.T) {
 	actualChunks := map[string]common.ChunkHeader{"chunk-1": header1, "chunk-2": header2}
 
 	cfg := config.DefaultOrphanedChunksGCControllerConfig()
-	logger := logging.NewTestLogger(slog.LevelError)
+	logger := logging.NewTestLogger(slog.LevelError, true)
 
 	tests := []struct {
 		name           string

@@ -10,11 +10,13 @@ import (
 	"testing"
 
 	"github.com/mochivi/distributed-file-system/internal/client"
+	"github.com/mochivi/distributed-file-system/internal/client/downloader"
+	"github.com/mochivi/distributed-file-system/internal/client/uploader"
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
-	"github.com/mochivi/distributed-file-system/pkg/streamer"
+	"github.com/mochivi/distributed-file-system/pkg/streaming"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
 
@@ -73,12 +75,12 @@ func NewTestClient(t *testing.T, logger *slog.Logger) *TestClient {
 		t.Fatalf("failed to create coordinator client: %v", err)
 	}
 
-	streamer := streamer.NewStreamer(config.DefaultStreamerConfig(true))
-	uploader := client.NewUploader(streamer, logger, client.UploaderConfig{
+	streamer := streaming.NewClientStreamer(config.DefaultStreamerConfig(true))
+	uploader := uploader.NewUploader(streamer, logger, uploader.UploaderConfig{
 		NumWorkers:      10,
 		ChunkRetryCount: 3,
 	})
-	downloader := client.NewDownloader(streamer, client.DownloaderConfig{
+	downloader := downloader.NewDownloader(streamer, downloader.DownloaderConfig{
 		NumWorkers:      10,
 		ChunkRetryCount: 3,
 		TempDir:         "/tmp",
@@ -103,10 +105,10 @@ func (c *TestClient) DownloadFile(path string) (string, error) {
 
 func (c *TestClient) DownloadAllChunks(t *testing.T, chunkInfos []common.ChunkInfo, logger *slog.Logger) error {
 	// Validate if the chunks were replicated to the provided nodes and their checksum matches the expectation
-	streamerInstance := streamer.NewStreamer(config.StreamerConfig{
+	streamerInstance := streaming.NewClientStreamer(config.StreamerConfig{
 		ChunkStreamSize: config.DefaultStreamerConfig(true).ChunkStreamSize,
 	})
-	streamerInstance.Config.WaitReplicas = true // Wait for the final stream with the replicas information
+	streamerInstance.Config().WaitReplicas = true // Wait for the final stream with the replicas information
 
 	for _, info := range chunkInfos {
 		for _, replica := range info.Replicas {
@@ -121,7 +123,7 @@ func (c *TestClient) DownloadAllChunks(t *testing.T, chunkInfos []common.ChunkIn
 	return nil
 }
 
-func downloadChunk(t *testing.T, info common.ChunkInfo, replica *common.NodeInfo, streamerInstance *streamer.Streamer, logger *slog.Logger) error {
+func downloadChunk(t *testing.T, info common.ChunkInfo, replica *common.NodeInfo, streamerInstance streaming.ClientStreamer, logger *slog.Logger) error {
 	dnClient, err := dnClientPool.getOrAddClient(replica)
 	if err != nil {
 		t.Errorf("failed to get datanode client: %v", err)
@@ -146,7 +148,7 @@ func downloadChunk(t *testing.T, info common.ChunkInfo, replica *common.NodeInfo
 
 	buffer := bytes.NewBuffer(make([]byte, 0, info.Header.Size))
 
-	if err := streamerInstance.ReceiveChunkStream(context.Background(), stream, buffer, logger, streamer.DownloadChunkStreamParams{
+	if err := streamerInstance.ReceiveChunkStream(context.Background(), stream, buffer, logger, streaming.DownloadChunkStreamParams{
 		SessionID:   resp.SessionID,
 		ChunkHeader: info.Header,
 	}); err != nil {

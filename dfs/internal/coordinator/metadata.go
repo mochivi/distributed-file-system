@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
@@ -19,6 +20,7 @@ type MetadataSessionManager interface {
 
 type metadataSessionManager struct {
 	sessions      map[string]metadataUploadSession
+	mu            sync.Mutex
 	commitTimeout time.Duration
 	logger        *slog.Logger
 }
@@ -71,10 +73,16 @@ func (m *metadataSessionManager) trackUpload(sessionID string, req common.Upload
 		Checksum:   req.Checksum,
 	}
 	m.logger.Info("Tracking upload session", slog.String("session_id", sessionID), slog.String("file_path", req.Path), slog.Int("num_chunks", numChunks))
+
+	m.mu.Lock()
 	m.sessions[sessionID] = newMetadataUploadSession(sessionID, m.commitTimeout, fileInfo)
+	m.mu.Unlock()
 }
 
 func (m *metadataSessionManager) commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore storage.MetadataStore) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	session, ok := m.sessions[sessionID]
 	if !ok {
 		return errors.New("session not found")

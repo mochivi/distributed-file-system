@@ -1,4 +1,4 @@
-package streamer
+package streaming
 
 import (
 	"bytes"
@@ -156,8 +156,8 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup
-			streamer := NewStreamer(tc.config)
-			logger := logging.NewTestLogger(slog.LevelError)
+			streamer := NewClientStreamer(tc.config)
+			logger := logging.NewTestLogger(slog.LevelError, true)
 			mockStream := &testutils.MockBidiStreamClient{}
 			tc.setupMocks(mockStream)
 
@@ -170,7 +170,21 @@ func TestStreamer_SendChunkStream(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, tc.expectedReplicas, returnedReplicas)
+
+			if tc.expectedReplicas != nil {
+				assert.Equal(t, len(tc.expectedReplicas), len(returnedReplicas))
+				for i, expected := range tc.expectedReplicas {
+					assert.Equal(t, expected.ID, returnedReplicas[i].ID)
+					assert.Equal(t, expected.Host, returnedReplicas[i].Host)
+					assert.Equal(t, expected.Port, returnedReplicas[i].Port)
+					assert.Equal(t, expected.Status, returnedReplicas[i].Status)
+					assert.Equal(t, expected.Capacity, returnedReplicas[i].Capacity)
+					assert.Equal(t, expected.Used, returnedReplicas[i].Used)
+				}
+			} else {
+				assert.Nil(t, returnedReplicas)
+			}
+
 			mockStream.AssertExpectations(t)
 		})
 	}
@@ -234,8 +248,8 @@ func TestStreamer_ReceiveChunkStream(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup
-			streamer := NewStreamer(tc.config)
-			logger := logging.NewTestLogger(slog.LevelError)
+			streamer := NewClientStreamer(tc.config)
+			logger := logging.NewTestLogger(slog.LevelError, true)
 			mockStream := &testutils.MockStreamClient{}
 			tc.setupMocks(mockStream)
 
