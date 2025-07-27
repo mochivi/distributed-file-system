@@ -10,6 +10,7 @@ services:
     environment:
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
+      - LOG_LEVEL=${LOG_LEVEL:-error}
     networks:
       - dfs-network
 
@@ -25,6 +26,7 @@ services:
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode1
       - DISK_STORAGE_BASE_DIR=/app
+      - LOG_LEVEL=${LOG_LEVEL:-error}
     depends_on:
       coordinator:
         condition: service_started
@@ -43,6 +45,7 @@ services:
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode2
       - DISK_STORAGE_BASE_DIR=/app
+      - LOG_LEVEL=${LOG_LEVEL:-error}
     depends_on:
       coordinator:
         condition: service_started
@@ -61,6 +64,7 @@ services:
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode3
       - DISK_STORAGE_BASE_DIR=/app
+      - LOG_LEVEL=${LOG_LEVEL:-error}
     depends_on:
       coordinator:
         condition: service_started
@@ -79,6 +83,7 @@ services:
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode4
       - DISK_STORAGE_BASE_DIR=/app
+      - LOG_LEVEL=${LOG_LEVEL:-error}
     depends_on:
       coordinator:
         condition: service_started
@@ -97,6 +102,7 @@ services:
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode5
       - DISK_STORAGE_BASE_DIR=/app
+      - LOG_LEVEL=${LOG_LEVEL:-error}
     depends_on:
       coordinator:
         condition: service_started
@@ -115,6 +121,7 @@ services:
       - COORDINATOR_PORT=8080
       - DATANODE_HOST=datanode6
       - DISK_STORAGE_BASE_DIR=/app
+      - LOG_LEVEL=${LOG_LEVEL:-error}
     depends_on:
       coordinator:
         condition: service_started
@@ -131,7 +138,7 @@ services:
       - COORDINATOR_HOST=coordinator
       - COORDINATOR_PORT=8080
       - ENVIRONMENT=development
-      - LOG_LEVEL=error
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - DEBUG=${DEBUG_E2E_TESTS:-false}
     depends_on:
       - coordinator

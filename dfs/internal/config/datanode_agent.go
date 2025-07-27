@@ -26,8 +26,8 @@ type HeartbeatControllerConfig struct {
 
 func DefaultHeartbeatControllerConfig() *HeartbeatControllerConfig {
 	return &HeartbeatControllerConfig{
-		Interval: 30 * time.Second,
-		Timeout:  10 * time.Second,
+		Interval: 2 * time.Second,
+		Timeout:  1 * time.Second,
 	}
 }
 

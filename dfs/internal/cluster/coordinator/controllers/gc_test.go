@@ -220,7 +220,7 @@ func TestDeletedFilesGCController_prepareChunkMappings(t *testing.T) {
 				tt.modifyMetadata(filesMetadata)
 			}
 
-			nodeToChunks, nodeToClient := prepareChunkMappings(filesMetadata, logging.NewTestLogger(slog.LevelError))
+			nodeToChunks, nodeToClient := prepareChunkMappings(filesMetadata, logging.NewTestLogger(slog.LevelError, true))
 
 			// t.Logf("%+v", nodeToChunks)
 

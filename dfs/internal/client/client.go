@@ -9,6 +9,7 @@ import (
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
+	"github.com/mochivi/distributed-file-system/pkg/client_pool"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
@@ -43,9 +44,14 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 	metadataSessionLogger := logging.ExtendLogger(logger, slog.String("metadata_session_id", uploadResponse.SessionID), slog.String("coordinator_id", c.coordinatorClient.Node().ID))
 	metadataSessionLogger.Info("Received UploadResponse")
 
-	uploadCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	chunkInfos, err := c.uploader.UploadFile(uploadCtx, file, uploadResponse.ChunkLocations, metadataSessionLogger, chunksize)
+	clientPool, err := client_pool.NewRotatingClientPool(uploadResponse.Nodes)
+	if err != nil {
+		logger.Error("Failed to create client pool", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("failed to create client pool: %w", err)
+	}
+
+	// TODO: add cancellation context to the uploader
+	chunkInfos, err := c.uploader.UploadFile(ctx, file, clientPool, uploadResponse.ChunkIDs, metadataSessionLogger, chunksize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload file: %w", err)
 	}
@@ -86,7 +92,8 @@ func (c *Client) DownloadFile(ctx context.Context, path string) (string, error) 
 	// Control all the goroutines and requests we will make
 	downloadCtx, cancel := context.WithCancel(ctx)
 	defer cancel() // any early return will terminate the created goroutines
-	tempFile, err := c.downloader.DownloadFile(downloadCtx, downloadResponse.ChunkLocations, downloadResponse.SessionID, int(downloadResponse.FileInfo.Size), logger)
+	tempFile, err := c.downloader.DownloadFile(downloadCtx, downloadResponse.FileInfo,
+		downloadResponse.ChunkLocations, downloadResponse.SessionID, logger)
 	if err != nil {
 		return "", fmt.Errorf("failed to download file: %w", err)
 	}

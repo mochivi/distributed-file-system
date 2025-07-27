@@ -135,7 +135,7 @@ func TestRegisterService_RegisterWithCoordinator(t *testing.T) {
 				return coordinatorClient, nil
 			})
 
-			registerService := NewRegisterService(logging.NewTestLogger(slog.LevelError))
+			registerService := NewRegisterService(logging.NewTestLogger(slog.LevelError, true))
 
 			err := registerService.RegisterWithCoordinator(ctx, nodeInfo, mockClusterStateManager, coordinatorFinder)
 

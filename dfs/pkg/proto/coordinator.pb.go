@@ -141,11 +141,12 @@ func (x *UploadRequest) GetChecksum() string {
 }
 
 type UploadResponse struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	ChunkLocations []*ChunkLocation       `protobuf:"bytes,1,rep,name=chunk_locations,json=chunkLocations,proto3" json:"chunk_locations,omitempty"`
-	SessionId      string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChunkIds      []string               `protobuf:"bytes,1,rep,name=chunk_ids,json=chunkIds,proto3" json:"chunk_ids,omitempty"`
+	Nodes         []*NodeInfo            `protobuf:"bytes,2,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UploadResponse) Reset() {
@@ -178,9 +179,16 @@ func (*UploadResponse) Descriptor() ([]byte, []int) {
 	return file_coordinator_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *UploadResponse) GetChunkLocations() []*ChunkLocation {
+func (x *UploadResponse) GetChunkIds() []string {
 	if x != nil {
-		return x.ChunkLocations
+		return x.ChunkIds
+	}
+	return nil
+}
+
+func (x *UploadResponse) GetNodes() []*NodeInfo {
+	if x != nil {
+		return x.Nodes
 	}
 	return nil
 }
@@ -1159,11 +1167,12 @@ const file_coordinator_proto_rawDesc = "" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x1d\n" +
 	"\n" +
 	"chunk_size\x18\x03 \x01(\x03R\tchunkSize\x12\x1a\n" +
-	"\bchecksum\x18\x04 \x01(\tR\bchecksum\"l\n" +
-	"\x0eUploadResponse\x12;\n" +
-	"\x0fchunk_locations\x18\x01 \x03(\v2\x12.dfs.ChunkLocationR\x0echunkLocations\x12\x1d\n" +
+	"\bchecksum\x18\x04 \x01(\tR\bchecksum\"q\n" +
+	"\x0eUploadResponse\x12\x1b\n" +
+	"\tchunk_ids\x18\x01 \x03(\tR\bchunkIds\x12#\n" +
+	"\x05nodes\x18\x02 \x03(\v2\r.dfs.NodeInfoR\x05nodes\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x02 \x01(\tR\tsessionId\"O\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\"O\n" +
 	"\rChunkLocation\x12\x19\n" +
 	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12#\n" +
 	"\x05nodes\x18\x02 \x03(\v2\r.dfs.NodeInfoR\x05nodes\"%\n" +
@@ -1286,7 +1295,7 @@ var file_coordinator_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil),    // 25: google.protobuf.Timestamp
 }
 var file_coordinator_proto_depIdxs = []int32{
-	3,  // 0: dfs.UploadResponse.chunk_locations:type_name -> dfs.ChunkLocation
+	21, // 0: dfs.UploadResponse.nodes:type_name -> dfs.NodeInfo
 	21, // 1: dfs.ChunkLocation.nodes:type_name -> dfs.NodeInfo
 	22, // 2: dfs.DownloadResponse.file_info:type_name -> dfs.FileInfo
 	3,  // 3: dfs.DownloadResponse.chunk_locations:type_name -> dfs.ChunkLocation

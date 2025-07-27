@@ -48,7 +48,7 @@ func FileInfoFromProto(pb *proto.FileInfo) FileInfo {
 }
 
 func (fi FileInfo) ToProto() *proto.FileInfo {
-	protoChunks := make([]*proto.ChunkInfo, len(fi.Chunks))
+	protoChunks := make([]*proto.ChunkInfo, 0, len(fi.Chunks))
 	for _, item := range fi.Chunks {
 		protoChunks = append(protoChunks, item.ToProto())
 	}
@@ -100,14 +100,18 @@ type ChunkInfo struct {
 }
 
 func ChunkInfoFromProto(pb *proto.ChunkInfo) ChunkInfo {
+	replicas := make([]*NodeInfo, 0, len(pb.Replicas))
+	for _, replica := range pb.Replicas {
+		replicas = append(replicas, NodeInfoFromProto(replica))
+	}
 	return ChunkInfo{
 		Header:   ChunkHeaderFromProto(pb.Header),
-		Replicas: make([]*NodeInfo, 0, len(pb.Replicas)),
+		Replicas: replicas,
 	}
 }
 
 func (ci ChunkInfo) ToProto() *proto.ChunkInfo {
-	protoReplicas := make([]*proto.NodeInfo, len(ci.Replicas))
+	protoReplicas := make([]*proto.NodeInfo, 0, len(ci.Replicas))
 	for _, replica := range ci.Replicas {
 		protoReplicas = append(protoReplicas, replica.ToProto())
 	}
@@ -156,8 +160,8 @@ func (di NodeInfo) Endpoint() string {
 	return fmt.Sprintf("%s:%d", di.Host, di.Port)
 }
 
-func NodeInfoFromProto(pb *proto.NodeInfo) NodeInfo {
-	return NodeInfo{
+func NodeInfoFromProto(pb *proto.NodeInfo) *NodeInfo {
+	return &NodeInfo{
 		ID:       pb.Id,
 		Host:     pb.IpAddress,
 		Port:     int(pb.Port),
@@ -169,6 +173,11 @@ func NodeInfoFromProto(pb *proto.NodeInfo) NodeInfo {
 }
 
 func (di NodeInfo) ToProto() *proto.NodeInfo {
+	timestamp := timestamppb.New(di.LastSeen)
+	if di.LastSeen.IsZero() {
+		timestamp = nil
+	}
+
 	return &proto.NodeInfo{
 		Id:        di.ID,
 		IpAddress: di.Host,
@@ -176,6 +185,6 @@ func (di NodeInfo) ToProto() *proto.NodeInfo {
 		Capacity:  int64(di.Capacity),
 		Used:      int64(di.Used),
 		Status:    proto.NodeStatus(di.Status),
-		LastSeen:  timestamppb.New(di.LastSeen),
+		LastSeen:  timestamp,
 	}
 }

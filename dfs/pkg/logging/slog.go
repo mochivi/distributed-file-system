@@ -2,6 +2,7 @@ package logging
 
 import (
 	"errors"
+	"io"
 	"log/slog"
 	"os"
 
@@ -31,7 +32,10 @@ func SetupTextLogger(logLevel slog.Level) *slog.Logger {
 }
 
 // NewTestLogger is a test logger that is used for testing
-func NewTestLogger(logLevel slog.Level) *slog.Logger {
+func NewTestLogger(logLevel slog.Level, discard bool) *slog.Logger {
+	if discard {
+		return slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
 	return SetupTextLogger(logLevel)
 }
 

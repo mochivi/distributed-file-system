@@ -17,6 +17,12 @@ func FormatChunkID(path string, chunkIndex int) string {
 	return fmt.Sprintf("%s_%d", pathHashStr, chunkIndex)
 }
 
+func HashFilepath(path string) string {
+	pathHash := sha256.Sum256([]byte(path))
+	pathHashStr := hex.EncodeToString(pathHash[:8]) // Use first 8 bytes for shorter ID
+	return pathHashStr
+}
+
 // ParseChunkID extracts the path hash and chunk number from a chunk ID
 func ParseChunkID(chunkID string) (string, int, error) {
 	parts := strings.Split(chunkID, "_")

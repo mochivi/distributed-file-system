@@ -41,7 +41,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 			CommitTimeout: 5 * time.Second,
 		},
 	}
-	logger := logging.NewTestLogger(slog.LevelError)
+	logger := logging.NewTestLogger(slog.LevelError, true)
 
 	testCases := []struct {
 		name         string
@@ -51,9 +51,9 @@ func TestCoordinator_UploadFile(t *testing.T) {
 		expectErr    bool
 	}{
 		{
-			name: "success",
+			name: "success: 1 chunk",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.nodeSelector.On("SelectBestNodes", 1).Return([]*common.NodeInfo{
+				mocks.nodeSelector.On("SelectBestNodes", 1, &common.NodeInfo{ID: "coordinator"}).Return([]*common.NodeInfo{
 					{ID: "node1", Status: common.NodeHealthy, Host: "127.0.0.1", Port: 8081},
 				}, true)
 				mocks.metadataManager.On("trackUpload", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -67,19 +67,16 @@ func TestCoordinator_UploadFile(t *testing.T) {
 			expectedResp: func(sessionID string) *proto.UploadResponse {
 				return &proto.UploadResponse{
 					SessionId: sessionID,
-					ChunkLocations: []*proto.ChunkLocation{
-						{
-							ChunkId: chunk.FormatChunkID("test.txt", 0), // The second variable is the chunk index
-							Nodes:   []*proto.NodeInfo{{Id: "node1", Status: proto.NodeStatus_NODE_HEALTHY, IpAddress: "127.0.0.1", Port: 8081}},
-						},
-					},
+					ChunkIds:  []string{chunk.FormatChunkID("test.txt", 0)},
+					Nodes:     []*proto.NodeInfo{{Id: "node1", Status: proto.NodeStatus_NODE_HEALTHY, IpAddress: "127.0.0.1", Port: 8081}},
 				}
 			},
+			expectErr: false,
 		},
 		{
 			name: "success: 2 chunks",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.nodeSelector.On("SelectBestNodes", 2).Return([]*common.NodeInfo{
+				mocks.nodeSelector.On("SelectBestNodes", 2, &common.NodeInfo{ID: "coordinator"}).Return([]*common.NodeInfo{
 					{ID: "node1", Status: common.NodeHealthy, Host: "127.0.0.1", Port: 8081},
 				}, true)
 				mocks.metadataManager.On("trackUpload", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -93,23 +90,16 @@ func TestCoordinator_UploadFile(t *testing.T) {
 			expectedResp: func(sessionID string) *proto.UploadResponse {
 				return &proto.UploadResponse{
 					SessionId: sessionID,
-					ChunkLocations: []*proto.ChunkLocation{
-						{
-							ChunkId: chunk.FormatChunkID("test.txt", 0), // The second variable is the chunk index
-							Nodes:   []*proto.NodeInfo{{Id: "node1", Status: proto.NodeStatus_NODE_HEALTHY, IpAddress: "127.0.0.1", Port: 8081}},
-						},
-						{
-							ChunkId: chunk.FormatChunkID("test.txt", 1), // The second variable is the chunk index
-							Nodes:   []*proto.NodeInfo{{Id: "node1", Status: proto.NodeStatus_NODE_HEALTHY, IpAddress: "127.0.0.1", Port: 8081}},
-						},
-					},
+					ChunkIds:  []string{chunk.FormatChunkID("test.txt", 0), chunk.FormatChunkID("test.txt", 1)},
+					Nodes:     []*proto.NodeInfo{{Id: "node1", Status: proto.NodeStatus_NODE_HEALTHY, IpAddress: "127.0.0.1", Port: 8081}},
 				}
 			},
+			expectErr: false,
 		},
 		{
 			name: "error: node selector not ok",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.nodeSelector.On("SelectBestNodes", 1).Return(nil, false)
+				mocks.nodeSelector.On("SelectBestNodes", 1, &common.NodeInfo{ID: "coordinator"}).Return(nil, false)
 			},
 			req: &proto.UploadRequest{
 				Path:      "test.txt",
@@ -117,7 +107,8 @@ func TestCoordinator_UploadFile(t *testing.T) {
 				Size:      (1 * 1024 * 1024) - 1, // 1MB - 1B
 				Checksum:  "test-checksum",
 			},
-			expectErr: true,
+			expectedResp: nil,
+			expectErr:    true,
 		},
 	}
 
@@ -141,14 +132,8 @@ func TestCoordinator_UploadFile(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				expected := tc.expectedResp(resp.SessionId)
-				for i, expected := range expected.ChunkLocations {
-					assert.Equal(t, expected.ChunkId, resp.ChunkLocations[i].ChunkId)
-					for j, node := range expected.Nodes {
-						assert.Equal(t, node.Id, resp.ChunkLocations[i].Nodes[j].Id)
-						assert.Equal(t, node.IpAddress, resp.ChunkLocations[i].Nodes[j].IpAddress)
-						assert.Equal(t, node.Port, resp.ChunkLocations[i].Nodes[j].Port)
-					}
-				}
+				assert.Equal(t, expected.ChunkIds, resp.ChunkIds)
+				assert.Equal(t, expected.Nodes, resp.Nodes)
 				assert.NotEmpty(t, resp.SessionId)
 			}
 
@@ -159,7 +144,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 
 func TestCoordinator_DownloadFile(t *testing.T) {
 	cfg := config.DefaultCoordinatorConfig()
-	logger := logging.NewTestLogger(slog.LevelError)
+	logger := logging.NewTestLogger(slog.LevelError, true)
 
 	testCases := []struct {
 		name         string
@@ -303,7 +288,7 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 
 func TestCoordinator_DeleteFile(t *testing.T) {
 	cfg := config.DefaultCoordinatorConfig()
-	logger := logging.NewTestLogger(slog.LevelError)
+	logger := logging.NewTestLogger(slog.LevelError, true)
 
 	testCases := []struct {
 		name         string
@@ -356,7 +341,7 @@ func TestCoordinator_DeleteFile(t *testing.T) {
 
 func TestCoordinator_ConfirmUpload(t *testing.T) {
 	cfg := config.DefaultCoordinatorConfig()
-	logger := logging.NewTestLogger(slog.LevelError)
+	logger := logging.NewTestLogger(slog.LevelError, true)
 
 	testCases := []struct {
 		name         string
@@ -414,7 +399,7 @@ func TestCoordinator_ConfirmUpload(t *testing.T) {
 
 func TestCoordinator_RegisterDataNode(t *testing.T) {
 	cfg := config.DefaultCoordinatorConfig()
-	logger := logging.NewTestLogger(slog.LevelError)
+	logger := logging.NewTestLogger(slog.LevelError, true)
 	testCases := []struct {
 		name         string
 		setupMocks   func(*serverMocks)
@@ -473,7 +458,7 @@ func TestCoordinator_RegisterDataNode(t *testing.T) {
 
 func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 	cfg := config.DefaultCoordinatorConfig()
-	logger := logging.NewTestLogger(slog.LevelError)
+	logger := logging.NewTestLogger(slog.LevelError, true)
 	testCases := []struct {
 		name         string
 		setupMocks   func(*serverMocks)
@@ -574,7 +559,7 @@ func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 
 func TestCoordinator_ListNodes(t *testing.T) {
 	cfg := config.DefaultCoordinatorConfig()
-	logger := logging.NewTestLogger(slog.LevelError)
+	logger := logging.NewTestLogger(slog.LevelError, true)
 	testCases := []struct {
 		name         string
 		setupMocks   func(*serverMocks)

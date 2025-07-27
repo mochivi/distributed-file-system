@@ -8,29 +8,36 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/pkg/client_pool"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"github.com/mochivi/distributed-file-system/pkg/streaming"
 )
 
 type container struct {
-	store              storage.ChunkStorage
-	replicationManager ReplicationProvider
-	sessionManager     SessionManager
-	clusterViewer      state.ClusterStateViewer
-	coordinatorFinder  state.CoordinatorFinder
-	selector           cluster.NodeSelector
+	store                 storage.ChunkStorage
+	replicationManager    ReplicationProvider
+	sessionManager        streaming.SessionManager
+	clusterViewer         state.ClusterStateViewer
+	coordinatorFinder     state.CoordinatorFinder
+	selector              cluster.NodeSelector
+	serverStreamerFactory streaming.ServerStreamerFactory
+	clientPoolFactory     client_pool.ClientPoolFactory
 }
 
-func NewContainer(store storage.ChunkStorage, replicationManager ReplicationProvider, sessionManager SessionManager,
-	clusterViewer state.ClusterStateViewer, coordinatorFinder state.CoordinatorFinder, selector cluster.NodeSelector) *container {
+func NewContainer(store storage.ChunkStorage, replicationManager ReplicationProvider, sessionManager streaming.SessionManager,
+	clusterViewer state.ClusterStateViewer, coordinatorFinder state.CoordinatorFinder, selector cluster.NodeSelector,
+	serverStreamerFactory streaming.ServerStreamerFactory, clientPoolFactory client_pool.ClientPoolFactory) *container {
 
 	return &container{
-		store:              store,
-		replicationManager: replicationManager,
-		sessionManager:     sessionManager,
-		clusterViewer:      clusterViewer,
-		coordinatorFinder:  coordinatorFinder,
-		selector:           selector,
+		store:                 store,
+		replicationManager:    replicationManager,
+		sessionManager:        sessionManager,
+		clusterViewer:         clusterViewer,
+		coordinatorFinder:     coordinatorFinder,
+		selector:              selector,
+		serverStreamerFactory: serverStreamerFactory,
+		clientPoolFactory:     clientPoolFactory,
 	}
 }
 

@@ -1,4 +1,4 @@
-package datanode
+package streaming
 
 import (
 	"fmt"
@@ -12,19 +12,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestSession(sessionID, chunkID string, status SessionStatus) *StreamingSession {
-	return &StreamingSession{
+func newTestSession(sessionID, chunkID string, status SessionStatus) *streamingSession {
+	return &streamingSession{
 		SessionID: sessionID,
 		ChunkHeader: common.ChunkHeader{
 			ID: chunkID,
 		},
 		Status: status,
-		logger: logging.NewTestLogger(slog.LevelError),
 	}
 }
 
 func TestNewStreamingSessionManager(t *testing.T) {
-	sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
+	sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError, true))
 	assert.NotNil(t, sm)
 	assert.NotNil(t, sm.sessions)
 	assert.Empty(t, sm.sessions)
@@ -33,19 +32,19 @@ func TestNewStreamingSessionManager(t *testing.T) {
 func TestStreamingSessionManager_Store(t *testing.T) {
 	testCases := []struct {
 		name           string
-		initialState   map[string]*StreamingSession
-		sessionToStore *StreamingSession
+		initialState   map[string]*streamingSession
+		sessionToStore *streamingSession
 		expectErr      bool
 	}{
 		{
 			name:           "success: store new session",
-			initialState:   make(map[string]*StreamingSession),
+			initialState:   make(map[string]*streamingSession),
 			sessionToStore: newTestSession("session1", "chunk1", SessionActive),
 			expectErr:      false,
 		},
 		{
 			name: "error: session for chunk already exists",
-			initialState: map[string]*StreamingSession{
+			initialState: map[string]*streamingSession{
 				"existing-session": newTestSession("existing-session", "chunk1", SessionActive),
 			},
 			sessionToStore: newTestSession("new-session", "chunk1", SessionActive),
@@ -53,7 +52,7 @@ func TestStreamingSessionManager_Store(t *testing.T) {
 		},
 		{
 			name: "success: session for chunk exists but not active",
-			initialState: map[string]*StreamingSession{
+			initialState: map[string]*streamingSession{
 				"existing-session": newTestSession("existing-session", "chunk1", SessionCompleted),
 			},
 			sessionToStore: newTestSession("new-session", "chunk1", SessionActive),
@@ -63,7 +62,7 @@ func TestStreamingSessionManager_Store(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
+			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError, true))
 			sm.sessions = tc.initialState
 
 			err := sm.Store(tc.sessionToStore.SessionID, tc.sessionToStore)
@@ -84,14 +83,14 @@ func TestStreamingSessionManager_Load(t *testing.T) {
 	session1 := newTestSession("session1", "chunk1", SessionActive)
 	testCases := []struct {
 		name            string
-		initialState    map[string]*StreamingSession
+		initialState    map[string]*streamingSession
 		sessionIDToLoad string
 		expectFound     bool
-		expectedSession *StreamingSession
+		expectedSession *streamingSession
 	}{
 		{
 			name: "success: session found",
-			initialState: map[string]*StreamingSession{
+			initialState: map[string]*streamingSession{
 				"session1": session1,
 			},
 			sessionIDToLoad: "session1",
@@ -100,7 +99,7 @@ func TestStreamingSessionManager_Load(t *testing.T) {
 		},
 		{
 			name:            "failure: session not found",
-			initialState:    make(map[string]*StreamingSession),
+			initialState:    make(map[string]*streamingSession),
 			sessionIDToLoad: "non-existent",
 			expectFound:     false,
 			expectedSession: nil,
@@ -109,7 +108,7 @@ func TestStreamingSessionManager_Load(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
+			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError, true))
 			sm.sessions = tc.initialState
 
 			session, found := sm.Load(tc.sessionIDToLoad)
@@ -121,7 +120,7 @@ func TestStreamingSessionManager_Load(t *testing.T) {
 }
 
 func TestStreamingSessionManager_Delete(t *testing.T) {
-	sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
+	sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError, true))
 	session := newTestSession("session-to-delete", "chunk-to-delete", SessionActive)
 
 	// Store it first
@@ -143,13 +142,13 @@ func TestStreamingSessionManager_Delete(t *testing.T) {
 func TestStreamingSessionManager_ExistsForChunk(t *testing.T) {
 	testCases := []struct {
 		name         string
-		initialState map[string]*StreamingSession
+		initialState map[string]*streamingSession
 		chunkID      string
 		expectExists bool
 	}{
 		{
 			name: "exists and active",
-			initialState: map[string]*StreamingSession{
+			initialState: map[string]*streamingSession{
 				"session1": newTestSession("session1", "chunk1", SessionActive),
 			},
 			chunkID:      "chunk1",
@@ -157,7 +156,7 @@ func TestStreamingSessionManager_ExistsForChunk(t *testing.T) {
 		},
 		{
 			name: "exists but not active",
-			initialState: map[string]*StreamingSession{
+			initialState: map[string]*streamingSession{
 				"session1": newTestSession("session1", "chunk1", SessionCompleted),
 			},
 			chunkID:      "chunk1",
@@ -165,7 +164,7 @@ func TestStreamingSessionManager_ExistsForChunk(t *testing.T) {
 		},
 		{
 			name:         "does not exist",
-			initialState: make(map[string]*StreamingSession),
+			initialState: make(map[string]*streamingSession),
 			chunkID:      "chunk-non-existent",
 			expectExists: false,
 		},
@@ -173,7 +172,7 @@ func TestStreamingSessionManager_ExistsForChunk(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
+			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError, true))
 			sm.sessions = tc.initialState
 
 			exists := sm.ExistsForChunk(tc.chunkID)
@@ -187,14 +186,14 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		initialState    map[string]*StreamingSession
+		initialState    map[string]*streamingSession
 		chunkID         string
 		expectFound     bool
-		expectedSession *StreamingSession
+		expectedSession *streamingSession
 	}{
 		{
 			name: "success: found",
-			initialState: map[string]*StreamingSession{
+			initialState: map[string]*streamingSession{
 				"session1": session1,
 				"session2": newTestSession("session2", "chunk2", SessionActive),
 			},
@@ -204,7 +203,7 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 		},
 		{
 			name: "not found",
-			initialState: map[string]*StreamingSession{
+			initialState: map[string]*streamingSession{
 				"session2": newTestSession("session2", "chunk2", SessionActive),
 			},
 			chunkID:         "chunk-non-existent",
@@ -215,7 +214,7 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
+			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError, true))
 			sm.sessions = tc.initialState
 
 			session, found := sm.LoadByChunk(tc.chunkID)
@@ -226,7 +225,7 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 }
 
 func TestStreamingSessionManager_Concurrency(t *testing.T) {
-	sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError))
+	sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError, true))
 	var wg sync.WaitGroup
 	numGoroutines := 100
 

@@ -13,7 +13,7 @@ import (
 )
 
 func TestTrackUpload(t *testing.T) {
-	logger := logging.NewTestLogger(slog.LevelDebug)
+	logger := logging.NewTestLogger(slog.LevelDebug, true)
 	manager := NewMetadataSessionManager(5*time.Second, logger)
 
 	req := common.UploadRequest{
@@ -97,7 +97,7 @@ func TestCommit(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			logger := logging.NewTestLogger(slog.LevelDebug)
+			logger := logging.NewTestLogger(slog.LevelDebug, true)
 			manager := NewMetadataSessionManager(tc.commitTimeout, logger)
 			mockStore := new(metadata.MockMetadataStore)
 
