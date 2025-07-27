@@ -223,6 +223,30 @@ Critical settings (ports, storage paths, cluster topology) will continue to requ
 
 ---
 
+## Logging
+
+All binaries (coordinator, datanode, tests & CLI) now share one environment variable that tunes log verbosity:
+
+```bash
+LOG_LEVEL=debug   # debug | info | warn | error (default=error)
+```
+
+If the variable is omitted the services fall back to `error`; the Docker-compose test harness sets `LOG_LEVEL=info` for developer convenience.
+
+---
+
+## Default Timeouts
+
+| Component | Setting | Old | New |
+|-----------|---------|-----|-----|
+| **Streaming session** | `node.streaming_session.timeout` | 1 m | **5 m** |
+| **Heartbeat controller** | `agent.heartbeat.interval` | 30 s | **2 s** |
+|  | `agent.heartbeat.timeout` | 10 s | **1 s** |
+
+Make sure to review these values if you operate clusters with high latency links.
+
+---
+
 ## Loading Configuration in Code
 
 ```bash
