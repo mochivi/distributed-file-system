@@ -407,7 +407,7 @@ docker logs dfs_datanode_1
 ## Contributing
 
 Contribution acceptance is planned for August/September.
-* Discord communitity will be created.
+* Discord communitity: [Go DFS](https://discord.gg/pF3xG6Wb)
 * Contribution guidelines
 * Repository configuration
 
