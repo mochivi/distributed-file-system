@@ -140,9 +140,9 @@ func (rm *ParalellReplicationService) tryStartReplication(ctx context.Context, c
 		if err != nil {
 			return false, "", err
 		}
-		return replicateChunkResponse.Accept, replicateChunkResponse, nil
+		return replicateChunkResponse.Accept, replicateChunkResponse.SessionID, nil
 	})
-	datanodeResponse := response.(common.NodeReady) // should panic if fails anyway
+	streamingSessionID := response.(string) // should panic if fails anyway
 
 	if err != nil {
 		<-semaphore // Release semaphore slot
@@ -152,7 +152,7 @@ func (rm *ParalellReplicationService) tryStartReplication(ctx context.Context, c
 	// Start replication goroutine
 	wg.Add(1)
 	activeReplications.Add(1)
-	go rm.replicateToClient(ctx, client, datanodeResponse.SessionID, chunkHeader, data, logger,
+	go rm.replicateToClient(ctx, client, streamingSessionID, chunkHeader, data, logger,
 		wg, semaphore, errChan, replicatedNodes, acceptedCount, activeReplications)
 
 	return nil
