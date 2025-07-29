@@ -11,8 +11,8 @@ import (
 
 type ClientPool interface {
 	GetClient() clients.IDataNodeClient
-	GetClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, string, error)
-	GetRemoveClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, string, error)
+	GetClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, any, error)
+	GetRemoveClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, any, error)
 	Len() int
 	Close()
 }
@@ -20,7 +20,7 @@ type ClientPool interface {
 type ClientPoolFactory func(nodes []*common.NodeInfo) (ClientPool, error)
 
 // hardcoded to return streaming session id, in the future we might want to return the server response itself by using some abstraction over it?
-type clientConnectionFunc func(client clients.IDataNodeClient) (bool, string, error)
+type clientConnectionFunc func(client clients.IDataNodeClient) (bool, any, error)
 
 // rotatingClientPool is a client pool that rotates through the nodes in a round-robin fashion
 // Useful when we don't care about specific nodes, but we want to distribute the load evenly
@@ -53,33 +53,33 @@ func (c *rotatingClientPool) GetClient() clients.IDataNodeClient {
 	return client
 }
 
-func (c *rotatingClientPool) GetRemoveClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, string, error) {
+func (c *rotatingClientPool) GetRemoveClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, any, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	client, streamingSessionID, err := c.getClientWithRetry(clientConnectionFunc)
+	client, response, err := c.getClientWithRetry(clientConnectionFunc)
 	if err != nil {
 		return nil, "", err
 	}
 
 	c.removeClient(client.Node().ID)
-	return client, streamingSessionID, nil
+	return client, response, nil
 }
 
-func (c *rotatingClientPool) GetClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, string, error) {
+func (c *rotatingClientPool) GetClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, any, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.getClientWithRetry(clientConnectionFunc)
 }
 
 // Internal reusable function to get a client with retry, does not lock the mutex as it should already be locked by the caller
-func (c *rotatingClientPool) getClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, string, error) {
+func (c *rotatingClientPool) getClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, any, error) {
 	for range len(c.clients) { // try all clients once
 		client := c.clients[c.index]
 
 		// same client retry loop
 		for i := 1; i <= 3; i++ {
-			accepted, streamingSessionID, err := clientConnectionFunc(client)
+			accepted, response, err := clientConnectionFunc(client)
 			if err != nil { // client connection error, retry the same client
 				time.Sleep(time.Duration(i) * 500 * time.Millisecond) // Exponential backoff on connection attempts
 				continue
@@ -92,11 +92,11 @@ func (c *rotatingClientPool) getClientWithRetry(clientConnectionFunc clientConne
 
 			// success, return client, ensure next call to getClient tries the next node
 			c.rotateClient()
-			return client, streamingSessionID, nil
+			return client, response, nil
 		}
 	}
 
-	return nil, "", fmt.Errorf("failed to get client")
+	return nil, nil, fmt.Errorf("failed to get client")
 }
 
 // Internal function, mutex should be locked by caller

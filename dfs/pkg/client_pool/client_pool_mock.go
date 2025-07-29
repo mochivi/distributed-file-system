@@ -36,7 +36,7 @@ func (m *MockClientPool) GetClient() clients.IDataNodeClient {
 	return client
 }
 
-func (m *MockClientPool) GetClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, string, error) {
+func (m *MockClientPool) GetClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, any, error) {
 	args := m.Called(clientConnectionFunc)
 
 	var client clients.IDataNodeClient
@@ -49,10 +49,10 @@ func (m *MockClientPool) GetClientWithRetry(clientConnectionFunc clientConnectio
 		client = nil
 	}
 
-	return client, args.String(1), args.Error(2)
+	return client, args.Get(1), args.Error(2)
 }
 
-func (m *MockClientPool) GetRemoveClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, string, error) {
+func (m *MockClientPool) GetRemoveClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, any, error) {
 	args := m.Called(clientConnectionFunc)
 
 	var client clients.IDataNodeClient
@@ -65,7 +65,7 @@ func (m *MockClientPool) GetRemoveClientWithRetry(clientConnectionFunc clientCon
 		client = nil
 	}
 
-	return client, args.String(1), args.Error(2)
+	return client, args.Get(1), args.Error(2)
 }
 
 func (m *MockClientPool) Len() int {

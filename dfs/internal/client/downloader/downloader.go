@@ -7,47 +7,29 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"sync"
 
 	"github.com/mochivi/distributed-file-system/internal/clients"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/pkg/client_pool"
 	"github.com/mochivi/distributed-file-system/pkg/streaming"
 )
 
+// Downloader is responsible for downloading a file from the data nodes
+type Downloader struct {
+	config   DownloaderConfig
+	streamer streaming.ClientStreamer
+}
+
+// DownloaderConfig is the configuration for the downloader
 type DownloaderConfig struct {
 	NumWorkers      int
 	ChunkRetryCount int
 	TempDir         string // directory to store temporary files
 }
 
-type DownloadWork struct {
-	chunkHeader common.ChunkHeader
-	client      clients.IDataNodeClient
-	sessionID   string
-	logger      *slog.Logger
-}
-
-type Downloader struct {
-	config   DownloaderConfig
-	streamer streaming.ClientStreamer
-}
-
-type downloadSession struct {
-	// Input params
-	chunkLocations []common.ChunkLocation
-	chunkHeaders   []common.ChunkHeader
-
-	// Output params
-	tempFile     *os.File
-	fileMutex    sync.Mutex
-	tempFileSize int64
-
-	// Internal state
-	ctx      context.Context
-	workChan chan DownloadWork
-	errChan  chan error
-	wg       *sync.WaitGroup
-	logger   *slog.Logger // scoped to the download session
+type downloadWork struct {
+	chunkID    string
+	clientPool client_pool.ClientPool
 }
 
 func NewDownloader(streamer streaming.ClientStreamer, config DownloaderConfig) *Downloader {
@@ -78,88 +60,91 @@ func (d *Downloader) DownloadFile(ctx context.Context, fileInfo common.FileInfo,
 		chunkHeaders = append(chunkHeaders, chunk.Header)
 	}
 
-	session := &downloadSession{
-		ctx:            ctx,
-		chunkLocations: chunkLocations,
-		chunkHeaders:   chunkHeaders,
-		workChan:       make(chan DownloadWork, d.config.NumWorkers),
-		errChan:        make(chan error, len(chunkLocations)),
-		wg:             &sync.WaitGroup{},
-		logger:         logger,
-		tempFile:       tempFile,
-		tempFileSize:   int64(fileInfo.Size),
+	nWorkers := min(d.config.NumWorkers, len(chunkLocations))
+	downloadCtx := NewDownloadContext(ctx, chunkLocations, chunkHeaders, tempFile, fileInfo, nWorkers, logger)
+
+	d.startWorkers(downloadCtx, nWorkers)
+
+	// Queue work
+	if err := d.queueWork(downloadCtx); err != nil {
+		logger.Error("Failed to queue work", slog.String("error", err.Error()))
+		return "", fmt.Errorf("failed to queue work: %w", err)
 	}
 
-	nWorkers := min(d.config.NumWorkers, len(chunkLocations))
+	if err := d.waitForCompletion(downloadCtx); err != nil {
+		downloadCtx.file.Delete()
+		return "", err
+	}
 
-	// Launch NumWorkers for session
+	return downloadCtx.file.Name(), nil
+}
+
+func (d *Downloader) startWorkers(downloadCtx *downloadContext, nWorkers int) {
 	for i := range nWorkers {
-		session.wg.Add(1)
+		downloadCtx.wg.Add(1)
 		go func(workerID int) {
-			defer session.wg.Done()
-			for work := range session.workChan {
-				if err := d.processWork(work, session); err != nil {
-					session.logger.Error(fmt.Sprintf("Worker %d failed", workerID), slog.String("error", err.Error()))
-					session.errChan <- err
+			defer downloadCtx.wg.Done()
+			for work := range downloadCtx.workChan {
+				if err := d.processWork(work, downloadCtx); err != nil {
+					downloadCtx.logger.Error(fmt.Sprintf("Worker %d failed", workerID), slog.String("error", err.Error()))
+					downloadCtx.errChan <- err
 				}
 			}
 		}(i)
 	}
+}
 
-	// Queue work
-	if err := d.queueWork(session); err != nil {
-		tempFile.Close()
-		return "", fmt.Errorf("failed to queue work: %w", err)
-	}
-	close(session.workChan)
-
+func (d *Downloader) waitForCompletion(downloadCtx *downloadContext) error {
 	// Close error channel when all goroutines complete
 	go func() {
-		session.wg.Wait()
-
-		close(session.errChan)
+		downloadCtx.wg.Wait()
+		close(downloadCtx.errChan)
 	}()
 
 	select {
-	case err, ok := <-session.errChan:
+	case err, ok := <-downloadCtx.errChan:
 		if !ok { // Error channel is closed
-			tempFile.Close()
-			return tempFile.Name(), nil
+			return nil
 		}
+		return err // fail fast on first error
 
-		// Return on first error
-		tempFile.Close()
-		os.Remove(tempFile.Name())
-		return "", err
-
-	case <-ctx.Done():
-		tempFile.Close()
-		os.Remove(tempFile.Name())
-		return "", ctx.Err()
+	case <-downloadCtx.ctx.Done():
+		return downloadCtx.ctx.Err()
 	}
 }
 
-func (d *Downloader) processWork(work DownloadWork, session *downloadSession) error {
-	retryCount := 0
-	for retryCount < d.config.ChunkRetryCount {
-		if err := d.downloadChunk(work, session); err != nil {
-			retryCount++
-			if retryCount >= d.config.ChunkRetryCount {
-				return fmt.Errorf("failed to download chunk %s after %d retries", work.chunkHeader.ID, retryCount)
+func (d *Downloader) processWork(work downloadWork, downloadCtx *downloadContext) error {
+	// Try to download chunk from all clients in the pool
+	// if any client fails, we remove it from the pool and try the next one until there's none left
+	for work.clientPool.Len() > 0 {
+		client, response, err := work.clientPool.GetRemoveClientWithRetry(func(client clients.IDataNodeClient) (bool, any, error) {
+			downloadChunkResponse, err := client.PrepareChunkDownload(downloadCtx.ctx, common.DownloadChunkRequest{ChunkID: work.chunkID})
+			if err != nil {
+				return false, "", err
 			}
-			session.logger.Error("Failed to download chunk", slog.String("chunk_id", work.chunkHeader.ID), slog.Int("retry_count", retryCount), slog.String("error", err.Error()))
+			return downloadChunkResponse.Accept, downloadChunkResponse, nil
+		})
+		downloadChunkResponse := response.(common.DownloadReady) // should panic if fails anyway
+
+		if err != nil {
+			return fmt.Errorf("failed to get client: %w", err)
+		}
+
+		if err := d.downloadChunk(downloadCtx, client, downloadChunkResponse.ChunkHeader, downloadChunkResponse.SessionID); err != nil {
+			downloadCtx.logger.Error("Failed to download chunk", slog.String("chunk_id", downloadChunkResponse.ChunkHeader.ID), slog.String("error", err.Error()))
 			continue
 		}
-		break
+		return nil
 	}
-	return nil
+
+	return fmt.Errorf("failed to download chunk %s", work.chunkID)
 }
 
-func (d *Downloader) downloadChunk(work DownloadWork, session *downloadSession) error {
-	session.logger.Info("Downloading chunk")
+func (d *Downloader) downloadChunk(downloadCtx *downloadContext, client clients.IDataNodeClient, chunkHeader common.ChunkHeader, sessionID string) error {
+	downloadCtx.logger.Info("Downloading chunk")
 
-	stream, err := work.client.DownloadChunkStream(session.ctx, common.DownloadStreamRequest{
-		SessionID:       work.sessionID,
+	stream, err := client.DownloadChunkStream(downloadCtx.ctx, common.DownloadStreamRequest{
+		SessionID:       sessionID,
 		ChunkStreamSize: int32(d.streamer.Config().ChunkStreamSize),
 	})
 	if err != nil {
@@ -167,80 +152,67 @@ func (d *Downloader) downloadChunk(work DownloadWork, session *downloadSession) 
 	}
 
 	// TODO: the buffer is as large as the chunk, but we would prefer to flush the buffer from time to time to avoid memory issues
-	buffer := bytes.NewBuffer(make([]byte, 0, int(work.chunkHeader.Size)))
+	buffer := bytes.NewBuffer(make([]byte, 0, int(chunkHeader.Size)))
 
-	if err := d.streamer.ReceiveChunkStream(session.ctx, stream, buffer, session.logger, streaming.DownloadChunkStreamParams{
-		SessionID:   work.sessionID,
-		ChunkHeader: work.chunkHeader,
+	if err := d.streamer.ReceiveChunkStream(downloadCtx.ctx, stream, buffer, downloadCtx.logger, streaming.DownloadChunkStreamParams{
+		SessionID:   sessionID,
+		ChunkHeader: chunkHeader,
 	}); err != nil {
 		return fmt.Errorf("failed to receive chunk stream: %w", err)
 	}
 
 	// Calculate offset to write to temp file
 	offset := int64(0)
-	for i := 0; i < work.chunkHeader.Index; i++ {
-		offset += int64(session.chunkHeaders[i].Size)
+	for i := 0; i < chunkHeader.Index; i++ {
+		offset += int64(downloadCtx.chunkHeaders[i].Size)
 	}
 
 	// Write buffer to temp file
-	session.fileMutex.Lock()
-	if _, err := session.tempFile.Seek(offset, io.SeekStart); err != nil {
-		return fmt.Errorf("failed to seek to offset %d: %w", offset, err)
+	if _, err := downloadCtx.file.SeekWrite(offset, io.SeekStart, buffer.Bytes()); err != nil {
+		return fmt.Errorf("failed to write to temp file at offset %d: %w", offset, err)
 	}
-	if _, err := session.tempFile.Write(buffer.Bytes()); err != nil {
-		return fmt.Errorf("failed to write buffer to temp file: %w", err)
-	}
-	// data := buffer.Bytes()
-	// for written := 0; written < len(data); {
-	//     n, err := session.tempFile.Write(data[written:])
-	//     if err != nil {
-	//         return fmt.Errorf("write failed: %w", err)
-	//     }
-	//     written += n
-	// }
-	session.fileMutex.Unlock()
 
 	return nil
 }
 
-func (d *Downloader) queueWork(session *downloadSession) error {
-	for _, location := range session.chunkLocations {
-		if err := session.ctx.Err(); err != nil {
+func (d *Downloader) queueWork(downloadCtx *downloadContext) error {
+	defer close(downloadCtx.workChan) // done queuing work
+	for _, location := range downloadCtx.chunkLocations {
+		if err := downloadCtx.ctx.Err(); err != nil {
 			return err
 		}
 
 		if len(location.Nodes) == 0 {
-			session.logger.Error("No nodes available for chunk", slog.String("chunk_id", location.ChunkID))
+			downloadCtx.logger.Error("No nodes available for chunk", slog.String("chunk_id", location.ChunkID))
 			return fmt.Errorf("no nodes available for chunk %s", location.ChunkID)
 		}
 
-		client, err := clients.NewDataNodeClient(location.Nodes[0])
+		clientPool, err := client_pool.NewRotatingClientPool(location.Nodes)
 		if err != nil {
-			return fmt.Errorf("failed to create datanode client: %w", err)
+			return fmt.Errorf("failed to create client pool: %w", err)
 		}
 
-		downloadChunkResponse, err := client.PrepareChunkDownload(session.ctx, common.DownloadChunkRequest{ChunkID: location.ChunkID})
-		if err != nil {
-			session.logger.Error("Failed to prepare chunk %s for download: %v", location.ChunkID, err)
-			return fmt.Errorf("failed to prepare chunk %s for download: %v", location.ChunkID, err)
-		}
+		// downloadChunkResponse, err := client.PrepareChunkDownload(downloadCtx.ctx, common.DownloadChunkRequest{ChunkID: location.ChunkID})
+		// if err != nil {
+		// 	downloadCtx.logger.Error("Failed to prepare chunk %s for download: %v", location.ChunkID, err)
+		// 	return fmt.Errorf("failed to prepare chunk %s for download: %v", location.ChunkID, err)
+		// }
 
-		if !downloadChunkResponse.Accept {
-			session.logger.Error("Node did not accept chunk download %s: %s", location.ChunkID, downloadChunkResponse.Message)
-			return fmt.Errorf("node did not accept chunk upload %s: %s", location.ChunkID, downloadChunkResponse.Message)
-		}
-		session.logger.Info(fmt.Sprintf("Node accepted chunk %s download request", location.ChunkID))
+		// if !downloadChunkResponse.Accept {
+		// 	downloadCtx.logger.Error("Node did not accept chunk download %s: %s", location.ChunkID, downloadChunkResponse.Message)
+		// 	return fmt.Errorf("node did not accept chunk upload %s: %s", location.ChunkID, downloadChunkResponse.Message)
+		// }
+		// downloadCtx.logger.Info(fmt.Sprintf("Node accepted chunk %s download request", location.ChunkID))
 
-		if downloadChunkResponse.SessionID == "" {
-			session.logger.Error("Node did not return a session ID", slog.String("chunk_id", location.ChunkID), slog.String("node_id", location.Nodes[0].ID))
-			return fmt.Errorf("node did not return a session ID")
-		}
+		// if downloadChunkResponse.SessionID == "" {
+		// 	downloadCtx.logger.Error("Node did not return a session ID", slog.String("chunk_id", location.ChunkID), slog.String("node_id", location.Nodes[0].ID))
+		// 	return fmt.Errorf("node did not return a session ID")
+		// }
 
-		session.workChan <- DownloadWork{
-			chunkHeader: downloadChunkResponse.ChunkHeader,
-			client:      client,
-			sessionID:   downloadChunkResponse.SessionID,
-			logger:      session.logger,
+		// Provide pool of clients that hold the desired chunk
+		downloadCtx.workChan <- downloadWork{
+			chunkID:    location.ChunkID,
+			clientPool: clientPool,
 		}
 	}
 
