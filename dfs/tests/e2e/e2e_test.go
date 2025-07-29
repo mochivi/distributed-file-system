@@ -83,7 +83,7 @@ func TestEndToEnd(t *testing.T) {
 
 	for _, tt := range fileSizeTestCases {
 		t.Run(tt.name, func(t *testing.T) {
-			// t.Parallel()
+			t.Parallel()
 
 			t.Logf("Running test case: %s", tt.name)
 

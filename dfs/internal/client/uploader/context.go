@@ -3,6 +3,7 @@ package uploader
 import (
 	"context"
 	"log/slog"
+	"sort"
 	"sync"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
@@ -34,6 +35,12 @@ func (c *chunkInfoMap) getChunkInfos() []common.ChunkInfo {
 	for _, chunkInfo := range c.chunkInfos {
 		chunkInfos = append(chunkInfos, *chunkInfo)
 	}
+
+	// Sort chunkInfos by index to ensure the chunks are uploaded in order
+	sort.Slice(chunkInfos, func(i, j int) bool {
+		return chunkInfos[i].Header.Index < chunkInfos[j].Header.Index
+	})
+
 	return chunkInfos
 }
 
