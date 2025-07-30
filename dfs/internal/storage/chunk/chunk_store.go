@@ -33,7 +33,7 @@ func NewChunkDiskStorage(fs afero.Fs, config config.DiskStorageConfig, serialize
 	if err := fs.MkdirAll(config.RootDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create rootDir for chunk disk storage: %w", err)
 	}
-	storageLogger.Info("Created chunk disk storage rootDir", slog.String("root_dir", config.RootDir))
+	storageLogger.Debug("Created chunk disk storage rootDir", slog.String("root_dir", config.RootDir))
 	return &ChunkDiskStorage{
 		fs:         fs,
 		config:     config,
@@ -77,7 +77,7 @@ func (d *ChunkDiskStorage) Store(chunkHeader common.ChunkHeader, data []byte) er
 		return fmt.Errorf("failed to write chunk data to file: %w", err)
 	}
 
-	d.logger.Info("Stored chunk", slog.String("chunk_id", chunkHeader.ID), slog.String("path", fullPath))
+	d.logger.Debug("Stored chunk", slog.String("chunk_id", chunkHeader.ID), slog.String("path", fullPath))
 	return nil
 }
 
@@ -98,7 +98,7 @@ func (d *ChunkDiskStorage) Get(chunkID string) (common.ChunkHeader, []byte, erro
 		return common.ChunkHeader{}, nil, fmt.Errorf("failed to get chunk data: %w", err)
 	}
 
-	d.logger.Info("Retrieved chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
+	d.logger.Debug("Retrieved chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
 	return header, data, nil
 }
 
@@ -125,7 +125,7 @@ func (d *ChunkDiskStorage) GetData(chunkID string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read chunk data: %w", err)
 	}
 
-	d.logger.Info("Retrieved chunk data", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
+	d.logger.Debug("Retrieved chunk data", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
 	return data, nil
 }
 
@@ -267,7 +267,7 @@ func (d *ChunkDiskStorage) Delete(chunkID string) error {
 		dirPath = filepath.Dir(dirPath)
 	}
 
-	d.logger.Info("Deleted chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
+	d.logger.Debug("Deleted chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
 	return nil
 }
 

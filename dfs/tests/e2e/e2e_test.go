@@ -121,18 +121,18 @@ func TestEndToEnd(t *testing.T) {
 				t.Errorf("%s: failed to download file: %v", tt.name, err)
 			}
 
-			// // Delete the file
-			// t.Logf("Deleting file: %s", fullFilepath)
-			// if err := client.DeleteFile(fullFilepath); err != nil {
-			// 	t.Errorf("failed to delete file: %v", err)
-			// }
+			// Delete the file
+			t.Logf("Deleting file: %s", fullFilepath)
+			if err := client.DeleteFile(fullFilepath); err != nil {
+				t.Errorf("failed to delete file: %v", err)
+			}
 
-			// // Try to download the file again, we expect to receive an error
-			// // this method calls the coordinator to download the file.
-			// t.Logf("Trying to download deleted file: %s", fullFilepath)
-			// if _, err := client.DownloadFile(fullFilepath); err == nil {
-			// 	t.Errorf("expected error when downloading deleted file")
-			// }
+			// Try to download the file again, we expect to receive an error
+			// this method calls the coordinator to download the file.
+			t.Logf("Trying to download deleted file: %s", fullFilepath)
+			if _, err := client.DownloadFile(fullFilepath); err == nil {
+				t.Errorf("expected error when downloading deleted file")
+			}
 		})
 	}
 }

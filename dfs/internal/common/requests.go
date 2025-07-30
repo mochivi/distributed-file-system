@@ -82,12 +82,13 @@ func (dr DownloadReady) ToProto() *proto.DownloadReady {
 
 type DownloadStreamRequest struct {
 	SessionID       string
-	ChunkStreamSize int32
+	ChunkStreamSize int
 }
 
 func DownloadStreamRequestFromProto(pb *proto.DownloadStreamRequest) (DownloadStreamRequest, error) {
-	req := DownloadStreamRequest{SessionID: pb.SessionId, ChunkStreamSize: pb.ChunkStreamSize}
+	req := DownloadStreamRequest{SessionID: pb.SessionId, ChunkStreamSize: int(pb.ChunkStreamSize)}
 
+	// Limit stream frame size to maximum 1MB
 	if req.ChunkStreamSize > 1024*1024 {
 		return DownloadStreamRequest{}, fmt.Errorf("chunk stream size is too large")
 	}
@@ -99,7 +100,7 @@ func DownloadStreamRequestFromProto(pb *proto.DownloadStreamRequest) (DownloadSt
 }
 
 func (r DownloadStreamRequest) ToProto() *proto.DownloadStreamRequest {
-	return &proto.DownloadStreamRequest{SessionId: r.SessionID, ChunkStreamSize: r.ChunkStreamSize}
+	return &proto.DownloadStreamRequest{SessionId: r.SessionID, ChunkStreamSize: int32(r.ChunkStreamSize)}
 }
 
 type DeleteChunkRequest struct {

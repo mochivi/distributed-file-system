@@ -3,8 +3,8 @@ package datanode
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"strings"
 	"sync"
@@ -12,6 +12,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"github.com/mochivi/distributed-file-system/pkg/streaming"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -226,9 +227,10 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 		logger.Error("Failed to receive first chunk", slog.String("error", err.Error()))
 		return status.Errorf(codes.Internal, "failed to receive first chunk: %v", err)
 	}
-	logger = logging.ExtendLogger(logger, slog.String("session_id", session.SessionID))
+	logger = logging.ExtendLogger(logger, slog.String("session_id", session.SessionID), slog.String("chunk_id", session.ChunkHeader.ID))
 	defer s.sessionManager.Delete(session.SessionID)
 
+	logger.Debug("starting to receive frames")
 	chunkData, err := streamProcessor.ReceiveChunks(session, stream)
 	if err != nil {
 		logger.Error("Failed to receive chunks", slog.String("error", err.Error()))
@@ -245,6 +247,12 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 		return status.Errorf(codes.Internal, "failed to store chunk: %v", err)
 	}
 	logger.Debug("Chunk stored successfully", slog.String("chunk_id", session.ChunkHeader.ID))
+
+	if err := streamProcessor.SendFinalAck(session.SessionID, len(chunkData), stream); err != nil {
+		logger.Error("Failed to send final ack", slog.String("error", err.Error()))
+		return status.Errorf(codes.Internal, "failed to send final ack: %v", err)
+	}
+	logger.Debug("Final ack sent successfully")
 
 	// If receiving node is primary node, must replicate to other nodes
 	if session.Propagate {
@@ -283,43 +291,19 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 	}
 	defer s.sessionManager.Delete(session.SessionID) // Clean up
 
-	// Retrieve the full chunk data
-	// TODO: this should be a io.Reader of size configurable ChunkStreamSize
+	// TODO: store should return an io.Reader directly
 	chunkData, err := s.store.GetData(session.ChunkHeader.ID)
 	if err != nil {
 		logger.Error("Could not retrieve chunk", slog.String("error", err.Error()))
 		return status.Errorf(codes.Internal, "could not retrieve chunk %s: %v", session.ChunkHeader.ID, err)
 	}
 	reader := bytes.NewReader(chunkData)
-	buffer := make([]byte, req.ChunkStreamSize)
-	offset := int64(0)
 
-	logger.Info("Starting to stream chunk to client")
-	for {
-		n, err := reader.Read(buffer)
-		if err == io.EOF {
-			break // We've sent the entire file.
-		}
-		if err != nil {
-			logger.Error("Failed to read from chunk source", slog.String("error", err.Error()))
-			return status.Errorf(codes.Internal, "failed to read from chunk source: %v", err)
-		}
-
-		if err := stream.Send(&proto.ChunkDataStream{
-			SessionId: req.SessionID,
-			ChunkId:   session.ChunkHeader.ID,
-			Data:      buffer[:n],
-			Offset:    offset,
-			IsFinal:   offset+int64(n) >= int64(len(chunkData)),
-		}); err != nil {
-			logger.Error("Failed to send data frame to client", slog.String("error", err.Error()))
-			return err
-		}
-
-		offset += int64(n)
+	if err := streaming.SendChunkFrames(reader, req.ChunkStreamSize, session.ChunkHeader.ID,
+		session.SessionID, len(chunkData), stream); err != nil {
+		return handleStreamingError(err, logger)
 	}
 
-	logger.Info("Successfully completed streaming chunk to client")
 	return nil
 }
 
@@ -355,4 +339,37 @@ func (s *DataNodeServer) replicate(chunkHeader common.ChunkHeader, data []byte) 
 	replicaNodes = append(replicaNodes, s.info) // Add self to the list of replica nodes
 
 	return replicaNodes, nil
+}
+
+// Error handling logic
+// TODO: extract to somewhere else,
+func handleStreamingError(err error, logger *slog.Logger) error {
+	// Log error
+	var streamErr *streaming.StreamingError
+	if errors.As(err, &streamErr) {
+		// Log with rich context from the structured error
+		logger.Error("Streaming operation failed",
+			slog.String("operation", streamErr.Op),
+			slog.String("session_id", streamErr.SessionID),
+			slog.String("chunk_id", streamErr.ChunkID),
+			slog.Int64("offset", streamErr.Offset),
+			slog.String("error", streamErr.Err.Error()))
+	} else {
+		// Fallback for unexpected error types
+		logger.Error("Unexpected streaming error", slog.String("error", err.Error()))
+	}
+
+	// Translate error
+	switch {
+	case errors.Is(err, streaming.ErrFrameReadFailed):
+		return status.Errorf(codes.Internal, "failed to read chunk data")
+	case errors.Is(err, streaming.ErrStreamSendFailed):
+		return status.Errorf(codes.Unavailable, "failed to send data to client")
+	case errors.Is(err, streaming.ErrStreamClosed):
+		return status.Errorf(codes.Aborted, "stream was closed unexpectedly")
+	case errors.Is(err, streaming.ErrStreamTimeout):
+		return status.Errorf(codes.DeadlineExceeded, "stream operation timed out")
+	default:
+		return status.Errorf(codes.Internal, "internal streaming error")
+	}
 }

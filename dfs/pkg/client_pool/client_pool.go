@@ -27,7 +27,7 @@ type clientConnectionFunc func(client clients.IDataNodeClient) (bool, any, error
 type rotatingClientPool struct {
 	index   int
 	clients []clients.IDataNodeClient
-	mu      sync.Mutex
+	mu      sync.RWMutex
 }
 
 func NewRotatingClientPool(nodes []*common.NodeInfo) (*rotatingClientPool, error) {
@@ -75,8 +75,10 @@ func (c *rotatingClientPool) GetClientWithRetry(clientConnectionFunc clientConne
 
 // Internal reusable function to get a client with retry, does not lock the mutex as it should already be locked by the caller
 func (c *rotatingClientPool) getClientWithRetry(clientConnectionFunc clientConnectionFunc) (clients.IDataNodeClient, any, error) {
-	for range len(c.clients) { // try all clients once
-		client := c.clients[c.index]
+	// based on the starting index, create a new slice that starts from it
+	orderedClients := append(c.clients[c.index:], c.clients[:c.index]...)
+
+	for _, client := range orderedClients { // try all clients once
 
 		// same client retry loop
 		for i := 1; i <= 3; i++ {
@@ -109,6 +111,8 @@ func (c *rotatingClientPool) removeClient() {
 }
 
 func (c *rotatingClientPool) Len() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return len(c.clients)
 }
 

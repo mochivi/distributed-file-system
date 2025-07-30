@@ -120,6 +120,7 @@ func TestDownloader_queueWork(t *testing.T) {
 	testCases := []struct {
 		name            string
 		chunkLocations  []common.ChunkLocation
+		nWorkers        int
 		expectErr       bool
 		expectedWorkCnt int
 	}{
@@ -131,6 +132,7 @@ func TestDownloader_queueWork(t *testing.T) {
 					Nodes:   []*common.NodeInfo{node},
 				},
 			},
+			nWorkers:        10,
 			expectErr:       false,
 			expectedWorkCnt: 1,
 		},
@@ -140,6 +142,7 @@ func TestDownloader_queueWork(t *testing.T) {
 				{ChunkID: "chunk_0", Nodes: []*common.NodeInfo{node}},
 				{ChunkID: "chunk_1", Nodes: []*common.NodeInfo{node}},
 			},
+			nWorkers:        10,
 			expectErr:       false,
 			expectedWorkCnt: 2,
 		},
@@ -148,6 +151,7 @@ func TestDownloader_queueWork(t *testing.T) {
 			chunkLocations: []common.ChunkLocation{
 				{ChunkID: "chunk_0", Nodes: []*common.NodeInfo{}},
 			},
+			nWorkers:        10,
 			expectErr:       true,
 			expectedWorkCnt: 0,
 		},
@@ -162,7 +166,11 @@ func TestDownloader_queueWork(t *testing.T) {
 			assert.NoError(t, err)
 
 			fileInfo := common.FileInfo{Size: 0}
-			downloadCtx := NewDownloadContext(context.Background(), tc.chunkLocations, nil, tmpFile, fileInfo, 1, logger)
+
+			// Just be careful to not add more chunks what workers during tests
+			// As the queue work goroutine will block, as there's nothing consuming it
+			// That won't happen outside of tests
+			downloadCtx := NewDownloadContext(context.Background(), tc.chunkLocations, nil, tmpFile, fileInfo, tc.nWorkers, logger)
 
 			err = downloader.queueWork(downloadCtx)
 			if tc.expectErr {

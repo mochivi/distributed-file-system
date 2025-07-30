@@ -14,6 +14,8 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/streaming"
 	"github.com/mochivi/distributed-file-system/pkg/testutils"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/client_pool"
@@ -29,12 +31,19 @@ type stubDataNodeReplicationServer struct {
 	// handshake in PrepareChunkUpload.
 	accept bool
 
+	// Determines whether the server returned an error at the connection attempt
+	err bool
+
 	// Determines whether the per-chunk/terminal acknowledgements sent back on
 	// the UploadChunkStream carry Success=true or false.
 	ackSuccess bool
 }
 
 func (s *stubDataNodeReplicationServer) PrepareChunkUpload(ctx context.Context, req *proto.UploadChunkRequest) (*proto.NodeReady, error) {
+	if s.err {
+		return nil, status.Errorf(codes.Internal, "unavailable")
+	}
+
 	return &proto.NodeReady{
 		Accept:    s.accept,
 		Message:   "stub server response",
@@ -314,7 +323,10 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "success: replication with sufficient clients",
 			requiredReplicas: 2,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 2, [][]bool{{true, true}, {true, true}})
+				return createClientPool(t, 2, []*stubDataNodeReplicationServer{
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+				})
 			},
 			expectError:   false,
 			expectedNodes: 2,
@@ -323,7 +335,11 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "success: exact required replicas",
 			requiredReplicas: 3,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 3, [][]bool{{true, true}, {true, true}, {true, true}})
+				return createClientPool(t, 3, []*stubDataNodeReplicationServer{
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+				})
 			},
 			expectError:   false,
 			expectedNodes: 3,
@@ -332,7 +348,10 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "error: insufficient clients in pool",
 			requiredReplicas: 3,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 2, [][]bool{{true, true}, {true, true}})
+				return createClientPool(t, 2, []*stubDataNodeReplicationServer{
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+				})
 			},
 			expectError:   true,
 			expectedNodes: 0,
@@ -341,7 +360,11 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "error: all clients reject connection",
 			requiredReplicas: 2,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 3, [][]bool{{false, true}, {false, true}, {false, true}})
+				return createClientPool(t, 3, []*stubDataNodeReplicationServer{
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+				})
 			},
 			expectError:   true,
 			expectedNodes: 0,
@@ -350,7 +373,11 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "error: streaming failures after connection",
 			requiredReplicas: 2,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 3, [][]bool{{true, false}, {true, false}, {true, false}})
+				return createClientPool(t, 3, []*stubDataNodeReplicationServer{
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+				})
 			},
 			expectError:   true,
 			expectedNodes: 0,
@@ -359,7 +386,12 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "success: mixed success and failure",
 			requiredReplicas: 2,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 4, [][]bool{{true, true}, {true, true}, {false, true}, {false, true}})
+				return createClientPool(t, 4, []*stubDataNodeReplicationServer{
+					{accept: true, err: false, ackSuccess: true},  // is successful
+					{accept: true, err: false, ackSuccess: true},  // is successful
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+				})
 			},
 			expectError:   false,
 			expectedNodes: 2,
@@ -368,7 +400,12 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "success: mixed success and failure with different ordering",
 			requiredReplicas: 2,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 4, [][]bool{{true, true}, {false, true}, {true, true}, {false, true}})
+				return createClientPool(t, 4, []*stubDataNodeReplicationServer{
+					{accept: true, err: false, ackSuccess: true},  // is successful
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+					{accept: true, err: false, ackSuccess: true},  // is successful
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+				})
 			},
 			expectError:   false,
 			expectedNodes: 2,
@@ -377,7 +414,11 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "error: streaming failures after connection",
 			requiredReplicas: 2,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 3, [][]bool{{true, false}, {true, false}, {true, false}})
+				return createClientPool(t, 3, []*stubDataNodeReplicationServer{
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+				})
 			},
 			expectError:   true,
 			expectedNodes: 0,
@@ -386,7 +427,12 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "success: mixed success and failure",
 			requiredReplicas: 2,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 4, [][]bool{{true, true}, {false, true}, {true, true}, {false, true}})
+				return createClientPool(t, 4, []*stubDataNodeReplicationServer{
+					{accept: true, err: false, ackSuccess: true},  // is successful
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+					{accept: true, err: false, ackSuccess: true},  // is successful
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+				})
 			},
 			expectError:   false,
 			expectedNodes: 2,
@@ -395,7 +441,10 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "success: single replica required",
 			requiredReplicas: 1,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 2, [][]bool{{true, true}, {true, true}})
+				return createClientPool(t, 2, []*stubDataNodeReplicationServer{
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+				})
 			},
 			expectError:   false,
 			expectedNodes: 1,
@@ -404,28 +453,64 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "success: single replica required, first few fail",
 			requiredReplicas: 1,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 4, [][]bool{{false, true}, {true, false}, {true, false}, {true, true}})
+				return createClientPool(t, 4, []*stubDataNodeReplicationServer{
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+					{accept: true, err: false, ackSuccess: true}}, // is successful
+				)
 			},
 			expectError:   false,
 			expectedNodes: 1,
 		},
 		{
-			name:             "success: single replica required, first few fail,  more replicas required",
+			name:             "success: multiple replicas required, some refuse or are unavailable",
 			requiredReplicas: 3,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 8, [][]bool{
-					{false, true}, {true, false}, {true, false}, {true, true},
-					{false, true}, {true, false}, {true, true}, {true, true},
+				return createClientPool(t, 8, []*stubDataNodeReplicationServer{
+					{accept: false, err: true, ackSuccess: true}, // is unavailable
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: false, err: true, ackSuccess: true}, // is unavailable
+					{accept: false, err: true, ackSuccess: true}, // is unavailable
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
 				})
 			},
 			expectError:   false,
 			expectedNodes: 3,
 		},
 		{
-			name:             "success: single replica required, first few fail",
+			name:             "success: multiple replicas required, some fail also during streaming",
+			requiredReplicas: 3,
+			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
+				return createClientPool(t, 10, []*stubDataNodeReplicationServer{
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+					{accept: true, err: false, ackSuccess: true},  // is successful
+					{accept: true, err: false, ackSuccess: true},  // is successful
+					{accept: false, err: true, ackSuccess: true},  // is unavailable
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+					{accept: false, err: true, ackSuccess: true},  // is unavailable
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+					{accept: true, err: false, ackSuccess: true},  // is successful, edge case: is last
+				})
+			},
+			expectError:   false,
+			expectedNodes: 3,
+		},
+		{
+			name:             "error: single replica required, all fail",
 			requiredReplicas: 1,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 4, [][]bool{{false, true}, {true, false}, {true, false}, {false, true}})
+				return createClientPool(t, 4, []*stubDataNodeReplicationServer{
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+					{accept: true, err: false, ackSuccess: false}, // fails during streaming
+					{accept: false, err: false, ackSuccess: true}, // refuses connection
+				})
 			},
 			expectError:   true,
 			expectedNodes: 0,
@@ -434,9 +519,14 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			name:             "success: large number of replicas",
 			requiredReplicas: 5,
 			setupClientPool: func(t *testing.T) (client_pool.ClientPool, func()) {
-				return createClientPool(t, 7, [][]bool{
-					{true, true}, {true, true}, {true, true}, {true, true}, {true, true},
-					{true, true}, {true, true},
+				return createClientPool(t, 7, []*stubDataNodeReplicationServer{
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
+					{accept: true, err: false, ackSuccess: true}, // is successful
 				})
 			},
 			expectError:   false,
@@ -449,7 +539,6 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 			clientPool, cleanup := tt.setupClientPool(t)
 			defer cleanup()
 
-			// In the test, add logging to see which clients are being tried
 			nodes, err := rm.Replicate(clientPool, header, data, tt.requiredReplicas)
 
 			if tt.expectError {
@@ -477,17 +566,14 @@ func TestReplicationManager_Replicate_Integration(t *testing.T) {
 	}
 }
 
-func createClientPool(t *testing.T, numClients int, responses [][]bool) (client_pool.ClientPool, func()) {
+func createClientPool(t *testing.T, numClients int, servers []*stubDataNodeReplicationServer) (client_pool.ClientPool, func()) {
 	t.Helper()
 
 	nodeInfos := make([]*common.NodeInfo, 0, numClients)
 	cleanups := make([]func(), numClients)
 
 	for i := range numClients {
-		client, cleanup := testutils.NewTestDataNodeClientWithStubServer(t, &stubDataNodeReplicationServer{
-			accept:     responses[i][0],
-			ackSuccess: responses[i][1],
-		})
+		client, cleanup := testutils.NewTestDataNodeClientWithStubServer(t, servers[i])
 
 		nodeInfos = append(nodeInfos, client.Node())
 		cleanups[i] = cleanup

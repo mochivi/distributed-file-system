@@ -143,17 +143,18 @@ func (u *Uploader) processWork(work UploaderWork, clientPool client_pool.ClientP
 	var replicatedNodes []*common.NodeInfo
 	for retryCount < u.config.ChunkRetryCount {
 		client, response, err := clientPool.GetClientWithRetry(func(client clients.IDataNodeClient) (bool, any, error) {
-			storeChunkResponse, err := client.StoreChunk(context.Background(), work.chunkHeader)
+			storeChunkResponse, err := client.StoreChunk(uploadCtx.ctx, work.chunkHeader)
 			if err != nil {
-				return false, "", err
+				return false, nil, err
 			}
 			return storeChunkResponse.Accept, storeChunkResponse.SessionID, nil
 		})
-		streamingSessionID := response.(string) // should panic if fails anyway
 
-		if err != nil { // client refused connection
+		if err != nil {
 			return fmt.Errorf("failed to connect to all provided clients")
 		}
+
+		streamingSessionID := response.(string) // should panic if fails anyway
 
 		replicatedNodes, err = u.uploadChunk(work, client, streamingSessionID, uploadCtx)
 

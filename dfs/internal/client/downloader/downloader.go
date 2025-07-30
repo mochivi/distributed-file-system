@@ -120,15 +120,15 @@ func (d *Downloader) processWork(work downloadWork, downloadCtx *downloadContext
 		client, response, err := work.clientPool.GetRemoveClientWithRetry(func(client clients.IDataNodeClient) (bool, any, error) {
 			downloadChunkResponse, err := client.PrepareChunkDownload(downloadCtx.ctx, common.DownloadChunkRequest{ChunkID: work.chunkID})
 			if err != nil {
-				return false, "", err
+				return false, nil, err
 			}
 			return downloadChunkResponse.Accept, downloadChunkResponse, nil
 		})
-		downloadChunkResponse := response.(common.DownloadReady) // should panic if fails anyway
 
 		if err != nil {
 			return fmt.Errorf("failed to get client: %w", err)
 		}
+		downloadChunkResponse := response.(common.DownloadReady) // should panic if fails anyway
 
 		if err := d.downloadChunk(downloadCtx, client, downloadChunkResponse.ChunkHeader, downloadChunkResponse.SessionID); err != nil {
 			downloadCtx.logger.Error("Failed to download chunk", slog.String("chunk_id", downloadChunkResponse.ChunkHeader.ID), slog.String("error", err.Error()))
@@ -145,7 +145,7 @@ func (d *Downloader) downloadChunk(downloadCtx *downloadContext, client clients.
 
 	stream, err := client.DownloadChunkStream(downloadCtx.ctx, common.DownloadStreamRequest{
 		SessionID:       sessionID,
-		ChunkStreamSize: int32(d.streamer.Config().ChunkStreamSize),
+		ChunkStreamSize: d.streamer.Config().ChunkStreamSize,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create download stream: %w", err)
@@ -191,23 +191,6 @@ func (d *Downloader) queueWork(downloadCtx *downloadContext) error {
 		if err != nil {
 			return fmt.Errorf("failed to create client pool: %w", err)
 		}
-
-		// downloadChunkResponse, err := client.PrepareChunkDownload(downloadCtx.ctx, common.DownloadChunkRequest{ChunkID: location.ChunkID})
-		// if err != nil {
-		// 	downloadCtx.logger.Error("Failed to prepare chunk %s for download: %v", location.ChunkID, err)
-		// 	return fmt.Errorf("failed to prepare chunk %s for download: %v", location.ChunkID, err)
-		// }
-
-		// if !downloadChunkResponse.Accept {
-		// 	downloadCtx.logger.Error("Node did not accept chunk download %s: %s", location.ChunkID, downloadChunkResponse.Message)
-		// 	return fmt.Errorf("node did not accept chunk upload %s: %s", location.ChunkID, downloadChunkResponse.Message)
-		// }
-		// downloadCtx.logger.Info(fmt.Sprintf("Node accepted chunk %s download request", location.ChunkID))
-
-		// if downloadChunkResponse.SessionID == "" {
-		// 	downloadCtx.logger.Error("Node did not return a session ID", slog.String("chunk_id", location.ChunkID), slog.String("node_id", location.Nodes[0].ID))
-		// 	return fmt.Errorf("node did not return a session ID")
-		// }
 
 		// Provide pool of clients that hold the desired chunk
 		downloadCtx.workChan <- downloadWork{

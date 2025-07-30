@@ -340,10 +340,11 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				session := streaming.NewStreamingSession("session1", chunkHeader, false)
 				session.Status = streaming.SessionActive
 
-				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil)
-				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test data!"), nil)
-				m.store.On("Store", session.ChunkHeader, []byte("test data!")).Return(nil)
-				m.sessionManager.On("Delete", session.SessionID).Return()
+				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil).Once()
+				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test data!"), nil).Once()
+				m.store.On("Store", session.ChunkHeader, []byte("test data!")).Return(nil).Once()
+				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test data!")), stream).Return(nil).Once()
+				m.sessionManager.On("Delete", session.SessionID).Return().Once()
 			},
 			expectErr: false,
 		},
@@ -354,10 +355,11 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				session := streaming.NewStreamingSession("session2", chunkHeader, false)
 				session.Status = streaming.SessionActive
 
-				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil)
-				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test data!"), nil)
-				m.store.On("Store", session.ChunkHeader, []byte("test data!")).Return(nil)
-				m.sessionManager.On("Delete", session.SessionID).Return()
+				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil).Once()
+				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test data!"), nil).Once()
+				m.store.On("Store", session.ChunkHeader, []byte("test data!")).Return(nil).Once()
+				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test data!")), stream).Return(nil).Once()
+				m.sessionManager.On("Delete", session.SessionID).Return().Once()
 			},
 			expectErr: false,
 		},
@@ -375,12 +377,14 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil).Once()
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test data!"), nil).Once()
 				m.store.On("Store", session.ChunkHeader, []byte("test data!")).Return(nil).Once()
+				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test data!")), stream).Return(nil).Once()
 
 				// inside replicate -- exclude self from selection
 				m.selector.On("SelectBestNodes", N_NODES, selfNode).Return(replicaNodes, true).Once()
 				m.replication.On("Replicate", m.clientPool, session.ChunkHeader, []byte("test data!"), mock.Anything).Return(replicaNodes, nil).Once()
 				m.clientPool.On("Close", mock.Anything).Once()
 
+				// Stream will wait for the final ack response with replicas
 				m.serverStreamer.On("SendFinalReplicasAck", session, finalReplicaNodes, stream).Return(nil).Once()
 				m.sessionManager.On("Delete", session.SessionID).Once()
 			},
@@ -434,6 +438,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil)
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test"), nil)
 				m.store.On("Store", session.ChunkHeader, []byte("test")).Return(nil)
+				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test")), stream).Return(nil).Once()
 				m.selector.On("SelectBestNodes", N_NODES, selfNode).Return([]*common.NodeInfo{{ID: "node-1"}}, true).Once()
 				m.replication.On("Replicate", m.clientPool, session.ChunkHeader, []byte("test"), mock.Anything).Return(nil, assert.AnError)
 				m.sessionManager.On("Delete", session.SessionID).Return()
@@ -456,6 +461,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil)
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test"), nil)
 				m.store.On("Store", session.ChunkHeader, []byte("test")).Return(nil)
+				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test")), stream).Return(nil).Once()
 				m.selector.On("SelectBestNodes", N_NODES, selfNode).Return(replicaNodes, true).Once()
 				m.replication.On("Replicate", m.clientPool, session.ChunkHeader, []byte("test"), mock.Anything).Return(replicaNodes, nil).Once()
 				m.clientPool.On("Close", mock.Anything).Return().Once()

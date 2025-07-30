@@ -37,6 +37,11 @@ func (m *MockServerStreamer) ReceiveChunks(session *streamingSession, stream grp
 	return args.Get(0).([]byte), args.Error(1)
 }
 
+func (m *MockServerStreamer) SendFinalAck(sessionID string, bytesReceived int, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
+	args := m.Called(sessionID, bytesReceived, stream)
+	return args.Error(0)
+}
+
 func (m *MockServerStreamer) SendFinalReplicasAck(session *streamingSession, replicaNodes []*common.NodeInfo, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
 	args := m.Called(session, replicaNodes, stream)
 	return args.Error(0)
