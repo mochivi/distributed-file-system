@@ -135,17 +135,20 @@ func (rm *ParalellReplicationService) tryStartReplication(ctx context.Context, c
 	errChan chan error, replicatedNodes *ReplicatedNodes, acceptedCount *atomic.Int64, activeReplications *atomic.Int64) error {
 
 	// Get a client from the pool
-	client, streamingSessionID, err := clientPool.GetRemoveClientWithRetry(func(client clients.IDataNodeClient) (bool, string, error) {
-		replicateChunkResponse, err := client.ReplicateChunk(context.Background(), chunkHeader)
+	client, response, err := clientPool.GetRemoveClientWithRetry(func(client clients.IDataNodeClient) (bool, any, error) {
+		replicateChunkResponse, err := client.ReplicateChunk(ctx, chunkHeader)
 		if err != nil {
 			return false, "", err
 		}
 		return replicateChunkResponse.Accept, replicateChunkResponse.SessionID, nil
 	})
+
 	if err != nil {
 		<-semaphore // Release semaphore slot
 		return err  // It only fails if there are no longer any available client to try
 	}
+
+	streamingSessionID := response.(string) // should panic if fails anyway
 
 	// Start replication goroutine
 	wg.Add(1)

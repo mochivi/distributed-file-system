@@ -37,7 +37,8 @@ dfs/
 │   ├── logging/           # Structured logging utilities
 │   ├── streamer/          # Streaming utilities
 │   ├── utils/             # General utilities, small functions, prototyping
-|   ├── testutils/         # Test utilities
+│   ├── client_pool/       # Client connection pools (rotating etc.)
+│   ├── testutils/         # Test utilities
 ├── tests/                 # Test files
 │   └── e2e/              # End-to-end tests
 ├── configs/              # Example yaml configuration files

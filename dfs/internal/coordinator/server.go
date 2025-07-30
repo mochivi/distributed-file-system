@@ -27,7 +27,7 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 	// Calculate number of chunks needed
 	chunkSize := req.ChunkSize
 	if chunkSize == 0 {
-		chunkSize = c.config.ChunkSize * 1024 * 1024
+		chunkSize = c.config.ChunkSize
 	}
 	numChunks := (req.Size + chunkSize - 1) / chunkSize
 	c.logger.Debug(fmt.Sprintf("File will be split into %d chunks of %dMB", numChunks, chunkSize/(1024*1024)), slog.Int("file_size", req.Size), slog.Int("chunk_size", chunkSize))

@@ -12,6 +12,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// ------ Upload - data flowing from client ------
+
 func (s *serverStreamer) HandleFirstChunk(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) (*streamingSession, error) {
 	chunkpb, err := stream.Recv()
 	if err != nil {
@@ -36,15 +38,14 @@ func (s *serverStreamer) HandleFirstChunk(stream grpc.BidiStreamingServer[proto.
 		return nil, err // code internal
 	}
 
-	// If the first chunk is the final chunk, handle it and return early
+	// If the first chunk is the final chunk, handle it and return early.
+	// The definitive final acknowledgement will be sent by the caller (e.g., the datanode server)
+	// once the chunk has been durably stored (and replicated if required).
 	if chunk.IsFinal {
 		if err := s.handleFinalChunk(session); err != nil {
 			return nil, err
 		}
-		if err := s.sendFinalAck(chunk, session.offset, stream); err != nil {
-			return nil, err
-		}
-		return session, nil // No more chunks will arrive, but UploadChunkStream still needs the session data, so just return normally.
+		return session, nil // caller will send final ack
 	}
 
 	return session, nil
@@ -60,7 +61,7 @@ func (s *serverStreamer) ReceiveChunks(session *streamingSession,
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to receive chunk stream: %w", err)
+			return nil, NewStreamReceiveError(session.SessionID, session.offset, err)
 		}
 
 		chunk := common.ChunkDataStreamFromProto(chunkpb)
@@ -77,10 +78,7 @@ func (s *serverStreamer) ReceiveChunks(session *streamingSession,
 			if err := s.handleFinalChunk(session); err != nil {
 				return nil, err // todo
 			}
-			if err := s.sendFinalAck(chunk, session.offset, stream); err != nil {
-				return nil, err // todo
-			}
-			break
+			break // caller will send final ack later
 		}
 	}
 
@@ -113,11 +111,11 @@ func (s *serverStreamer) handleFinalChunk(session *streamingSession) error {
 	return nil
 }
 
-func (s *serverStreamer) sendFinalAck(chunk common.ChunkDataStream, bytesReceived int,
+func (s *serverStreamer) SendFinalAck(sessionID string, bytesReceived int,
 	stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
 
 	finalAck := common.ChunkDataAck{
-		SessionID:     chunk.SessionID,
+		SessionID:     sessionID,
 		Success:       true,
 		Message:       "Chunk received successfully",
 		BytesReceived: bytesReceived,
@@ -144,5 +142,39 @@ func (s *serverStreamer) SendFinalReplicasAck(session *streamingSession, replica
 	if err := stream.Send(finalReplicasAck.ToProto()); err != nil {
 		return status.Errorf(codes.Internal, "failed to send chunk data ack with replicas: %v", err)
 	}
+	return nil
+}
+
+// ------ Download - data flowing to client ------
+
+// SendChunkFrames is a pure function, as it requires no dependencies
+// so, we keep it simple
+func SendChunkFrames(reader io.Reader, streamFrameSize int, chunkID, sessionID string, totalSize int,
+	stream grpc.ServerStreamingServer[proto.ChunkDataStream]) error {
+	buffer := make([]byte, streamFrameSize)
+	offset := int64(0)
+
+	for {
+		n, err := reader.Read(buffer)
+		if err == io.EOF {
+			break // We've sent the entire file.
+		}
+		if err != nil {
+			return NewChunkReadError(sessionID, chunkID, offset, err)
+		}
+
+		if err := stream.Send(&proto.ChunkDataStream{
+			SessionId: sessionID,
+			ChunkId:   chunkID,
+			Data:      buffer[:n],
+			Offset:    offset,
+			IsFinal:   offset+int64(n) >= int64(totalSize),
+		}); err != nil {
+			return NewStreamSendError(sessionID, chunkID, offset, err)
+		}
+
+		offset += int64(n)
+	}
+
 	return nil
 }

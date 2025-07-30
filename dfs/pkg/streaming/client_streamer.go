@@ -21,7 +21,7 @@ import (
 func (s *clientStreamer) SendChunkStream(ctx context.Context, stream grpc.BidiStreamingClient[proto.ChunkDataStream, proto.ChunkDataAck],
 	logger *slog.Logger, params UploadChunkStreamParams) ([]*common.NodeInfo, error) {
 
-	logger = logging.OperationLogger(logger, "stream_chunk", slog.String("session_id", params.SessionID))
+	logger = logging.OperationLogger(logger, "stream_chunk", slog.String("session_id", params.SessionID), slog.String("chunk_id", params.ChunkHeader.ID))
 	logger.Debug("Initializing chunk data stream")
 
 	// Stream data in chunks

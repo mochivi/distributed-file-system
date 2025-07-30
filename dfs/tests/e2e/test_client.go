@@ -77,11 +77,11 @@ func NewTestClient(t *testing.T, logger *slog.Logger) *TestClient {
 
 	streamer := streaming.NewClientStreamer(config.DefaultStreamerConfig(true))
 	uploader := uploader.NewUploader(streamer, logger, uploader.UploaderConfig{
-		NumWorkers:      10,
+		NumWorkers:      16,
 		ChunkRetryCount: 3,
 	})
 	downloader := downloader.NewDownloader(streamer, downloader.DownloaderConfig{
-		NumWorkers:      10,
+		NumWorkers:      16,
 		ChunkRetryCount: 3,
 		TempDir:         "/tmp",
 	})
@@ -140,7 +140,7 @@ func downloadChunk(t *testing.T, info common.ChunkInfo, replica *common.NodeInfo
 
 	stream, err := dnClient.DownloadChunkStream(context.Background(), common.DownloadStreamRequest{
 		SessionID:       resp.SessionID,
-		ChunkStreamSize: int32(config.DefaultStreamerConfig(true).ChunkStreamSize), // Follows the default chunk stream size -- 256KB
+		ChunkStreamSize: config.DefaultStreamerConfig(true).ChunkStreamSize, // Follows the default chunk stream size -- 256KB
 	})
 	if err != nil {
 		t.Fatalf("failed to create download stream: %v", err)

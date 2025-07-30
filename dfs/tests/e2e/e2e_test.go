@@ -15,33 +15,33 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
 
-func compareChecksums(t *testing.T, originalFilePath string, downloadedFilePath string) {
+func compareChecksums(t *testing.T, originalFilePath string, downloadedFilePath string, testName string) {
 	originalFile, err := os.Open(originalFilePath)
 	if err != nil {
-		t.Fatalf("failed to open file: %v", err)
+		t.Fatalf("%s: failed to open file: %v", testName, err)
 	}
 	defer originalFile.Close()
 	originalFileData, err := io.ReadAll(originalFile)
 	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
+		t.Fatalf("%s: failed to read file: %v", testName, err)
 	}
 	originalFileChecksum := chunk.CalculateChecksum(originalFileData)
-	t.Logf("Original file checksum: %s", originalFileChecksum)
+	t.Logf("%s: Original file checksum: %s", testName, originalFileChecksum)
 
 	downloadedFile, err := os.Open(downloadedFilePath)
 	if err != nil {
-		t.Fatalf("failed to open downloaded file: %v", err)
+		t.Fatalf("%s: failed to open downloaded file: %v", testName, err)
 	}
 	defer downloadedFile.Close()
 	downloadedFileData, err := io.ReadAll(downloadedFile)
 	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
+		t.Fatalf("%s: failed to read file: %v", testName, err)
 	}
 	downloadedFileChecksum := chunk.CalculateChecksum(downloadedFileData)
-	t.Logf("Downloaded file checksum: %s", downloadedFileChecksum)
+	t.Logf("%s: Downloaded file checksum: %s", testName, downloadedFileChecksum)
 
 	if originalFileChecksum != downloadedFileChecksum {
-		t.Errorf("Checksums do not match")
+		t.Errorf("%s: Checksums do not match", testName)
 	}
 }
 
@@ -101,41 +101,38 @@ func TestEndToEnd(t *testing.T) {
 				t.Errorf("%s: failed to upload file: %v", tt.name, err)
 			}
 			t.Logf("%s: Uploaded file: %s", tt.name, tt.filename)
-			for _, chunkInfo := range chunkInfos {
-				t.Logf("%s: Chunk info: %+v", tt.name, chunkInfo)
+
+			// First, try downloading the file from the coordinator
+			fullFilepath := filepath.Join(uploadAt, tt.filename)
+			downloadFilePath, err := client.DownloadFile(fullFilepath)
+			if err != nil {
+				t.Fatalf("%s: failed to download file: %v", tt.name, err)
+			}
+			t.Logf("%s: Downloaded file: %s", tt.name, downloadFilePath)
+
+			// Check the integrity of the downloaded file
+			compareChecksums(t, testFilePath, downloadFilePath, tt.name)
+
+			// Download all chunks from all replicas for this file and validate the checksum
+			// bypasses the coordinator and downloads the file directly from the datanodes
+			// so that we can check if all replicas have all chunks they report to have
+			t.Logf("Downloading all chunks from all replicas for file: %s", tt.filename)
+			if err := client.DownloadAllChunks(t, chunkInfos, logger); err != nil {
+				t.Errorf("%s: failed to download file: %v", tt.name, err)
 			}
 
-			// // First, try downloading the file from the coordinator
-			// fullFilepath := filepath.Join(uploadAt, tt.filename)
-			// downloadFilePath, err := client.DownloadFile(fullFilepath)
-			// if err != nil {
-			// 	t.Fatalf("failed to download file: %v", err)
-			// }
-			// t.Logf("Downloaded file: %s", downloadFilePath)
+			// Delete the file
+			t.Logf("Deleting file: %s", fullFilepath)
+			if err := client.DeleteFile(fullFilepath); err != nil {
+				t.Errorf("failed to delete file: %v", err)
+			}
 
-			// // Check the integrity of the downloaded file
-			// compareChecksums(t, testFilePath, downloadFilePath)
-
-			// // Download all chunks from all replicas for this file and validate the checksum
-			// // bypasses the coordinator and downloads the file directly from the datanodes
-			// // so that we can check if all replicas have all chunks they report to have
-			// t.Logf("Downloading all chunks from all replicas for file: %s", tt.filename)
-			// if err := client.DownloadAllChunks(t, chunkInfos, logger); err != nil {
-			// 	t.Errorf("failed to download file: %v", err)
-			// }
-
-			// // Delete the file
-			// t.Logf("Deleting file: %s", fullFilepath)
-			// if err := client.DeleteFile(fullFilepath); err != nil {
-			// 	t.Errorf("failed to delete file: %v", err)
-			// }
-
-			// // Try to download the file again, we expect to receive an error
-			// // this method calls the coordinator to download the file.
-			// t.Logf("Trying to download deleted file: %s", fullFilepath)
-			// if _, err := client.DownloadFile(fullFilepath); err == nil {
-			// 	t.Errorf("expected error when downloading deleted file")
-			// }
+			// Try to download the file again, we expect to receive an error
+			// this method calls the coordinator to download the file.
+			t.Logf("Trying to download deleted file: %s", fullFilepath)
+			if _, err := client.DownloadFile(fullFilepath); err == nil {
+				t.Errorf("expected error when downloading deleted file")
+			}
 		})
 	}
 }
