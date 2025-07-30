@@ -30,6 +30,7 @@ A **distributed file system** written in Go that demonstrates chunk-based storag
 * **Data Replication**: Default factor of 3 (1 primary + 2 replicas) with parallel replication
 * **Streaming Protocol**: Bidirectional gRPC streams with back-pressure control and SHA-256 checksums
 * **Node Management**: Automatic registration, heartbeat monitoring, and cluster state management
+* **Resilient Client Connections**: Rotating client pool with automatic failover over multiple DataNodes (see `pkg/client_pool`)
 * **Session Management**: Dual session types (streaming + metadata) ensuring operation atomicity
 * **Delete & List Operations**: Implemented file deletion (with GC) and recursive directory listing APIs
 
@@ -292,7 +293,8 @@ dfs/
 │   ├── logging/           # Structured logging utilities
 │   ├── streamer/          # Streaming utilities
 │   ├── utils/             # General utilities, small functions, prototyping
-|   ├── testutils/         # Test utilities
+│   ├── client_pool/       # Client connection pools (rotating etc.)
+│   ├── testutils/         # Test utilities
 ├── tests/                 # Test files
 │   └── e2e/              # End-to-end tests
 ├── configs/              # Example yaml configuration files
