@@ -102,134 +102,66 @@ make clean && make proto
 
 ## Current Architecture Overview
 
+### System Components
+
 ```mermaid
 flowchart TB
-    subgraph "Client"
+ subgraph subGraph0["Client Layer"]
         CLI["CLI Client"]
         SDK["Go SDK"]
-    end
+        CPOOL["Client Pool<br>• Rotating connections<br>• Failover handling<br>• Retry logic"]
+  end
+ subgraph subGraph1["Control Plane"]
+        COORD["Coordinator<br>• Metadata Management<br>• Node Selection<br>• Session Management"]
+  end
+ subgraph subGraph2["Data Plane"]
+        DN1["DataNode 1<br>• Chunk Storage<br>• Session Management"]
+        DN2["DataNode 2<br>• Chunk Storage<br>• Session Management"]
+        DN3["DataNode N<br>• Chunk Storage<br>• Session Management"]
+  end
+    CLI --> CPOOL
+    SDK --> CPOOL
+    CPOOL <--> COORD & DN1
+    DN1 -. replicate .-> DN2 & DN3
+    DN2 -. replicate .-> DN3
+    DN1 -. heartbeat .-> COORD
+    DN2 -. heartbeat .-> COORD
+    DN3 -. heartbeat .-> COORD
 
-    subgraph "Control Plane"
-        COORD["Coordinator<br/>• Metadata Management<br/>• Node Selection<br/>• Chunk Planning"]
-    end
-
-    subgraph "Data Plane"
-        DN1["DataNode 1<br/>• Chunk Storage<br/>• Replication<br/>• Heartbeat Loop"]
-        DN2["DataNode 2"]
-        DN3["DataNode N"]
-    end
-
-    CLI --> COORD
-    SDK --> COORD
-    CLI --> DN1
-    SDK --> DN1
-
-    DN1 --> DN2
-    DN1 --> DN3
-    DN2 --> DN3
-
-    DN1 --> COORD
-    DN2 --> COORD
-    DN3 --> COORD
-
+    style CPOOL fill:#fff3e0
     style COORD fill:#e1f5fe
     style DN1 fill:#f3e5f5
     style DN2 fill:#f3e5f5
     style DN3 fill:#f3e5f5
 ```
 
-### Planned architecture design
-```mermaid
-flowchart TB
-    subgraph "External Access"
-        WEB["Web Dashboard"]
-        MOBILE["Mobile App"]
-        API_CLIENT["API Clients"]
-    end
-
-    subgraph "API Gateway Layer"
-        GATEWAY["API Gateway<br/>• HTTP/REST API<br/>• Authentication<br/>• Rate Limiting<br/>• Load Balancing"]
-        ADMIN_API["Admin API<br/>• Cluster Management<br/>• User Management<br/>• System Monitoring"]
-    end
-
-    subgraph "Authentication & Authorization"
-        AUTH["Auth Service<br/>• JWT Tokens<br/>• RBAC<br/>• API Keys"]
-        IAM["Identity Management<br/>• User Accounts<br/>• Permissions<br/>• Audit Logs"]
-    end
-
-    subgraph "Control Plane"
-        COORD_CLUSTER["Coordinator Cluster<br/>• Leader Election<br/>• Metadata Consensus<br/>• Failover"]
-        ETCD["etcd Cluster<br/>• Metadata Storage<br/>• Configuration<br/>• Service Discovery"]
-    end
-
-    subgraph "Data Plane"
-        subgraph "Zone A"
-            DNA1["DataNode A1"]
-            DNA2["DataNode A2"]
-        end
-        subgraph "Zone B"
-            DNB1["DataNode B1"]
-            DNB2["DataNode B2"]
-        end
-        subgraph "Zone C"
-            DNC1["DataNode C1"]
-            DNC2["DataNode C2"]
-        end
-    end
-
-    subgraph "Storage Backends"
-        LOCAL["Local Disk"]
-        S3["S3 Compatible"]
-        GCS["Google Cloud Storage"]
-        AZURE["Azure Blob Storage"]
-    end
-
-    subgraph "Observability"
-        METRICS["Metrics<br/>• Prometheus*<br/>• Custom Metrics"]
-        TRACING["Tracing<br/>• OpenTelemetry*<br/>"]
-        LOGS["Logging<br/>• Structured Logs<br/>• Log Aggregation"]
-    end
-
-    WEB --> GATEWAY
-    MOBILE --> GATEWAY
-    API_CLIENT --> GATEWAY
-
-    GATEWAY --> AUTH
-    ADMIN_API --> AUTH
-    AUTH --> IAM
-
-    GATEWAY --> COORD_CLUSTER
-    ADMIN_API --> COORD_CLUSTER
-    COORD_CLUSTER --> ETCD
-
-    COORD_CLUSTER --> DNA1
-    COORD_CLUSTER --> DNA2
-    COORD_CLUSTER --> DNB1
-    COORD_CLUSTER --> DNB2
-
-    DNA1 --> LOCAL
-    DNA2 --> S3
-    DNB1 --> GCS
-    DNB2 --> AZURE
-
-    DNA1 --> METRICS
-    DNA2 --> TRACING
-    COORD_CLUSTER --> LOGS
-
-    style GATEWAY fill:#e8f5e8
-    style AUTH fill:#fff3e0
-    style COORD_CLUSTER fill:#e1f5fe
-    style ETCD fill:#fce4ec
-    style METRICS fill:#f3e5f5
-```
-
 ### Key Concepts
 - **Chunks**: Files split into 8MB pieces with SHA-256 checksums
-- **Replication**: Each chunk stored on N nodes
+- **Replication**: Each chunk stored on N nodes with primary→replica streaming
 - **Sessions**: Dual session management (streaming + metadata) for atomicity
-- **Heartbeats**: N-second intervals with incremental cluster state updates
+- **Client Pool**: Rotating connections with failover and retry logic
+- **Heartbeats**: 2-second intervals with incremental cluster state updates
 
-> **Complete Architecture:** [docs/architecture.md](docs/architecture.md) | **Protocol Details:** [docs/protocol.md](docs/protocol.md)
+### Protocol Flows
+
+The system implements three main protocol flows:
+
+#### Upload Flow
+1. **Metadata Session**: Client → Coordinator creates upload session
+2. **Streaming Sessions**: Client → Primary → Replicas with bidirectional streaming
+3. **Metadata Commit**: Client confirms upload completion
+
+#### Download Flow  
+1. **File Metadata**: Client retrieves file info and chunk locations
+2. **Chunk Downloads**: Client downloads chunks using server-side streaming
+3. **File Assembly**: Client assembles chunks and verifies integrity
+
+#### Delete Flow
+1. **Soft Delete**: Coordinator marks file as deleted
+2. **Chunk Cleanup**: Background GC processes remove chunks from storage
+3. **Orphaned Cleanup**: Local GC scans clean up leftover chunks
+
+> **Complete Architecture (including planned):** [docs/architecture.md](docs/architecture.md) | **Detailed Protocol Flows:** [docs/protocol.md](docs/protocol.md)
 
 ---
 
