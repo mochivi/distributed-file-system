@@ -19,7 +19,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
-	"github.com/mochivi/distributed-file-system/internal/launcher"
+	"github.com/mochivi/distributed-file-system/internal/grpcutil"
 	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
@@ -160,7 +160,12 @@ func main() {
 			container.clusterStateManager, container.coordinatorFinder, container.nodeSelector, container.streamerFactory, container.clientPoolFactory)
 		server := datanode.NewDataNodeServer(&datanodeInfo, appConfig.Node, serverContainer, logger)
 
-		grpcServer := grpc.NewServer()
+		grpcServer := grpc.NewServer(
+			grpc.ChainUnaryInterceptor(
+				grpcutil.NewLoggingInterceptor(rootLogger),
+				grpcutil.ErrorsInterceptor,
+			),
+		)
 		proto.RegisterDataNodeServiceServer(grpcServer, server)
 
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", datanodePort))
@@ -185,7 +190,7 @@ func main() {
 		}()
 	}
 
-	if err := launcher.Launch(ctx, cancel, logger, setupGrpcFunc, launchNodeAgentFunc, 15*time.Second); err != nil {
+	if err := grpcutil.Launch(ctx, cancel, logger, setupGrpcFunc, launchNodeAgentFunc, 15*time.Second); err != nil {
 		log.Fatalf("Failed to launch datanode: %v", err)
 	}
 }
