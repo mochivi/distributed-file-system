@@ -11,9 +11,9 @@
 - **gRPC Streaming**: Bidirectional streaming with back-pressure control and checksums
 
 **File Operations**
-- **Upload**: Complete implementation with chunking, replication (factor 3), and metadata commit
-- **Download**: Complete implementation with chunk retrieval from multiple replica nodes
-- **Node Management**: Registration, heartbeat, and incremental cluster state updates
+- **Upload**: Complete implementation with chunking, replication, and metadata commit only upon client confirmation
+- **Download**: Complete implementation with chunk retrieval from multiple possible replica nodes
+- **Node Management**: Registration, heartbeat, and incremental cluster state updates with versioning
 
 **Storage Layer**
 - **Chunk Storage**: Disk-based storage with nested directory structure (avoids filesystem limitations)
@@ -28,22 +28,22 @@
 ### ❌ Missing/Incomplete Features
 
 **Critical Gaps**
-1. **File Operations**: DeleteFile and ListFiles gRPC methods defined but not implemented
-2. **Metadata Persistence**: Currently in-memory only (lost on coordinator restart)
-3. **Garbage Collection**: No cleanup mechanism for orphaned chunks
-4. **CLI Interface**: Basic client exists but lacks user-friendly commands
-
-**Security & Reliability**
-5. **Authentication**: No TLS, JWT, or mTLS implementation
-6. **Authorization**: No access control or user management
-7. **Data Integrity**: No at-rest encryption or erasure coding
-8. **Failure Recovery**: Limited fault tolerance mechanisms
+1. **Metadata Persistence**: Currently in-memory only (lost on coordinator restart)
+2. **Garbage Collection**: GCs are not fully implemented or tested, require persistent metadata
+3. **CLI Interface**: Basic client exists but lacks user-friendly commands
 
 **Operational Features**
-9. **HTTP Gateway**: Stubbed but no REST API implementation
-10. **Observability**: No metrics, tracing, or structured monitoring
-11. **Configuration**: Runtime configuration needs improvement (currently compile-time constants)
-12. **Capacity Management**: No load balancing or storage rebalancing
+1. **File Listing**: Clients must be able to list stored files
+2. **API Gateway**: Entrypoint into the system, transcoding HTTP -> gRPC
+3. **Observability**: No metrics, tracing, or structured monitoring
+4. **Configuration**: Runtime configuration needs improvement (currently compile-time constants)
+5. **Capacity Management**: No load balancing or storage rebalancing
+6. **Self Healing**: Coordinator must be aware of nodes dropping for replication consistency
+
+**Security & Reliability**
+1. **Authentication**: No TLS, JWT, or mTLS implementation
+2. **Authorization**: No access control or user management
+3. **Data Integrity**: No at-rest encryption or erasure coding
 
 ---
 
@@ -53,37 +53,38 @@
 
 **Priority 1: Essential File Operations**
 - [x] **Implement DeleteFile operation**
-  - Add coordinator logic for file deletion
-  - Implement chunk cleanup on datanodes
-  - Add client SDK support
-  - Write comprehensive tests
+  - [x] Add coordinator logic for file deletion
+  - [x] Implement chunk cleanup on datanodes
+  - [x] Add client SDK support
+  - [x] Write comprehensive tests
 
 - [ ] **Implement ListFiles operation**
-  - Add directory listing in coordinator
-  - Implement metadata querying
-  - Add pagination support
-  - Create client SDK methods
+  - [ ] Add directory listing in coordinator
+  - [ ] Implement metadata querying
+  - [ ] Add pagination support
+  - [ ] Create client SDK methods
 
 - [ ] **Persistent Metadata Storage**
-  - Replace in-memory storage with disk-based solution
-  - Add metadata backup/restore functionality
-  - Implement metadata compaction
-  - Add migration tools
-  - Might involve an external tool to track metadata -> etcd?
+  - [ ] Choose distributed key-value of choice -> etcd?
 
 **Priority 2: Garbage Collection**
 - [ ] **Orphaned Chunk Detection**
-  - Implement chunk reference counting
-  - Add periodic cleanup jobs -> if some chunk is not referenced in the metadata, it is marked for deletion, actually deleted after a certain timeout.
-  - Create chunk verification tools -> integrity verification of chunks
-  - Add manual cleanup commands
+  - [x] Add periodic cleanup jobs -> if some chunk is not referenced in the metadata, it is marked for deletion, actually deleted after a certain period (grace period for file recovery).
+  - [ ] Create chunk verification tools -> integrity verification of chunks
+  - [ ] Add tests
+
+- [ ] **Deleted Files Cleanup**
+  - [x] Add gargabe collection cycle to check for files marked for deletion and emit requests for datanodes for deletion.
+  - [ ] Add tests
 
 **Priority 3: Enhanced Testing**
 - [ ] **E2E Test Coverage**
-  - Add download operation tests
-  - Add delete operation tests
-  - Add list operation tests
-  - Add failure scenario tests
+  - [x] Add download operation tests
+  - [x] Add delete operation tests
+  - [ ] Add list operation tests
+  - [ ] Add failure scenario tests
+
+## **Phases listed below are subject to large changes, most are quick ideas of new features**
 
 ### Phase 2: User Experience & CLI
 
@@ -102,7 +103,7 @@
   - Configuration management
   - Help documentation
 
-**HTTP Gateway**
+**API Gateway**
 - [ ] **REST API Implementation**
   - File upload/download endpoints
   - Directory listing API
@@ -180,7 +181,7 @@
   - Storage analytics
   - Health monitoring
 
-### Phase 6: Advanced Features (6-8 weeks)
+### Phase 6: Advanced Features
 
 **Enhanced Storage**
 - [ ] **Multi-Backend Support**
@@ -239,57 +240,6 @@
   - Contributing guidelines
   - Code review checklist
   - Release process documentation
-
-- [] **Contributions**
-  - Github repository rules
-  - Contribution guide
-  - Discord community
----
-
-## Success Metrics
-
-### Phase 1 Success Criteria
-- [ ] All basic file operations (upload, download, delete, list) working
-- [ ] Metadata persists across coordinator restarts
-- [ ] Garbage collection removes orphaned chunks
-
-### Phase 2 Success Criteria
-- [ ] CLI provides intuitive user experience
-- [ ] HTTP API supports all file operations
-- [ ] Performance acceptable for typical use cases
-- [ ] Documentation covers all user scenarios
-
-### Phase 3 Success Criteria
-- [ ] All connections secured with TLS
-- [ ] Authentication and authorization working
-- [ ] System recovers from single node failures
-- [ ] Data integrity verified under normal operation
-
-### Phase 4 Success Criteria
-- [ ] System handles 10+ nodes efficiently
-- [ ] Load balancing distributes work evenly
-- [ ] Configuration changes don't require restarts
-- [ ] Performance scales linearly with nodes
-
-### Phase 5 Success Criteria
-- [ ] Comprehensive metrics available
-- [ ] Distributed tracing provides visibility
-- [ ] Operational tools support common tasks
-- [ ] Alerting detects issues proactively
-
-### Phase 6 Success Criteria
-- [ ] Multiple storage backends supported
-- [ ] Plugin architecture enables extensions
-- [ ] Cluster management is automated
-- [ ] System ready for production deployment
-
----
-
-## Getting Started
-
-### Immediate Next Steps
-1. **Set up project tracking** (GitHub Issues)
-2. **Create detailed specifications** for file operations, current and planned
 ---
 
 *This roadmap is a living document and should be updated as the project evolves and requirements change.* 

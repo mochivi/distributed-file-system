@@ -20,8 +20,14 @@ responsibilities of every component and how they interact at runtime.
 | **Client SDK / CLI** | • Split files into chunks & compute checksums.  \
   • Drive upload/download flows.  \
   • Expose CLI for file operations. | `internal/client` |
+| **Client Pool** | • Rotating client connections with failover.  \
+  • Retry logic and load distribution.  \
+  • Connection management for DataNode operations. | `pkg/client_pool` |
 | **Streamer** | Zero-copy framing, retries and back-pressure for any
   `ChunkDataStream` (client → node or node → node). | `pkg/streamer` |
+| **Node Agent Controllers** | • Heartbeat management and health monitoring.  \
+  • Garbage collection for orphaned chunks and deleted files.  \
+  • Background maintenance operations. | `internal/cluster/*/controllers` |
 
 ---
 
@@ -31,8 +37,9 @@ This section provides a high-level summary of the features that are currently im
 
 ### Client-Facing Operations (via Coordinator)
 
-* **File Upload:** A client can request to upload a file. The coordinator determines the chunking strategy and assigns data nodes for each chunk. The client then uploads the chunks directly to the specified data nodes.
-* **File Download:** A client can request to download a file. The coordinator provides the locations of the file's chunks, which the client can then download from the data nodes using replica selection algorithms.
+* **File Upload:** A client can request to upload a file. The coordinator determines the chunking strategy and assigns data nodes for each chunk. The client then uploads the chunks directly to the specified data nodes using client pool for connection management.
+* **File Download:** A client can request to download a file. The coordinator provides the locations of the file's chunks, which the client can then download from the data nodes using replica selection algorithms and client pool for failover.
+* **File Delete:** A client can request to delete a file. The coordinator marks the file as deleted and background garbage collection processes clean up the chunks.
 * **Upload Confirmation:** After successfully uploading all chunks to their respective data nodes, the client must send a confirmation to the coordinator. This action commits the file's metadata, making it "officially" part of the filesystem.
 
 ### Coordinator Functionality
@@ -45,15 +52,16 @@ This section provides a high-level summary of the features that are currently im
 ### Data Node Functionality
 
 * **Chunk Storage:** Data nodes store chunk data on local disk using a nested directory structure based on chunk IDs to avoid filesystem limitations with too many files in a single directory.
-* **gRPC Service:** Each data node exposes a gRPC service for handling chunk operations (uploads, downloads, deletion, health checks).
+* **gRPC Service:** Each data node exposes a gRPC service for handling chunk operations (uploads, downloads, deletion, bulk deletion, health checks).
 * **Chunk Replication:** When a data node receives a chunk from a client (acting as the "primary"), it replicates that chunk in parallel to the other replica nodes assigned by the coordinator.
 * **Streaming Session Management:** Data nodes manage streaming sessions with configurable timeouts to handle client disconnections gracefully.
+* **Bulk Operations:** Data nodes support bulk chunk deletion for garbage collection and storage optimization.
 
 ### Missing/Incomplete Features
 
-* **DeleteFile and ListFiles:** gRPC methods are defined but coordinator implementation is not complete.
+* **ListFiles Client Support:** gRPC method is implemented in coordinator but client-side implementation is incomplete.
 * **Metadata Persistence:** Coordinator metadata is lost on restart - requires implementation of persistent storage backend (planned: etcd).
-* **Garbage Collection:** No mechanism to clean up orphaned chunks when files are deleted or uploads fail.
+* **Garbage Collection:** Partially implemented but not tested - orphaned chunks GC and deleted files GC controllers exist but need testing and integration.
 
 ---
 
@@ -64,8 +72,8 @@ This section provides a high-level summary of the features that are currently im
 | `UploadFile(UploadRequest)` | Returns chunk plan (primary + replicas) and metadata session ID. |
 | `ConfirmUpload(ConfirmUploadRequest)` | Commits metadata after client confirms all chunks uploaded. |
 | `DownloadFile(DownloadRequest)` | Returns chunk map + file info with available replicas. |
-| `DeleteFile(DeleteRequest)` | **Planned** - Remove file metadata and trigger chunk cleanup. |
-| `ListFiles(ListRequest)` | **Planned** - List files in directory with pagination. |
+| `DeleteFile(DeleteRequest)` | ✅ **Implemented** - Remove file metadata and trigger chunk cleanup. |
+| `ListFiles(ListRequest)` | ✅ **Implemented** - List files in directory (coordinator only, client support incomplete). |
 | `RegisterDataNode(RegisterDataNodeRequest)` | Called once at node start-up to join cluster. |
 | `DataNodeHeartbeat(HeartbeatRequest)` | Periodic health + disk usage update; returns incremental node updates. |
 | `ListNodes(ListNodesRequest)` | Returns current cluster state and version information. |
@@ -83,6 +91,7 @@ This section provides a high-level summary of the features that are currently im
 | `PrepareChunkDownload` | unary | Validate chunk exists and create download session. |
 | `DownloadChunkStream` | server stream | Stream chunk bytes to client / peer. |
 | `DeleteChunk` | unary | Remove a chunk from storage. |
+| `BulkDeleteChunk` | unary | Delete multiple chunks in one request (garbage collection, rebalancing). |
 | `HealthCheck` | unary | Liveness probe for monitoring. |
 
 ---
@@ -136,39 +145,7 @@ The system uses two types of sessions for different purposes:
 
 ## Configuration Management
 
-### Environment Variables (Bootstrap)
-Key environment variables for service discovery and basic configuration:
-
-* `COORDINATOR_HOST` / `COORDINATOR_PORT` - Service discovery for coordinator
-* `DATANODE_HOST` / `DATANODE_PORT` - Node registration information  
-
-### YAML Configuration
-Detailed configuration is managed through YAML files in `configs/`:
-
-* Node-specific settings (timeouts, buffer sizes, storage paths)
-* Cluster-wide policies (replication factor, chunk sizes)
-* Feature flags and operational parameters
-
----
-
-## Package dependency diagram
-
-```mermaid
-flowchart TD
-    client --> common
-    datanode --> common
-    datanode --> storage
-    coordinator --> common
-    storage --> encoding
-    common --> pkgproto
-    datanode --> pkgproto
-    coordinator --> pkgproto
-    client --> pkgproto
-    client --> pkgstreamer
-    datanode --> pkgstreamer
-    pkgstreamer --> pkgproto
-```
-
+Refer to [Configuration Management](docs/configuration.md)
 ---
 
 ## Current Technical Specifications

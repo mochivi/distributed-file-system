@@ -20,21 +20,31 @@ This document outlines the comprehensive system design for the DFS project, cove
 
 ```mermaid
 flowchart TB
-    subgraph "Client"
+    subgraph "Client Layer"
         CLI["CLI Client"]
         SDK["Go SDK"]
+        CPOOL["Client Pool<br/>• Rotating connections<br/>• Failover handling<br/>• Retry logic"]
     end
 
     subgraph "Control Plane"
-        COORD["Coordinator<br/>• Metadata Management<br/>• Node Selection<br/>• Chunk Planning"]
+        COORD["Coordinator<br/>• Metadata Management<br/>• Node Selection<br/>• Chunk Planning<br/>• Session Management"]
     end
 
     subgraph "Data Plane"
-        DN1["DataNode 1<br/>• Chunk Storage<br/>• Replication<br/>• Heartbeat Loop"]
+        DN1["DataNode 1<br/>• Chunk Storage<br/>• Replication<br/>• Heartbeat Loop<br/>• Session Management"]
         DN2["DataNode 2"]
         DN3["DataNode 3"]
         DN4["DataNode 4"]
         DNn["DataNode N"]
+    end
+
+    subgraph "Client Operations"
+        UPLOADER["Uploader<br/>• Chunk planning<br/>• Replication coordination<br/>• Session management"]
+        DOWNLOADER["Downloader<br/>• Chunk assembly<br/>• Client pool integration<br/>• Error handling"]
+    end
+
+    subgraph "Streaming Layer"
+        STREAMING["Streaming Package<br/>• Bidirectional streams<br/>• Server-side streams<br/>• Flow control<br/>• Error handling"]
     end
 
     subgraph "Storage Layer"
@@ -43,12 +53,17 @@ flowchart TB
         DISK3[("Local Disk")]
     end
 
-    CLI --> COORD
-    SDK --> COORD
-    CLI --> DN1
-    SDK --> DN1
-    CLI --> DN2
-    SDK --> DN2
+    CLI --> CPOOL
+    SDK --> CPOOL
+    CPOOL --> COORD
+    CPOOL --> DN1
+    CPOOL --> DN2
+
+    UPLOADER --> CPOOL
+    DOWNLOADER --> CPOOL
+
+    UPLOADER --> STREAMING
+    DOWNLOADER --> STREAMING
 
     DN1 --> DN2
     DN1 --> DN3
@@ -69,90 +84,78 @@ flowchart TB
     style DN1 fill:#f3e5f5
     style DN2 fill:#f3e5f5
     style DN3 fill:#f3e5f5
+    style CPOOL fill:#fff3e0
+    style UPLOADER fill:#e8f5e8
+    style DOWNLOADER fill:#e8f5e8
+    style STREAMING fill:#fce4ec
 ```
 
-### Current Upload Data Flow
+---
+
+## Protocol Integration
+
+### Session Management Architecture
+
+The system implements two distinct session types that align with the[protocol specification](docs/protocol.md):
 
 ```mermaid
-sequenceDiagram
-    participant C as Client
-    participant COORD as Coordinator
-    participant DN1 as Primary DataNode
-    participant DN2 as Replica DataNode
-    participant DN3 as Replica DataNode
-
-    Note over C,DN3: File Upload Flow
-
-    C->>COORD: UploadRequest(path, size, chunkSize)
-    COORD->>COORD: Generate chunk plan
-    COORD-->>C: UploadResponse(chunkLocations, sessionID)
-
-    loop For each chunk
-        C->>DN1: PrepareChunkUpload(chunkHeader)
-        DN1-->>C: NodeReady(sessionID)
-        
-        C->>DN1: ChunkDataStream (bidirectional)
-        DN1-->>C: ChunkDataAck (flow control)
-        
-        par Parallel Replication
-            DN1->>DN2: PrepareChunkUpload + ChunkDataStream
-            DN1->>DN3: PrepareChunkUpload + ChunkDataStream
-        end
-        
-        DN2-->>DN1: Replication Complete
-        DN3-->>DN1: Replication Complete
-        DN1-->>C: Final ChunkDataAck(replicas)
+flowchart TB
+    subgraph "Session Types"
+        METADATA_SESSION["Metadata Sessions<br/>• Coordinator-managed<br/>• File operation scope<br/>• 5-minute timeout<br/>• Atomic operations"]
+        STREAMING_SESSION["Streaming Sessions<br/>• DataNode-managed<br/>• Chunk transfer scope<br/>• 1-minute timeout<br/>• Bidirectional/Server-side"]
     end
 
-    C->>COORD: ConfirmUpload(sessionID, chunkInfos)
-    COORD-->>C: ConfirmUploadResponse(success)
+    subgraph "Session Lifecycle"
+        CREATE["Session Creation<br/>• UUID generation<br/>• State initialization<br/>• Timeout setup"]
+        ACTIVE["Active Session<br/>• Request processing<br/>• State updates<br/>• Heartbeat monitoring"]
+        CLEANUP["Session Cleanup<br/>• State cleanup<br/>• Resource release<br/>• Timeout handling"]
+    end
+
+    subgraph "Session Management"
+        COORD_SESSION["Coordinator Session Manager<br/>• Metadata session tracking<br/>• File operation coordination<br/>• Atomic commit handling"]
+        DN_SESSION["DataNode Session Manager<br/>• Streaming session tracking<br/>• Chunk transfer coordination<br/>• Flow control management"]
+    end
+
+    METADATA_SESSION --> CREATE
+    STREAMING_SESSION --> CREATE
+    CREATE --> ACTIVE
+    ACTIVE --> CLEANUP
+
+    COORD_SESSION --> METADATA_SESSION
+    DN_SESSION --> STREAMING_SESSION
+
+    style METADATA_SESSION fill:#e1f5fe
+    style STREAMING_SESSION fill:#f3e5f5
+    style CREATE fill:#e8f5e8
+    style ACTIVE fill:#fff3e0
+    style CLEANUP fill:#ffebee
 ```
 
-### Current Download Data Flow
+### Replication Protocol Implementation
+
+The replication protocol is implemented through a multi-tier architecture:
 
 ```mermaid
-sequenceDiagram
-    participant C as Client
-    participant COORD as Coordinator
-    participant DN1 as DataNode (Replica 1)
-    participant DN2 as DataNode (Replica 2)
-    participant DN3 as DataNode (Replica 3)
-
-    Note over C,DN3: File Download Flow
-
-    C->>COORD: DownloadRequest(path)
-    COORD->>COORD: Lookup file metadata
-    COORD->>COORD: Find available replicas for each chunk
-    COORD-->>C: DownloadResponse(chunkLocations, fileInfo, sessionID)
-
-    loop For each chunk (parallel downloads)
-        Note over C,DN3: Client selects best replica based on some selection scoring algorithm
-        
-        C->>DN1: PrepareChunkDownload(chunkID)
-        DN1->>DN1: Validate chunk exists
-        DN1-->>C: DownloadReady(sessionID, chunkHeader)
-        
-        C->>DN1: DownloadStreamRequest(sessionID, chunkStreamSize)
-        
-        loop Stream chunk data
-            DN1->>DN1: Read chunk from storage
-            DN1-->>C: ChunkDataStream(data, offset, partialChecksum)
-            Note over C,DN1: Client verifies checksums in real-time
-        end
-        
-        DN1-->>C: ChunkDataStream(isFinal=true)
-        C->>C: Verify final chunk checksum
-        
-        alt If chunk verification fails
-            Note over C,DN3: Client tries next available replica
-            C->>DN2: PrepareChunkDownload + DownloadStreamRequest
-            Note over DN2,C: Repeat download process
-        end
+flowchart TB
+    subgraph "Replication Flow"
+        CLIENT_UPLOAD["Client Upload<br/>• PrepareChunkUpload<br/>• UploadChunkStream<br/>• propagate=true"]
+        PRIMARY_REPLICATE["Primary Replication<br/>• PrepareChunkUpload<br/>• UploadChunkStream<br/>• propagate=false"]
+        REPLICA_STORE["Replica Storage<br/>• Chunk validation<br/>• Checksum verification<br/>• Storage commit"]
     end
 
-    C->>C: Reassemble file from chunks
-    C->>C: Verify complete file checksum
-    Note over C: Download complete - temporary file ready
+    subgraph "Replication Management"
+        REPLICA_COORD["Replication Coordinator<br/>• Node selection<br/>• Failure handling<br/>• Consistency checks"]
+        REPLICA_MONITOR["Replica Monitor<br/>• Health tracking<br/>• Performance metrics<br/>• Failure detection"]
+    end
+
+    CLIENT_UPLOAD --> PRIMARY_REPLICATE
+    PRIMARY_REPLICATE --> REPLICA_STORE
+    REPLICA_COORD --> PRIMARY_REPLICATE
+    REPLICA_MONITOR --> REPLICA_STORE
+
+    style CLIENT_UPLOAD fill:#e8f5e8
+    style PRIMARY_REPLICATE fill:#e1f5fe
+    style REPLICA_STORE fill:#f3e5f5
 ```
 
 ---
@@ -416,6 +419,43 @@ flowchart TB
     style HYBRID_IMPL fill:#f3e5f5
 ```
 
+### Garbage Collection & Cleanup Architecture
+
+```mermaid
+flowchart TB
+    subgraph "Garbage Collection"
+        GC_SCANNER["Garbage Collector<br/>• Periodic scanning<br/>• Orphaned chunk detection<br/>• Metadata validation"]
+        CHUNK_INVENTORY["Chunk Inventory<br/>• Local chunk tracking<br/>• Metadata verification<br/>• Storage reconciliation"]
+    end
+
+    subgraph "Cleanup Operations"
+        INDIVIDUAL_DELETE["Individual Delete<br/>• DeleteChunk(chunkID)<br/>• Per-chunk cleanup<br/>• Success/failure tracking"]
+        BULK_DELETE["Bulk Delete<br/>• BulkDeleteChunk(chunkIDs[])<br/>• Batch operations<br/>• Failed chunk reporting"]
+        ORPHANED_CLEANUP["Orphaned Cleanup<br/>• Local inventory scan<br/>• Metadata validation<br/>• Automatic cleanup"]
+    end
+
+    subgraph "Cleanup Triggers"
+        FILE_DELETE["File Deletion<br/>• Coordinator-initiated<br/>• All replica cleanup<br/>• Soft delete marking"]
+        GC_TRIGGER["Garbage Collection<br/>• Periodic scanning<br/>• Orphaned detection<br/>• Storage optimization"]
+        REBALANCE["Rebalancing<br/>• Storage rebalancing<br/>• Chunk migration<br/>• Capacity optimization"]
+    end
+
+    GC_SCANNER --> CHUNK_INVENTORY
+    CHUNK_INVENTORY --> ORPHANED_CLEANUP
+
+    FILE_DELETE --> INDIVIDUAL_DELETE
+    GC_TRIGGER --> BULK_DELETE
+    REBALANCE --> BULK_DELETE
+
+    ORPHANED_CLEANUP --> INDIVIDUAL_DELETE
+
+    style GC_SCANNER fill:#e8f5e8
+    style CHUNK_INVENTORY fill:#e1f5fe
+    style INDIVIDUAL_DELETE fill:#fff3e0
+    style BULK_DELETE fill:#f3e5f5
+    style ORPHANED_CLEANUP fill:#ffebee
+```
+
 ---
 
 ## Security Architecture
@@ -532,6 +572,9 @@ flowchart TB
 3. **Authentication**: JWT RBAC
 4. **Storage Backend**: Pluggable storage backend, must support local disk & cloud storage integration
 5. **Monitoring**: Build custom vs. adopt existing observability stack (TDB)
+6. **Client Pool**: Rotating client pool for improved reliability and failover
+7. **Session Management**: Two-tier session system for metadata and streaming operations
+8. **Garbage Collection**: Local inventory scanning for orphaned chunk cleanup
 
 ---
 

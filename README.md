@@ -25,27 +25,30 @@ A **distributed file system** written in Go that demonstrates chunk-based storag
 ## Features
 
 ### Core Functionality ✅
-* **Upload/Download Operations**: Complete file transfer with chunking and parallel processing *(refactored – see `internal/client/uploader` & `downloader` packages)*
+* **Upload/Download Operations**: Complete file transfer with chunking and parallel processing
+* **Delete**: Implemented file deletion (with GC) and recursive directory listing APIs
 * **Chunk-based Storage**: 8MB default chunks with configurable sizes up to 64MB
 * **Data Replication**: Default factor of 3 (1 primary + 2 replicas) with parallel replication
-* **Streaming Protocol**: Bidirectional gRPC streams with back-pressure control and SHA-256 checksums
+* **Streaming Protocol**: Bidirectional (upload) and unidirectional (download) gRPC streams with back-pressure control and SHA-256 checksums
 * **Node Management**: Automatic registration, heartbeat monitoring, and cluster state management
-* **Resilient Client Connections**: Rotating client pool with automatic failover over multiple DataNodes (see `pkg/client_pool`)
-* **Session Management**: Dual session types (streaming + metadata) ensuring operation atomicity
-* **Delete & List Operations**: Implemented file deletion (with GC) and recursive directory listing APIs
+* **Resilient Client Connections**: Rotating client pool with automatic failover over multiple DataNodes
+* **Session Management**: Two session types (streaming + metadata) ensuring operation atomicity
 
 ### Architecture Highlights
 * **Coordinator Service**: Metadata-only service (file → chunk mapping, cluster membership)
-* **DataNode Service**: Distributed storage nodes with peer-to-peer replication
-* **Client SDK**: Go SDK with parallel upload/download **(new rotating client-pool & checksum-verified streaming)**
+* **Datanode Service**: Distributed storage nodes with peer-to-peer parallel replication
+* **Client SDK**: Go SDK with parallel upload/download
 * **Protocol Buffers**: Efficient serialization over gRPC (HTTP/2)
 * **Docker Integration**: Full e2e test environment with 1 coordinator + 6 datanodes
 
 ### Planned Features 🚧
-* **Persistent Metadata**: etcd-based coordinator storage (currently in-memory)
-* **API Gateway**: HTTP/REST interface with authentication and authorization
-* **Enhanced Security**: TLS, JWT authentication, RBAC access control
+* **File Listing**: Clients must be able to list stored files
+* **Persistent Metadata**: etcd-based (or similar) metadata storage (currently in-memory on coordinator)
+* **Garbage Collection Cycles**: Partially implemented, require persistent metadata and testing
 * **Observability**: Metrics, tracing, and operational monitoring
+* **Enhanced Security**: TLS, JWT authentication, RBAC access control
+* **Chunk encryption**: Chunk encryption storage options
+* **API Gateway**: HTTP/REST interface with authentication and authorization
 
 > **See Complete Feature List:** [docs/roadmap.md](docs/roadmap.md) | **Technical Details:** [docs/architecture.md](docs/architecture.md)
 
