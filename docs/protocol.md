@@ -8,6 +8,8 @@ IDL definitions are located in [`pkg/proto/*.proto`](../pkg/proto/).
 
 ## Core Messages
 
+>Internal translation datatypes can be seen in the `internal/common` package
+
 ### Chunk-Related Messages
 | Message | Purpose |
 |---------|---------|
@@ -16,6 +18,13 @@ IDL definitions are located in [`pkg/proto/*.proto`](../pkg/proto/).
 | `ChunkDataStream` | Frame inside streaming protocol (data + offset + flags + checksum). |
 | `ChunkDataAck` | Acknowledgement for a `ChunkDataStream` frame with flow control. |
 | `ChunkLocation` | Mapping of chunk ID to available data nodes. |
+| `NodeReady` | Signals whether a node is ready to start streaming a chunk (accept flag, session ID, optional message). |
+| `DownloadReady` | Combines `NodeReady` with a `ChunkHeader` for download sessions. |
+| `DownloadStreamRequest` | Client request parameters for a chunk download stream (session ID, frame size). |
+| `DeleteChunkRequest` | Request to remove a specific chunk by ID. |
+| `DeleteChunkResponse` | Result of deleting a chunk, including success flag and message. |
+| `BulkDeleteChunkRequest` | Request to delete multiple chunks with a reason. |
+| `BulkDeleteChunkResponse` | Result of a bulk delete operation including failed chunk list. |
 
 ### File Operation Messages
 | Message | Purpose |
@@ -36,6 +45,8 @@ IDL definitions are located in [`pkg/proto/*.proto`](../pkg/proto/).
 | `HeartbeatRequest` | Periodic node status update with version tracking. |
 | `HeartbeatResponse` | Coordinator response with incremental cluster updates. |
 | `NodeUpdate` | Incremental cluster state change (add/remove/update node). |
+| `HealthCheckRequest` | Liveness probe for a single node. |
+| `HealthCheckResponse` | Health status returned for a liveness probe. |
 
 See `common.proto`, `coordinator.proto`, `datanode.proto` for complete field definitions.
 
@@ -63,6 +74,7 @@ See `common.proto`, `coordinator.proto`, `datanode.proto` for complete field def
 | `PrepareChunkDownload` | unary | Validate chunk exists and create download session. | ✅ Implemented |
 | `DownloadChunkStream` | server stream | Stream chunk bytes to client. | ✅ Implemented |
 | `DeleteChunk` | unary | Remove chunk from storage (called during file deletion). | ✅ Implemented |
+| `BulkDeleteChunk` | unary | Delete multiple chunks in one request (garbage collection, rebalance). | ✅ Implemented |
 | `HealthCheck` | unary | Liveness probe for monitoring and load balancers. | ✅ Implemented |
 
 ---
@@ -83,7 +95,7 @@ The system uses two distinct session types for different operational scopes:
 - **Lifecycle:** UploadFile → ChunkUploads → ConfirmUpload
 - **Session ID:** UUID generated during `UploadFile`
 - **Scope:** Complete file operation across multiple chunks
-- **Timeout:** Configurable per-coordinator (default: 5 minutes)
+- **Timeout:** Configurable per-coordinator
 
 ---
 
@@ -93,37 +105,116 @@ The system uses two distinct session types for different operational scopes:
 sequenceDiagram
     participant C as Client
     participant COORD as Coordinator
-    participant DN as DataNode
+    participant PDN as Primary DataNode
+    participant RDN as Replica DataNode
 
-    Note over C,DN: 1. Metadata Session Creation
+    Note over C,RDN: 1. Metadata Session Creation
     C->>COORD: UploadFile(path, size, chunkSize)
     COORD->>COORD: Create metadata session
     COORD-->>C: UploadResponse(chunkLocations[], metadataSessionID)
 
-    Note over C,DN: 2. Streaming Sessions (per chunk)
+    Note over C,RDN: 2. Streaming Sessions (per chunk)
     loop For each chunk
-        C->>DN: PrepareChunkUpload(chunkHeader)
-        DN->>DN: Create streaming session
-        DN-->>C: NodeReady(streamingSessionID)
+        C->>PDN: PrepareChunkUpload(chunkHeader, propagate=true)
+        PDN->>PDN: Create streaming session
+        PDN-->>C: NodeReady(accept, streamingSessionID)
         
-        C->>DN: UploadChunkStream(streamingSessionID, data...)
-        DN->>DN: Replicate to other nodes
-        DN-->>C: ChunkDataAck(success, replicas[])
+        Note over C,RDN: Bidirectional streaming with replication
+        C->>PDN: UploadChunkStream(streamingSessionID, data...)
+        PDN->>RDN: PrepareChunkUpload(chunkHeader, propagate=false)
+        RDN-->>PDN: NodeReady(accept, replicaSessionID)
+        PDN->>RDN: UploadChunkStream(replicaSessionID, data...)
+        RDN-->>PDN: ChunkDataAck(success)
+        PDN-->>C: ChunkDataAck(success, replicas[], ready_for_next)
     end
 
-    Note over C,DN: 3. Metadata Commit
+    Note over C,RDN: 3. Metadata Commit
     C->>COORD: ConfirmUpload(metadataSessionID, chunkInfos[])
     COORD->>COORD: Commit file metadata atomically
     COORD-->>C: ConfirmUploadResponse(success)
 ```
 
-### Session Lifecycle Steps
+### Upload Session Lifecycle Steps
 
 1. **Metadata Session Creation**: Coordinator creates session for entire file operation
 2. **Streaming Sessions**: DataNode creates session for each chunk transfer
 3. **Chunk Upload**: Client streams data with replication managed by primary node
 4. **Metadata Commit**: Client confirms all chunks uploaded; coordinator commits atomically
 5. **Session Cleanup**: Both session types cleaned up after completion or timeout
+
+---
+
+## Download Session Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant COORD as Coordinator
+    participant DN as DataNode
+
+    Note over C,DN: 1. File Metadata Retrieval
+    C->>COORD: DownloadFile(path)
+    COORD->>COORD: Lookup file metadata
+    COORD-->>C: DownloadResponse(fileInfo, chunkLocations[], sessionID)
+
+    Note over C,DN: 2. Chunk Downloads (per chunk)
+    loop For each chunk
+        C->>DN: PrepareChunkDownload(chunkID)
+        DN->>DN: Validate chunk exists
+        DN-->>C: DownloadReady(accept, chunkHeader, sessionID)
+        
+        Note over C,DN: Server-side streaming
+        C->>DN: DownloadStreamRequest(sessionID, chunkStreamSize)
+        DN->>C: ChunkDataStream(sessionID, chunkID, data, offset, isFinal)
+    end
+
+    Note over C,DN: 3. File Assembly
+    C->>C: Assemble chunks in order
+    C->>C: Verify file checksum
+```
+
+### Download Session Lifecycle Steps
+
+1. **File Metadata Retrieval**: Coordinator provides file info and chunk locations
+2. **Chunk Downloads**: Client downloads each chunk from available DataNodes
+3. **File Assembly**: Client assembles chunks and verifies integrity
+
+---
+
+## Delete Session Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant COORD as Coordinator
+    participant DN as DataNode
+
+    Note over C,DN: 1. File Deletion Request
+    C->>COORD: DeleteFile(path)
+    COORD->>COORD: Lookup file metadata
+    COORD->>COORD: Mark file as deleted (soft delete)
+    COORD-->>C: DeleteResponse(success, message)
+
+    Note over C,DN: 2. Chunk Cleanup (per chunk)
+    loop For each chunk in file
+        COORD->>DN: DeleteChunk(chunkID)
+        DN->>DN: Remove chunk from storage
+        DN-->>COORD: DeleteChunkResponse(success, message)
+    end
+
+    Note over C,DN: 3. Bulk Cleanup (optional)
+    COORD->>DN: BulkDeleteChunk(chunkIDs[], reason)
+    DN->>DN: Remove multiple chunks
+    DN-->>COORD: BulkDeleteChunkResponse(success, failed[])
+```
+
+### Delete Session Lifecycle Steps
+
+1. **File Deletion Request**: Coordinator marks file as deleted and returns success
+2. **Chunk Cleanup**: Coordinator deletes each chunk from all replica nodes
+3. **Bulk Cleanup**: Optional bulk deletion for garbage collection or rebalancing
+
+> Note: for datanodes that were down/failed to receive during the chunk cleanup phase innitiated by the coordinator, the Orphaned Chunks Garbage Collector constantly scans the datanode's inventory locally, pulls the metadata from storage and cleans up leftover chunks. 
 
 ---
 
@@ -153,7 +244,7 @@ message ChunkDataAck {
 }
 ```
 
-### Flow Control Protocol (TODO: implement buffer flushing to disk)
+### Flow Control Protocol (TODO: implement buffer flushing to disk, currently, buffer is sized the same as the chunk)
 - **Back-pressure**: DataNode sets `ready_for_next=false` when buffer full
 - **Client behavior**: Waits for `ready_for_next=true` before sending next frame
 - **Timeout handling**: Streams timeout if no activity within session timeout
@@ -181,40 +272,7 @@ Replication is handled transparently within the `UploadChunkStream` RPC:
 
 ## Error Handling and Recovery
 
-### Client-Side Errors
-| Error | Cause | Recovery |
-|-------|-------|----------|
-| `SESSION_NOT_FOUND` | Invalid or expired session ID | Restart operation from prepare phase |
-| `CHECKSUM_MISMATCH` | Data corruption during transfer | Retry chunk upload |
-| `INSUFFICIENT_REPLICAS` | Not enough nodes available | Retry with backoff or fail |
-| `TIMEOUT` | Session or operation timeout | Retry operation with new session |
-
-### Server-Side Errors
-| Error | Cause | Recovery |
-|-------|-------|----------|
-| `CAPACITY_EXCEEDED` | Node storage full | Select different node |
-| `CHUNK_NOT_FOUND` | Missing chunk during download | Try alternative replica |
-| `INVALID_REQUEST` | Malformed request | Fix client request format |
-| `INTERNAL_ERROR` | Server-side failure | Retry with different node |
-
----
-
-## Protocol Versioning and Compatibility
-
-### Forward Compatibility
-- **Field additions**: Safe - proto3 handles unknown fields gracefully
-- **Optional fields**: Can be added without breaking existing clients
-- **New RPCs**: Can be added to services without affecting existing clients
-
-### Breaking Changes  
-- **Required field changes**: Not allowed - breaks wire compatibility
-- **Tag number changes**: Never allowed - corrupts wire format
-- **Message removal**: Requires deprecation period and version coordination
-
-### Version Management
-- Protocol buffer compiler version pinned in `go.mod`
-- Generated code checked into repository for reproducible builds
-- API versioning planned for future major protocol changes
+TODO: define and categorize protocol errors
 
 ---
 
@@ -223,14 +281,14 @@ Replication is handled transparently within the `UploadChunkStream` RPC:
 ### Streaming Performance
 - **Frame size**: 256KB default (configurable)
 - **Concurrent streams**: Limited per node to prevent resource exhaustion
-- **Compression**: gRPC-level compression available (configurable)
+- **Compression**: gRPC-level compression available
 - **Connection reuse**: gRPC connection pooling for efficiency
 
 ### Protocol Overhead
-- **Message framing**: ~50 bytes per ChunkDataStream frame
-- **Session management**: ~200 bytes per session creation
-- **Heartbeat frequency**: 30 seconds default (configurable)
-- **Metadata operations**: Sub-millisecond for in-memory coordinator
+- **Message framing**: TODO: calculate message size in bytes
+- **Heartbeat frequency**: 30 seconds default (configurable); TODO: calculate average message sizes
+
+> Benchmarks to be added in future update
 
 ---
 
@@ -242,7 +300,7 @@ Replication is handled transparently within the `UploadChunkStream` RPC:
 - **Network isolation**: Services should run in protected network segments
 
 ### Data Integrity
-- **Checksums**: SHA-256 at frame, chunk, and file levels
+- **Checksums**: SHA-256 at chunk and file levels. TODO: per-frame checksum - requires benchmark, would allow for frame retries (validate if needed). 
 - **Verification**: Multiple verification points throughout pipeline
 - **Tamper detection**: Checksum mismatches trigger immediate failure
 

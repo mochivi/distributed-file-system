@@ -23,7 +23,7 @@ dfs/
 ├── internal/              # Private application code
 │   ├── client/            # Client SDK (uploader, downloader)
 │   ├── clients/           # gRPC client wrappers
-│   ├── cluster/           # Node management & selection
+│   ├── cluster/           # Node management & selection. Cluster services and controller loops
 │   ├── common/            # Shared types, proto -> internal type conversion & validation
 │   ├── config/            # Configuration management
 │   ├── coordinator/       # Coordinator business logic
