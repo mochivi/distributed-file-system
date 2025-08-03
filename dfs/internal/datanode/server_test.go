@@ -18,8 +18,6 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type serverMocks struct {
@@ -356,10 +354,9 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 	logger := logging.NewTestLogger(slog.LevelError, true)
 
 	testCases := []struct {
-		name            string
-		setupMocks      func(*serverMocks, *testutils.MockBidiStreamServer)
-		expectErr       bool
-		expectedErrCode codes.Code
+		name       string
+		setupMocks func(*serverMocks, *testutils.MockBidiStreamServer)
+		expectErr  bool
 	}{
 		{
 			name: "success - single chunk upload",
@@ -423,8 +420,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 			setupMocks: func(m *serverMocks, stream *testutils.MockBidiStreamServer) {
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(nil, assert.AnError)
 			},
-			expectErr:       true,
-			expectedErrCode: codes.Internal,
+			expectErr: true,
 		},
 		{
 			name: "error: ReceiveChunks fails",
@@ -437,8 +433,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return(nil, assert.AnError)
 				m.sessionManager.On("Delete", session.SessionID).Return()
 			},
-			expectErr:       true,
-			expectedErrCode: codes.Internal,
+			expectErr: true,
 		},
 		{
 			name: "error: storage failure",
@@ -452,8 +447,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				m.store.On("Store", session.ChunkHeader, []byte("test")).Return(assert.AnError)
 				m.sessionManager.On("Delete", session.SessionID).Return()
 			},
-			expectErr:       true,
-			expectedErrCode: codes.Internal,
+			expectErr: true,
 		},
 		{
 			name: "error: replication failure",
@@ -472,8 +466,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				m.sessionManager.On("Delete", session.SessionID).Return()
 				m.clientPool.On("Close", mock.Anything).Return()
 			},
-			expectErr:       true,
-			expectedErrCode: codes.Internal,
+			expectErr: true,
 		},
 		{
 			name: "error: SendFinalReplicasAck fails",
@@ -496,8 +489,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				m.serverStreamer.On("SendFinalReplicasAck", session, finalReplicaNodes, stream).Return(assert.AnError)
 				m.sessionManager.On("Delete", session.SessionID).Return()
 			},
-			expectErr:       true,
-			expectedErrCode: codes.Internal,
+			expectErr: true,
 		},
 	}
 
@@ -521,11 +513,6 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 
 			if tc.expectErr {
 				assert.Error(t, err)
-				if tc.expectedErrCode != codes.OK {
-					st, ok := status.FromError(err)
-					assert.True(t, ok)
-					assert.Equal(t, tc.expectedErrCode, st.Code())
-				}
 			} else {
 				assert.NoError(t, err)
 			}
@@ -541,12 +528,11 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 	logger := logging.NewTestLogger(slog.LevelError, true)
 
 	testCases := []struct {
-		name            string
-		setupMocks      func(*serverMocks, *testutils.MockStreamServer)
-		setupStreams    func(*testutils.MockStreamServer)
-		req             *proto.DownloadStreamRequest
-		expectErr       bool
-		expectedErrCode codes.Code
+		name         string
+		setupMocks   func(*serverMocks, *testutils.MockStreamServer)
+		setupStreams func(*testutils.MockStreamServer)
+		req          *proto.DownloadStreamRequest
+		expectErr    bool
 	}{
 		{
 			name: "success: download chunk",
@@ -596,8 +582,7 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 				SessionId:       "invalid-session",
 				ChunkStreamSize: 1024,
 			},
-			expectErr:       true,
-			expectedErrCode: codes.NotFound,
+			expectErr: true,
 		},
 		{
 			name: "error: chunk data retrieval failure",
@@ -614,8 +599,7 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 				SessionId:       "session3",
 				ChunkStreamSize: 1024,
 			},
-			expectErr:       true,
-			expectedErrCode: codes.Internal,
+			expectErr: true,
 		},
 		{
 			name: "error: stream send failure",
@@ -658,11 +642,6 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 
 			if tc.expectErr {
 				assert.Error(t, err)
-				if tc.expectedErrCode != codes.OK {
-					st, ok := status.FromError(err)
-					assert.True(t, ok)
-					assert.Equal(t, tc.expectedErrCode, st.Code())
-				}
 			} else {
 				assert.NoError(t, err)
 			}

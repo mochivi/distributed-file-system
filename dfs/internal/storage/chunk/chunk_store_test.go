@@ -32,7 +32,7 @@ func TestChunkDiskStorage_StoreAndGet(t *testing.T) {
 		header      common.ChunkHeader
 		data        []byte
 		expectErr   bool
-		expectedErr string
+		expectedErr error
 	}{
 		{
 			name:   "success: store and get chunk",
@@ -44,7 +44,7 @@ func TestChunkDiskStorage_StoreAndGet(t *testing.T) {
 			header:      common.ChunkHeader{ID: "invalid", Index: 0, Size: int64(3)},
 			data:        []byte("bad"),
 			expectErr:   true,
-			expectedErr: "invalid chunk ID format",
+			expectedErr: ErrInvalidChunkID,
 		},
 	}
 
@@ -55,7 +55,7 @@ func TestChunkDiskStorage_StoreAndGet(t *testing.T) {
 			err := store.Store(tc.header, tc.data)
 			if tc.expectErr {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tc.expectedErr)
+				assert.ErrorIs(t, err, tc.expectedErr)
 				return
 			}
 			require.NoError(t, err)

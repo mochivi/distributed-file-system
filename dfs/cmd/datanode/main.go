@@ -35,7 +35,7 @@ import (
 
 type container struct {
 	// shared or grpc server dependencies
-	chunkStore          storage.ChunkStorage
+	chunkStore          chunk.ChunkStorage
 	replicationManager  datanode.ReplicationProvider
 	sessionManager      streaming.SessionManager
 	clusterStateManager state.ClusterStateManager

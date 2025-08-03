@@ -1,9 +1,15 @@
-package storage
+package chunk
 
 import (
 	"context"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+)
+
+type StorageBackendType string
+
+const (
+	StorageBackendDisk StorageBackendType = "disk"
 )
 
 // TODO: add context awareness

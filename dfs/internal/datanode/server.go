@@ -8,7 +8,10 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/mochivi/distributed-file-system/internal/apperr"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
+	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"github.com/mochivi/distributed-file-system/pkg/streaming"
@@ -88,8 +91,10 @@ func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.Dow
 
 	chunkHeader, err := s.store.GetHeader(req.ChunkID)
 	if err != nil {
-		logger.Error("Failed to get chunk info", slog.String(common.LogError, err.Error()))
-		return nil, status.Errorf(codes.Internal, "failed to get chunk info: %v", err)
+		if errors.Is(err, chunk.ErrInvalidChunkID) {
+			return nil, apperr.InvalidArgument("invalid chunkID", err)
+		}
+		return nil, err
 	}
 
 	session := s.sessionManager.NewSession(ctx, chunkHeader, false)
@@ -122,11 +127,13 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 	}
 
 	if err := s.store.Delete(req.ChunkID); err != nil {
-		logger.Error("Failed to delete chunk", slog.String(common.LogError, err.Error()))
-		return nil, status.Errorf(codes.Internal, "failed to delete chunk: %v", err)
+		if errors.Is(err, chunk.ErrInvalidChunkID) {
+			return nil, apperr.InvalidArgument("invalid chunkID", err)
+		}
+		return nil, err
 	}
-	logger.Info("Chunk deleted successfully")
 
+	logger.Info("Chunk deleted successfully")
 	return common.DeleteChunkResponse{
 		Success: true,
 		Message: "chunk deleted",
@@ -248,9 +255,11 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 	// TODO: for now, storing entire chunk in buffer and writing all at once
 	logger.Debug("Storing chunk", slog.Int(common.LogChunkSize, len(chunkData)))
 	if err = s.store.Store(session.ChunkHeader, chunkData); err != nil {
-		logger.Error("Failed to store chunk", slog.String(common.LogError, err.Error()))
 		session.Fail()
-		return status.Errorf(codes.Internal, "failed to store chunk: %v", err)
+		if errors.Is(err, chunk.ErrInvalidChunkID) {
+			apperr.InvalidArgument("invalid chunkID", err)
+		}
+		return err
 	}
 	logger.Debug("Chunk stored successfully")
 
@@ -303,11 +312,13 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 	// TODO: store should return an io.Reader directly
 	chunkData, err := s.store.GetData(session.ChunkHeader.ID)
 	if err != nil {
-		logger.Error("Could not retrieve chunk", slog.String(common.LogError, err.Error()))
-		return status.Errorf(codes.Internal, "could not retrieve chunk %s: %v", session.ChunkHeader.ID, err)
+		if errors.Is(err, encoding.ErrDeserializeHeader) {
+			return apperr.Internal(err)
+		}
+		return err
 	}
-	reader := bytes.NewReader(chunkData)
 
+	reader := bytes.NewReader(chunkData)
 	if err := streaming.SendChunkFrames(reader, req.ChunkStreamSize, session.ChunkHeader.ID,
 		session.SessionID, len(chunkData), stream); err != nil {
 		return handleStreamingError(err, logger)

@@ -2,53 +2,130 @@ package chunk
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"syscall"
+
+	"github.com/mochivi/distributed-file-system/internal/apperr"
+	"google.golang.org/grpc/codes"
 )
 
-// These errors should be backend agnostic but relate to the file system.
-// Which is the reason why we translate FS errors into our own errors.
-// Same errors could happen on different backends but return different errors.
-
+// Sentinel errors - not FS related
 var (
-	ErrOpFailed          = errors.New("operation failed")
-	ErrNotFound          = errors.New("chunk not found")
-	ErrPermission        = errors.New("permission denied")
-	ErrResourceExhausted = errors.New("resource exhausted")
-	ErrNotExist          = errors.New("does not exist")
-	ErrAlreadyExists     = errors.New("already exists")
-	ErrIOError           = errors.New("I/O error")
-	ErrInvalidArgument   = errors.New("invalid argument")
-	ErrInvalidPath       = errors.New("invalid path")
+	// Package-specific kinds (not directly mapped from the OS)
+	ErrInvalidChunkID = errors.New("invalid chunk id")
 )
 
-func handleFsError(err error) error {
-	switch err {
-	case os.ErrNotExist:
-		return ErrNotFound
-	case os.ErrPermission:
-		return ErrPermission
-	case os.ErrExist:
-		return ErrAlreadyExists
-	case syscall.ENOSPC:
-		return ErrResourceExhausted
-	case syscall.EIO:
-		return ErrIOError
-	case syscall.EACCES:
-		return ErrPermission
-	case syscall.EPERM:
-		return ErrPermission
-	case syscall.EINVAL:
-		return ErrInvalidArgument
-	case syscall.ENOTDIR:
-		return ErrInvalidPath
+type FSErrorKind uint8
+
+const (
+	KindOpFailed FSErrorKind = iota
+	// File-system related kinds
+	KindNotFound
+	KindPermission
+	KindResourceExhausted
+	KindAlreadyExists
+	KindIO
+	KindInvalidArgument
+	KindInvalidPath
+)
+
+func (k FSErrorKind) String() string {
+	switch k {
+	case KindNotFound:
+		return "not found"
+	case KindPermission:
+		return "permission denied"
+	case KindResourceExhausted:
+		return "resource exhausted"
+	case KindAlreadyExists:
+		return "already exists"
+	case KindIO:
+		return "I/O error"
+	case KindInvalidArgument:
+		return "invalid argument"
+	case KindInvalidPath:
+		return "invalid path"
 	default:
-		return ErrOpFailed
+		return "operation failed"
 	}
 }
 
-// These errors are specific to this package but not related to the file system.
-var (
-	ErrInvalidChunkID  = errors.New("invalid chunk ID")
-	ErrSerializeHeader = errors.New("failed to serialize chunk header")
-)
+// mapFSErrorKind translates underlying OS/afero errors into FsError values so
+// the rest of the codebase can reason about them in a backend-agnostic way.
+func mapFSErrorKind(err error) FSErrorKind {
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return KindNotFound
+	case errors.Is(err, os.ErrPermission), errors.Is(err, syscall.EACCES), errors.Is(err, syscall.EPERM):
+		return KindPermission
+	case errors.Is(err, os.ErrExist):
+		return KindAlreadyExists
+	case errors.Is(err, syscall.ENOSPC):
+		return KindResourceExhausted
+	case errors.Is(err, syscall.EIO):
+		return KindIO
+	case errors.Is(err, syscall.EINVAL):
+		return KindInvalidArgument
+	case errors.Is(err, syscall.ENOTDIR):
+		return KindInvalidPath
+	default:
+		return KindOpFailed
+	}
+}
+
+type FsError struct {
+	Kind    FSErrorKind        // the package, backend agnostic error kind
+	Message string             // the context from where the error occured
+	Backend StorageBackendType // the backend type
+	Err     error              // the underlying error
+}
+
+func NewFsError(msg string, err error, backend StorageBackendType) *FsError {
+	kind := mapFSErrorKind(err)
+	return &FsError{
+		Message: fmt.Sprintf("%s: %s", msg, kind.String()),
+		Backend: backend,
+		Kind:    kind,
+		Err:     err,
+	}
+}
+
+func (e *FsError) Error() string {
+	if e == nil {
+		return "<nil>"
+	}
+	msg := e.Message
+	if e.Err != nil {
+		msg = fmt.Sprintf("%s: %v", e.Message, e.Err)
+	}
+	return msg
+}
+
+func (e *FsError) Unwrap() error { return e.Err }
+
+// Implement the apperr.ToAppError interface
+// Allows the error interceptor to automatically translates custom errors into grpc errors
+func (e *FsError) ToAppError() *apperr.AppError {
+	var code codes.Code
+	msg := e.Message
+
+	switch e.Kind {
+	case KindNotFound:
+		code = codes.NotFound
+	case KindPermission:
+		code = codes.PermissionDenied
+	case KindResourceExhausted:
+		code = codes.ResourceExhausted
+	case KindAlreadyExists:
+		code = codes.AlreadyExists
+	case KindInvalidArgument, KindInvalidPath:
+		code = codes.InvalidArgument
+	case KindIO, KindOpFailed:
+		code = codes.Internal
+	default:
+		return apperr.Internal(e)
+	}
+
+	return apperr.Wrap(code, msg, e)
+}

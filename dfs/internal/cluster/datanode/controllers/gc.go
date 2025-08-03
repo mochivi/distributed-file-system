@@ -11,7 +11,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/cluster/shared"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
-	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 )
 
 type OrphanedChunksGCProvider interface {
@@ -22,14 +22,14 @@ type OrphanedChunksGCController struct {
 	ctx     context.Context
 	cancel  context.CancelCauseFunc
 	scanner shared.MetadataScannerProvider
-	store   storage.ChunkStorage // maybe abstract later
-	running bool                 // No need for mutex as a single goroutine runs the GC
+	store   chunk.ChunkStorage // maybe abstract later
+	running bool               // No need for mutex as a single goroutine runs the GC
 	config  *config.OrphanedChunksGCControllerConfig
 	nodeID  string // Must be replaced with some reader of nodeInformation, which could be updated, nodeID should be immutable but it is a good pattern
 	logger  *slog.Logger
 }
 
-func NewOrphanedChunksGCController(ctx context.Context, scanner shared.MetadataScannerProvider, store storage.ChunkStorage,
+func NewOrphanedChunksGCController(ctx context.Context, scanner shared.MetadataScannerProvider, store chunk.ChunkStorage,
 	config *config.OrphanedChunksGCControllerConfig, nodeID string, logger *slog.Logger) *OrphanedChunksGCController {
 	ctx, cancel := context.WithCancelCause(ctx)
 	return &OrphanedChunksGCController{
@@ -99,7 +99,7 @@ func (c *OrphanedChunksGCController) run(ctx context.Context) ([]string, error) 
 }
 
 func getChunks(ctx context.Context, nodeID string, scanner shared.MetadataScannerProvider,
-	store storage.ChunkStorage) (map[string]*common.ChunkHeader, map[string]common.ChunkHeader, error) {
+	store chunk.ChunkStorage) (map[string]*common.ChunkHeader, map[string]common.ChunkHeader, error) {
 
 	g, ctx := errgroup.WithContext(ctx)
 	var actualChunks map[string]common.ChunkHeader

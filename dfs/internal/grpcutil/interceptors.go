@@ -22,14 +22,20 @@ func ErrorsInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo,
 		return resp, nil
 	}
 
-	// Attempt to cast the returned error to the application's custom error type.
+	// Attempt to translate the error to an AppError.
+	// If it implements the AppErrorTranslator interface, this will work
 	var appErr *apperr.AppError
-	if errors.As(err, &appErr) {
-		// This is the custom error, so we can translate it directly.
+	if errTranslator, ok := err.(apperr.AppErrorTranslator); ok {
+		appErr = errTranslator.ToAppError()
 		return nil, status.Error(appErr.Code, appErr.Message)
 	}
 
-	// This is an unexpected error type (e.g., a panic recovered as an error).
+	// Otherwise, check if it already an appErr directly
+	if errors.As(err, &appErr) {
+		return nil, status.Error(appErr.Code, appErr.Message)
+	}
+
+	// Lastly, return an internal server error for an unmapped error kind.
 	return nil, status.Error(codes.Internal, "an unexpected internal error occurred")
 }
 

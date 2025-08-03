@@ -7,7 +7,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
-	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/client_pool"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -15,7 +15,7 @@ import (
 )
 
 type container struct {
-	store                 storage.ChunkStorage
+	store                 chunk.ChunkStorage
 	replicationManager    ReplicationProvider
 	sessionManager        streaming.SessionManager
 	clusterViewer         state.ClusterStateViewer
@@ -25,7 +25,7 @@ type container struct {
 	clientPoolFactory     client_pool.ClientPoolFactory
 }
 
-func NewContainer(store storage.ChunkStorage, replicationManager ReplicationProvider, sessionManager streaming.SessionManager,
+func NewContainer(store chunk.ChunkStorage, replicationManager ReplicationProvider, sessionManager streaming.SessionManager,
 	clusterViewer state.ClusterStateViewer, coordinatorFinder state.CoordinatorFinder, selector cluster.NodeSelector,
 	serverStreamerFactory streaming.ServerStreamerFactory, clientPoolFactory client_pool.ClientPoolFactory) *container {
 
