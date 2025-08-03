@@ -343,7 +343,7 @@ docker logs dfs_datanode_1
 
 ## Contributing
 
-* Discord communitity: [Go DFS]([https://discord.gg/pF3xG6Wb](https://discord.gg/WrZKdMv3Q6))
+* Discord communitity: [Go DFS](https://discord.gg/WrZKdMv3Q6)
 * [Contribution guidelines](contributing.md):
 
 ## License
