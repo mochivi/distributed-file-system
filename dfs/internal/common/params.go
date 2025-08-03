@@ -86,6 +86,14 @@ const (
 	OpPutChunk    = "put_chunk"
 	OpDeleteChunk = "delete_chunk"
 
+	// Metadata operations
+	OpGetFile          = "get_file"
+	OpPutFile          = "put_file"
+	OpDeleteFile       = "delete_file"
+	OpListFiles        = "list_files"
+	OpGetChunksForNode = "get_chunks_for_node"
+	OpGetDeletedFiles  = "get_deleted_files"
+
 	// Bulk storage operations
 	OpGetHeaders = "get_chunk_headers"
 	OpListChunks = "list_chunks"

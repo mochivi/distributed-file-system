@@ -206,8 +206,8 @@ func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 			name: "success",
 			setupMocks: func(m *serverMocks) {
 				session := streaming.NewStreamingSession(context.Background(), "session1", common.ChunkHeader{ID: "chunk1", Size: 1024}, false)
-				m.store.On("Exists", "chunk1").Return(true)
-				m.store.On("GetHeader", "chunk1").Return(chunkHeader, nil)
+				m.store.On("Exists", mock.Anything, "chunk1").Return(true)
+				m.store.On("GetHeader", mock.Anything, "chunk1").Return(chunkHeader, nil)
 				m.sessionManager.On("NewSession", mock.Anything, mock.AnythingOfType("common.ChunkHeader"), mock.AnythingOfType("bool")).Return(session)
 				m.sessionManager.On("Store", session.SessionID, session).Return(nil)
 			},
@@ -221,7 +221,7 @@ func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 		{
 			name: "error: chunk not found",
 			setupMocks: func(m *serverMocks) {
-				m.store.On("Exists", "not-found-chunk").Return(false)
+				m.store.On("Exists", mock.Anything, "not-found-chunk").Return(false)
 			},
 			req:       &proto.DownloadChunkRequest{ChunkId: "not-found-chunk"},
 			expectErr: true,
@@ -229,8 +229,8 @@ func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 		{
 			name: "error: failed to get chunk header",
 			setupMocks: func(m *serverMocks) {
-				m.store.On("Exists", "header-fail-chunk").Return(true)
-				m.store.On("GetHeader", "header-fail-chunk").Return(common.ChunkHeader{}, assert.AnError)
+				m.store.On("Exists", mock.Anything, "header-fail-chunk").Return(true)
+				m.store.On("GetHeader", mock.Anything, "header-fail-chunk").Return(common.ChunkHeader{}, assert.AnError)
 			},
 			req:       &proto.DownloadChunkRequest{ChunkId: "header-fail-chunk"},
 			expectErr: true,
@@ -239,8 +239,8 @@ func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 			name: "error: streaming session already exists",
 			setupMocks: func(m *serverMocks) {
 				session := streaming.NewStreamingSession(context.Background(), "session1", common.ChunkHeader{ID: "existing-chunk", Size: 1024}, false)
-				m.store.On("Exists", "existing-chunk").Return(true)
-				m.store.On("GetHeader", "existing-chunk").Return(chunkHeader, nil)
+				m.store.On("Exists", mock.Anything, "existing-chunk").Return(true)
+				m.store.On("GetHeader", mock.Anything, "existing-chunk").Return(chunkHeader, nil)
 				m.sessionManager.On("NewSession", mock.Anything, mock.AnythingOfType("common.ChunkHeader"), mock.AnythingOfType("bool")).Return(session)
 				m.sessionManager.On("Store", session.SessionID, session).Return(assert.AnError)
 			},
@@ -293,8 +293,8 @@ func TestDataNodeServer_DeleteChunk(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(m *serverMocks) {
-				m.store.On("Exists", "chunk1").Return(true)
-				m.store.On("Delete", "chunk1").Return(nil)
+				m.store.On("Exists", mock.Anything, "chunk1").Return(true)
+				m.store.On("Delete", mock.Anything, "chunk1").Return(nil)
 			},
 			req:          &proto.DeleteChunkRequest{ChunkId: "chunk1"},
 			expectedResp: &proto.DeleteChunkResponse{Success: true, Message: "chunk deleted"},
@@ -303,7 +303,7 @@ func TestDataNodeServer_DeleteChunk(t *testing.T) {
 		{
 			name: "error: chunk not found",
 			setupMocks: func(m *serverMocks) {
-				m.store.On("Exists", "not-found-chunk").Return(false)
+				m.store.On("Exists", mock.Anything, "not-found-chunk").Return(false)
 			},
 			req:          &proto.DeleteChunkRequest{ChunkId: "not-found-chunk"},
 			expectedResp: &proto.DeleteChunkResponse{Success: false, Message: "chunk not found"},
@@ -312,8 +312,8 @@ func TestDataNodeServer_DeleteChunk(t *testing.T) {
 		{
 			name: "error: failed to delete",
 			setupMocks: func(m *serverMocks) {
-				m.store.On("Exists", "delete-fail-chunk").Return(true)
-				m.store.On("Delete", "delete-fail-chunk").Return(assert.AnError)
+				m.store.On("Exists", mock.Anything, "delete-fail-chunk").Return(true)
+				m.store.On("Delete", mock.Anything, "delete-fail-chunk").Return(assert.AnError)
 			},
 			req:       &proto.DeleteChunkRequest{ChunkId: "delete-fail-chunk"},
 			expectErr: true,
@@ -367,7 +367,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil).Once()
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test data!"), nil).Once()
-				m.store.On("Store", session.ChunkHeader, []byte("test data!")).Return(nil).Once()
+				m.store.On("Store", mock.Anything, session.ChunkHeader, []byte("test data!")).Return(nil).Once()
 				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test data!")), stream).Return(nil).Once()
 				m.sessionManager.On("Delete", session.SessionID).Return().Once()
 			},
@@ -382,7 +382,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil).Once()
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test data!"), nil).Once()
-				m.store.On("Store", session.ChunkHeader, []byte("test data!")).Return(nil).Once()
+				m.store.On("Store", mock.Anything, session.ChunkHeader, []byte("test data!")).Return(nil).Once()
 				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test data!")), stream).Return(nil).Once()
 				m.sessionManager.On("Delete", session.SessionID).Return().Once()
 			},
@@ -401,7 +401,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil).Once()
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test data!"), nil).Once()
-				m.store.On("Store", session.ChunkHeader, []byte("test data!")).Return(nil).Once()
+				m.store.On("Store", mock.Anything, session.ChunkHeader, []byte("test data!")).Return(nil).Once()
 				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test data!")), stream).Return(nil).Once()
 
 				// inside replicate -- exclude self from selection
@@ -444,7 +444,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil)
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test"), nil)
-				m.store.On("Store", session.ChunkHeader, []byte("test")).Return(assert.AnError)
+				m.store.On("Store", mock.Anything, session.ChunkHeader, []byte("test")).Return(assert.AnError)
 				m.sessionManager.On("Delete", session.SessionID).Return()
 			},
 			expectErr: true,
@@ -459,7 +459,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil)
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test"), nil)
-				m.store.On("Store", session.ChunkHeader, []byte("test")).Return(nil)
+				m.store.On("Store", mock.Anything, session.ChunkHeader, []byte("test")).Return(nil)
 				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test")), stream).Return(nil).Once()
 				m.selector.On("SelectBestNodes", N_NODES, selfNode).Return([]*common.NodeInfo{{ID: "node-1"}}, nil).Once()
 				m.replication.On("Replicate", m.clientPool, session.ChunkHeader, []byte("test"), mock.Anything).Return(nil, assert.AnError)
@@ -481,7 +481,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil)
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test"), nil)
-				m.store.On("Store", session.ChunkHeader, []byte("test")).Return(nil)
+				m.store.On("Store", mock.Anything, session.ChunkHeader, []byte("test")).Return(nil)
 				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test")), stream).Return(nil).Once()
 				m.selector.On("SelectBestNodes", N_NODES, selfNode).Return(replicaNodes, nil).Once()
 				m.replication.On("Replicate", m.clientPool, session.ChunkHeader, []byte("test"), mock.Anything).Return(replicaNodes, nil).Once()
@@ -542,7 +542,7 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 
 				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, true)
 				m.sessionManager.On("Delete", session.SessionID).Return()
-				m.store.On("GetData", chunkHeader.ID).Return([]byte("test data!"), nil)
+				m.store.On("GetData", mock.Anything, chunkHeader.ID).Return([]byte("test data!"), nil)
 			},
 			setupStreams: func(stream *testutils.MockStreamServer) {
 				stream.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(nil).Once()
@@ -561,7 +561,7 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 
 				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, true)
 				m.sessionManager.On("Delete", session.SessionID).Return()
-				m.store.On("GetData", chunkHeader.ID).Return([]byte("this is a test chunk"), nil)
+				m.store.On("GetData", mock.Anything, chunkHeader.ID).Return([]byte("this is a test chunk"), nil)
 			},
 			setupStreams: func(stream *testutils.MockStreamServer) {
 				stream.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(nil).Times(2)
@@ -592,7 +592,7 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 
 				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, true)
 				m.sessionManager.On("Delete", session.SessionID).Return()
-				m.store.On("GetData", chunkHeader.ID).Return(nil, assert.AnError)
+				m.store.On("GetData", mock.Anything, chunkHeader.ID).Return(nil, assert.AnError)
 			},
 			setupStreams: func(stream *testutils.MockStreamServer) {},
 			req: &proto.DownloadStreamRequest{
@@ -609,7 +609,7 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 
 				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, true)
 				m.sessionManager.On("Delete", session.SessionID).Return()
-				m.store.On("GetData", chunkHeader.ID).Return([]byte("test data!"), nil)
+				m.store.On("GetData", mock.Anything, chunkHeader.ID).Return([]byte("test data!"), nil)
 			},
 			setupStreams: func(stream *testutils.MockStreamServer) {
 				stream.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(assert.AnError)
