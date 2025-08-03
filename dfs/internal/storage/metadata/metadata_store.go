@@ -34,7 +34,7 @@ func (m *MetadataDiskStorage) GetFile(path string) (*common.FileInfo, error) {
 
 	info, ok := m.cache[path]
 	if !ok {
-		return nil, fmt.Errorf("file not found: %s", path)
+		return nil, fmt.Errorf("%w: %s", ErrNotFound, path)
 	}
 
 	return info, nil
@@ -54,7 +54,7 @@ func (m *MetadataDiskStorage) DeleteFile(path string) error {
 	defer m.mu.Unlock()
 
 	if _, ok := m.cache[path]; !ok {
-		return fmt.Errorf("file not found: %s", path)
+		return fmt.Errorf("%w: %s", ErrNotFound, path)
 	}
 
 	delete(m.cache, path)
