@@ -343,12 +343,9 @@ docker logs dfs_datanode_1
 
 ## Contributing
 
-Contribution acceptance is planned for August/September.
-* Discord communitity: [Go DFS](https://discord.gg/pF3xG6Wb)
-* Contribution guidelines
-* Repository configuration
+* Discord communitity: [Go DFS]([https://discord.gg/pF3xG6Wb](https://discord.gg/WrZKdMv3Q6))
+* [Contribution guidelines](contributing.md):
 
 ## License
-
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
