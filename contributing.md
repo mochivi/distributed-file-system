@@ -13,7 +13,7 @@ patches and documentation improvements.
 ---
 
 ### Discord Channel
-I am happy to provide guidance, answer questions and help everyone willing to contribute. For that, join the [Discord Channel](https://discord.gg/6guPgjW9).
+I am happy to provide guidance, answer questions and help everyone willing to contribute. For that, join the [Discord Channel](https://discord.gg/WrZKdMv3Q6).
 
 ---
 
