@@ -17,7 +17,6 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
 	"github.com/mochivi/distributed-file-system/internal/grpcutil"
-	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -30,7 +29,7 @@ type container struct {
 	// gRPC server dependencies
 	clusterStateHistoryManager state.ClusterStateHistoryManager
 	selector                   cluster.NodeSelector
-	metaStore                  storage.MetadataStore
+	metaStore                  metadata.MetadataStore
 	metadataManager            coordinator.MetadataSessionManager // Coordinates when to actually commit metadata
 
 	// Node Agent dependencies

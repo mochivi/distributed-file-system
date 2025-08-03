@@ -20,7 +20,6 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
 	"github.com/mochivi/distributed-file-system/internal/grpcutil"
-	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
@@ -45,7 +44,7 @@ type container struct {
 	clientPoolFactory   client_pool.ClientPoolFactory
 
 	// Node Agent dependencies
-	metadataStore   storage.MetadataStore
+	metadataStore   metadata.MetadataStore
 	metadataScanner shared.MetadataScannerProvider
 }
 

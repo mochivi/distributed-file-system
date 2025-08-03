@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/storage"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
+	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
 type MetadataSessionManager interface {
 	trackUpload(sessionID string, req common.UploadRequest, numChunks int)
-	commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore storage.MetadataStore) error
+	commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error
 }
 
 type metadataSessionManager struct {
@@ -79,7 +79,7 @@ func (m *metadataSessionManager) trackUpload(sessionID string, req common.Upload
 	m.mu.Unlock()
 }
 
-func (m *metadataSessionManager) commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore storage.MetadataStore) error {
+func (m *metadataSessionManager) commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

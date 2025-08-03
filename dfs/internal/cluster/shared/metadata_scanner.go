@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
 )
 
 // TODO: propagate context to metadata storage layer
@@ -28,11 +28,11 @@ type MetadataScannerProvider interface {
 type MetadataScannerService struct {
 	ctx    context.Context
 	cancel context.CancelCauseFunc
-	store  storage.MetadataStore // Read-only access to the metadata store, retrieves files for scanning
+	store  metadata.MetadataStore // Read-only access to the metadata store, retrieves files for scanning
 	logger *slog.Logger
 }
 
-func NewMetadataScannerService(ctx context.Context, store storage.MetadataStore, logger *slog.Logger) *MetadataScannerService {
+func NewMetadataScannerService(ctx context.Context, store metadata.MetadataStore, logger *slog.Logger) *MetadataScannerService {
 	ctx, cancel := context.WithCancelCause(ctx)
 	return &MetadataScannerService{
 		ctx:    ctx,
