@@ -59,7 +59,7 @@ A **distributed file system** written in Go that demonstrates chunk-based storag
 | Tool | Version | Purpose |
 |------|---------|---------|
 | **Go** | 1.24.4+ | Building binaries and running unit tests |
-| **Docker** | 20.10+ | Local multi-node cluster and e2e testing |
+| **Docker** | Latest | Local multi-node cluster and e2e testing |
 | **Protocol Buffers** | Latest | Required only when modifying `.proto` files |
 
 ### Development Tools (Optional)
@@ -343,12 +343,9 @@ docker logs dfs_datanode_1
 
 ## Contributing
 
-Contribution acceptance is planned for August/September.
-* Discord communitity: [Go DFS](https://discord.gg/pF3xG6Wb)
-* Contribution guidelines
-* Repository configuration
+* Discord communitity: [Go DFS]([https://discord.gg/pF3xG6Wb](https://discord.gg/WrZKdMv3Q6))
+* [Contribution guidelines](contributing.md):
 
 ## License
-
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
