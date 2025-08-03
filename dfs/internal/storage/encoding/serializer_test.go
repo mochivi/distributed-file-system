@@ -87,13 +87,13 @@ func TestProtoSerializer_DeserializeHeader_Errors(t *testing.T) {
 	testCases := []struct {
 		name        string
 		data        []byte
-		expectedErr string
+		expectedErr error
 		isEofError  bool
 	}{
 		{
 			name:        "error: invalid magic",
 			data:        []byte("BADM\x01\x00\x00\x00\x00"),
-			expectedErr: "invalid magic",
+			expectedErr: ErrInValidHeader,
 		},
 		{
 			name: "error: invalid version",
@@ -102,7 +102,7 @@ func TestProtoSerializer_DeserializeHeader_Errors(t *testing.T) {
 				{2}, // invalid version
 				validSerialized[5:],
 			}, nil),
-			expectedErr: "invalid version",
+			expectedErr: ErrInValidHeader,
 		},
 		{
 			name:       "error: eof reading magic",
@@ -127,7 +127,7 @@ func TestProtoSerializer_DeserializeHeader_Errors(t *testing.T) {
 		{
 			name:        "error: header length is 0",
 			data:        append(append([]byte(serializer.Magic), serializer.Version), []byte{0, 0, 0, 0}...),
-			expectedErr: "header length is 0",
+			expectedErr: ErrInValidHeader,
 		},
 	}
 
@@ -142,7 +142,7 @@ func TestProtoSerializer_DeserializeHeader_Errors(t *testing.T) {
 				isUnexpectedEof := errors.Is(err, io.ErrUnexpectedEOF)
 				assert.True(t, isEof || isUnexpectedEof, "expected EOF or ErrUnexpectedEOF, but got %v", err)
 			} else {
-				assert.Contains(t, err.Error(), tc.expectedErr)
+				assert.ErrorIs(t, err, tc.expectedErr)
 			}
 		})
 	}

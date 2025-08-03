@@ -3,7 +3,6 @@ package encoding
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 
@@ -49,7 +48,7 @@ func (s *ProtoSerializer) SerializeHeader(chunkHeader common.ChunkHeader) ([]byt
 	headerPB := chunkHeader.ToProto()
 	headerBytes, err := pb.Marshal(headerPB)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrSerializeHeader, err)
 	}
 
 	// 2) build file: magic + ver + len + header + data
@@ -67,41 +66,41 @@ func (s *ProtoSerializer) DeserializeHeader(reader io.Reader) (common.ChunkHeade
 	// 1) read magic
 	magic := make([]byte, 4)
 	if _, err := io.ReadFull(reader, magic); err != nil {
-		return common.ChunkHeader{}, err
+		return common.ChunkHeader{}, fmt.Errorf("%w: %w", ErrDeserializeHeader, err)
 	}
 	if string(magic) != s.Magic {
-		return common.ChunkHeader{}, fmt.Errorf("invalid magic: %s", string(magic))
+		return common.ChunkHeader{}, fmt.Errorf("%w: invalid magic: %s", ErrInValidHeader, string(magic))
 	}
 
 	// 2) read version
 	version := make([]byte, 1)
 	if _, err := io.ReadFull(reader, version); err != nil {
-		return common.ChunkHeader{}, err
+		return common.ChunkHeader{}, fmt.Errorf("%w: %w", ErrDeserializeHeader, err)
 	}
 	if version[0] != s.Version {
-		return common.ChunkHeader{}, fmt.Errorf("invalid version: %d", version[0])
+		return common.ChunkHeader{}, fmt.Errorf("%w: invalid version: %d", ErrInValidHeader, version[0])
 	}
 
 	// 3) read length
 	lengthBytes := make([]byte, 4)
 	if _, err := io.ReadFull(reader, lengthBytes); err != nil {
-		return common.ChunkHeader{}, err
+		return common.ChunkHeader{}, fmt.Errorf("%w: %w", ErrDeserializeHeader, err)
 	}
 	lengthInt := binary.BigEndian.Uint32(lengthBytes)
 
 	if lengthInt == 0 {
-		return common.ChunkHeader{}, errors.New("header length is 0")
+		return common.ChunkHeader{}, fmt.Errorf("%w: header length is 0", ErrInValidHeader)
 	}
 
 	// 4) read header
 	headerBytes := make([]byte, lengthInt)
 	if _, err := io.ReadFull(reader, headerBytes); err != nil {
-		return common.ChunkHeader{}, err
+		return common.ChunkHeader{}, fmt.Errorf("%w: %w", ErrDeserializeHeader, err)
 	}
 
 	headerPB := &proto.ChunkHeader{}
 	if err := pb.Unmarshal(headerBytes, headerPB); err != nil {
-		return common.ChunkHeader{}, err
+		return common.ChunkHeader{}, fmt.Errorf("%w: %w", ErrDeserializeHeader, err)
 	}
 	return common.ChunkHeaderFromProto(headerPB), nil
 }
@@ -110,7 +109,7 @@ func (s *ProtoSerializer) HeaderSize(chunkHeader common.ChunkHeader) (int, error
 	headerPB := chunkHeader.ToProto()
 	headerBytes, err := pb.Marshal(headerPB)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("%w: %w", ErrSerializeHeader, err)
 	}
 	return 9 + len(headerBytes), nil // 4 B magic + 1 B version + 4 B length
 }

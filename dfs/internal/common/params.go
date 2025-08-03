@@ -50,16 +50,20 @@ const (
 	LogSuccess      = "success"
 	LogSuccessCount = "success_count"
 	LogFailureCount = "failure_count"
+
+	// Storage related params
+
 )
 
 // Component names
 const (
-	ComponentCoordinator = "coordinator"
-	ComponentDatanode    = "datanode"
-	ComponentClient      = "client"
-	ComponentUploader    = "uploader"
-	ComponentDownloader  = "downloader"
-	ComponentStreamer    = "streamer"
+	ComponentCoordinator  = "coordinator"
+	ComponentDatanode     = "datanode"
+	ComponentClient       = "client"
+	ComponentUploader     = "uploader"
+	ComponentDownloader   = "downloader"
+	ComponentStreamer     = "streamer"
+	ComponentChunkStorage = "chunk_storage"
 )
 
 // Operation names
@@ -74,4 +78,15 @@ const (
 	OpReplicate  = "replicate"
 	OpGC         = "gc"
 	OpHeartbeat  = "heartbeat"
+
+	// Storage related operations
+	OpGetChunk    = "get_chunk"
+	OpGetHeader   = "get_chunk_header"
+	OpGetData     = "get_chunk_data"
+	OpPutChunk    = "put_chunk"
+	OpDeleteChunk = "delete_chunk"
+
+	// Bulk storage operations
+	OpGetHeaders = "get_chunk_headers"
+	OpListChunks = "list_chunks"
 )
