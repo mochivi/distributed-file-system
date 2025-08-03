@@ -1,6 +1,7 @@
 package streaming
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -23,9 +24,9 @@ func NewStreamingSessionManager(config config.StreamingSessionManagerConfig, log
 	return &streamingSessionManager{sessions: make(map[string]*streamingSession), config: config, logger: logger}
 }
 
-func (sm *streamingSessionManager) NewSession(chunkHeader common.ChunkHeader, propagate bool) *streamingSession {
+func (sm *streamingSessionManager) NewSession(ctx context.Context, chunkHeader common.ChunkHeader, propagate bool) *streamingSession {
 	sessionID := uuid.New().String()
-	session := NewStreamingSession(sessionID, chunkHeader, propagate)
+	session := NewStreamingSession(ctx, sessionID, chunkHeader, propagate)
 	session.ExpiresAt = time.Now().Add(sm.config.SessionTimeout)
 	return session
 }

@@ -146,7 +146,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	logger := logging.ExtendLogger(rootLogger, slog.String("node_id", datanodeInfo.ID))
+	logger := logging.ExtendLogger(rootLogger,
+		slog.String(common.LogComponent, common.ComponentDatanode),
+		slog.String(common.LogNodeID, datanodeInfo.ID))
 
 	// Root context and cancel function for coordinated shutdown
 	ctx, cancel := context.WithCancel(context.Background())

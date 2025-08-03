@@ -1,13 +1,19 @@
 package logging
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
 	"os"
 
+	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/utils"
 )
+
+type contextKey string
+
+const loggerKey contextKey = "logger"
 
 // TextLogger can be used during development for more readable logs
 func SetupTextLogger(logLevel slog.Level) *slog.Logger {
@@ -69,6 +75,32 @@ func InitLogger() (*slog.Logger, error) {
 	return logger, nil
 }
 
+func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
+	return context.WithValue(ctx, loggerKey, logger)
+}
+
+func FromContext(ctx context.Context) *slog.Logger {
+	if logger, ok := ctx.Value(loggerKey).(*slog.Logger); ok {
+		return logger
+	}
+	return slog.Default() // Fallback to default logger
+}
+
+func FromContextWith(ctx context.Context, kvs ...any) (context.Context, *slog.Logger) {
+	logger := FromContext(ctx)        // Get logger fom context
+	logger = logger.With(kvs...)      // Add new fields
+	newCtx := WithLogger(ctx, logger) // Attach to new context already
+	return newCtx, logger
+}
+
+func FromContextWithOperation(ctx context.Context, operation string, kvs ...any) (context.Context, *slog.Logger) {
+	logger := FromContext(ctx) // Get logger fom context
+	attrs := append(kvs, slog.String(common.LogOperation, operation))
+	logger = logger.With(attrs...)
+	newCtx := WithLogger(ctx, logger) // Attach to new context already
+	return newCtx, logger
+}
+
 // Extend logger with additional attributes
 func ExtendLogger(logger *slog.Logger, kvs ...any) *slog.Logger {
 	return logger.With(kvs...)
@@ -76,11 +108,11 @@ func ExtendLogger(logger *slog.Logger, kvs ...any) *slog.Logger {
 
 // Add some operation specific attributes to the logger
 func OperationLogger(logger *slog.Logger, operation string, kvs ...any) *slog.Logger {
-	attrs := append(kvs, slog.String("operation", operation))
+	attrs := append(kvs, slog.String(common.LogOperation, operation))
 	return ExtendLogger(logger, attrs...)
 }
 
 func ServiceLogger(logger *slog.Logger, service string, kvs ...any) *slog.Logger {
-	attrs := append(kvs, slog.String("service", service))
+	attrs := append(kvs, slog.String(common.LogService, service))
 	return ExtendLogger(logger, attrs...)
 }

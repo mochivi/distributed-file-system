@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/apperr"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -35,10 +37,16 @@ func NewLoggingInterceptor(logger *slog.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		start := time.Now()
 
-		// Log incoming request
-		logger.Info("Request started",
-			slog.String(common.LoggingParamMethod, info.FullMethod),
-			slog.Time(common.LoggingParamTimestamp, start))
+		// Generate a request ID for each request
+		requestID := generateRequestID()
+		requestLogger := logging.ExtendLogger(logger, slog.String(common.LogRequestID, requestID))
+
+		requestLogger.Info("Request started",
+			slog.String(common.LogMethod, info.FullMethod),
+			slog.Time(common.LogTimestamp, start))
+
+		// Attach logger to context
+		ctx = logging.WithLogger(ctx, requestLogger)
 
 		resp, err := handler(ctx, req)
 
@@ -48,17 +56,21 @@ func NewLoggingInterceptor(logger *slog.Logger) grpc.UnaryServerInterceptor {
 		// The ErrorsInterceptor has already handled error translation and logging
 		if err != nil {
 			// Just log that it failed, error details already logged by ErrorsInterceptor
-			logger.Info("Request completed with error",
-				slog.String(common.LoggingParamMethod, info.FullMethod),
-				slog.String(common.LoggingParamError, err.Error()),
-				slog.Duration(common.LoggingParamDuration, duration),
-				slog.String(common.LoggingParamGrpcStatus, status.Code(err).String()))
+			requestLogger.Info("Request completed with error",
+				slog.String(common.LogMethod, info.FullMethod),
+				slog.String(common.LogError, err.Error()),
+				slog.Duration(common.LogDuration, duration),
+				slog.String(common.LogStatus, status.Code(err).String()))
 		} else {
-			logger.Info("Request completed successfully",
-				slog.String(common.LoggingParamMethod, info.FullMethod),
-				slog.Duration(common.LoggingParamDuration, duration))
+			requestLogger.Info("Request completed successfully",
+				slog.String(common.LogMethod, info.FullMethod),
+				slog.Duration(common.LogDuration, duration))
 		}
 
 		return resp, err
 	}
+}
+
+func generateRequestID() string {
+	return uuid.NewString()
 }

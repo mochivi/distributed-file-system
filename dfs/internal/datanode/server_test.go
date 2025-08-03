@@ -72,16 +72,57 @@ func TestDataNodeServer_PrepareChunkUpload(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(m *serverMocks) {
-				session := streaming.NewStreamingSession("session1", common.ChunkHeader{ID: "chunk1", Size: 10}, false)
+				session := streaming.NewStreamingSession(context.Background(), "session1", common.ChunkHeader{ID: "chunk1", Size: 10}, false)
 				session.Status = streaming.SessionActive
 				m.sessionManager.On("LoadByChunk", "chunk1").Return(nil, false)
-				m.sessionManager.On("NewSession", mock.AnythingOfType("common.ChunkHeader"), mock.AnythingOfType("bool")).Return(session)
+				m.sessionManager.On("NewSession", mock.Anything, mock.AnythingOfType("common.ChunkHeader"), mock.AnythingOfType("bool")).Return(session)
 				m.sessionManager.On("Store", session.SessionID, session).Return(nil)
 			},
 			req: &proto.UploadChunkRequest{
 				ChunkHeader: &proto.ChunkHeader{Id: "chunk1", Size: 512},
 			},
 			expectedResp: &proto.NodeReady{Accept: true, Message: "Ready to receive chunk data"},
+			expectErr:    false,
+		},
+		{
+			name: "success: session already active",
+			setupMocks: func(m *serverMocks) {
+				activeSession := streaming.NewStreamingSession(context.Background(), "active-chunk", common.ChunkHeader{ID: "active-chunk", Size: 128}, false)
+				m.sessionManager.On("LoadByChunk", "active-chunk").Return(activeSession, true)
+			},
+			req: &proto.UploadChunkRequest{ChunkHeader: &proto.ChunkHeader{Id: "active-chunk", Size: 128}},
+			expectedResp: &proto.NodeReady{
+				Accept:  true,
+				Message: "Session already active",
+			},
+			expectErr: false,
+		},
+		{
+			name: "success: session already completed",
+			setupMocks: func(m *serverMocks) {
+				session := streaming.NewStreamingSession(context.Background(), "session1", common.ChunkHeader{ID: "chunk1", Size: 10}, false)
+				session.Status = streaming.SessionCompleted
+				m.sessionManager.On("LoadByChunk", "chunk1").Return(session, true)
+				m.sessionManager.On("Delete", session.SessionID)
+			},
+			req: &proto.UploadChunkRequest{
+				ChunkHeader: &proto.ChunkHeader{Id: "chunk1", Size: 512},
+			},
+			expectedResp: &proto.NodeReady{Accept: false, Message: "Invalid session"},
+			expectErr:    false,
+		},
+		{
+			name: "success: session already completed",
+			setupMocks: func(m *serverMocks) {
+				session := streaming.NewStreamingSession(context.Background(), "session1", common.ChunkHeader{ID: "chunk1", Size: 10}, false)
+				session.Status = streaming.SessionFailed
+				m.sessionManager.On("LoadByChunk", "chunk1").Return(session, true)
+				m.sessionManager.On("Delete", session.SessionID)
+			},
+			req: &proto.UploadChunkRequest{
+				ChunkHeader: &proto.ChunkHeader{Id: "chunk1", Size: 512},
+			},
+			expectedResp: &proto.NodeReady{Accept: false, Message: "Invalid session"},
 			expectErr:    false,
 		},
 		{
@@ -101,19 +142,6 @@ func TestDataNodeServer_PrepareChunkUpload(t *testing.T) {
 			expectedResp: &proto.NodeReady{
 				Accept:  false,
 				Message: "Invalid chunk metadata",
-			},
-			expectErr: false,
-		},
-		{
-			name: "success: session already active",
-			setupMocks: func(m *serverMocks) {
-				activeSession := streaming.NewStreamingSession("active-chunk", common.ChunkHeader{ID: "active-chunk", Size: 128}, false)
-				m.sessionManager.On("LoadByChunk", "active-chunk").Return(activeSession, true)
-			},
-			req: &proto.UploadChunkRequest{ChunkHeader: &proto.ChunkHeader{Id: "active-chunk", Size: 128}},
-			expectedResp: &proto.NodeReady{
-				Accept:  true,
-				Message: "session already active",
 			},
 			expectErr: false,
 		},
@@ -179,10 +207,10 @@ func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(m *serverMocks) {
-				session := streaming.NewStreamingSession("session1", common.ChunkHeader{ID: "chunk1", Size: 1024}, false)
+				session := streaming.NewStreamingSession(context.Background(), "session1", common.ChunkHeader{ID: "chunk1", Size: 1024}, false)
 				m.store.On("Exists", "chunk1").Return(true)
 				m.store.On("GetHeader", "chunk1").Return(chunkHeader, nil)
-				m.sessionManager.On("NewSession", mock.AnythingOfType("common.ChunkHeader"), mock.AnythingOfType("bool")).Return(session)
+				m.sessionManager.On("NewSession", mock.Anything, mock.AnythingOfType("common.ChunkHeader"), mock.AnythingOfType("bool")).Return(session)
 				m.sessionManager.On("Store", session.SessionID, session).Return(nil)
 			},
 			req: &proto.DownloadChunkRequest{ChunkId: "chunk1"},
@@ -212,10 +240,10 @@ func TestDataNodeServer_PrepareChunkDownload(t *testing.T) {
 		{
 			name: "error: streaming session already exists",
 			setupMocks: func(m *serverMocks) {
-				session := streaming.NewStreamingSession("session1", common.ChunkHeader{ID: "existing-chunk", Size: 1024}, false)
+				session := streaming.NewStreamingSession(context.Background(), "session1", common.ChunkHeader{ID: "existing-chunk", Size: 1024}, false)
 				m.store.On("Exists", "existing-chunk").Return(true)
 				m.store.On("GetHeader", "existing-chunk").Return(chunkHeader, nil)
-				m.sessionManager.On("NewSession", mock.AnythingOfType("common.ChunkHeader"), mock.AnythingOfType("bool")).Return(session)
+				m.sessionManager.On("NewSession", mock.Anything, mock.AnythingOfType("common.ChunkHeader"), mock.AnythingOfType("bool")).Return(session)
 				m.sessionManager.On("Store", session.SessionID, session).Return(assert.AnError)
 			},
 			req:       &proto.DownloadChunkRequest{ChunkId: "existing-chunk"},
@@ -337,7 +365,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 			name: "success - single chunk upload",
 			setupMocks: func(m *serverMocks, stream *testutils.MockBidiStreamServer) {
 				chunkHeader := common.ChunkHeader{ID: "chunk1", Size: 10, Checksum: chunk.CalculateChecksum([]byte("test data!"))}
-				session := streaming.NewStreamingSession("session1", chunkHeader, false)
+				session := streaming.NewStreamingSession(context.Background(), "session1", chunkHeader, false)
 				session.Status = streaming.SessionActive
 
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil).Once()
@@ -352,7 +380,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 			name: "success: multiple chunks upload",
 			setupMocks: func(m *serverMocks, stream *testutils.MockBidiStreamServer) {
 				chunkHeader := common.ChunkHeader{ID: "chunk2", Size: 10, Checksum: chunk.CalculateChecksum([]byte("test data!"))}
-				session := streaming.NewStreamingSession("session2", chunkHeader, false)
+				session := streaming.NewStreamingSession(context.Background(), "session2", chunkHeader, false)
 				session.Status = streaming.SessionActive
 
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil).Once()
@@ -367,7 +395,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 			name: "success: upload with replication",
 			setupMocks: func(m *serverMocks, stream *testutils.MockBidiStreamServer) {
 				chunkHeader := common.ChunkHeader{ID: "chunk3", Size: 10, Checksum: chunk.CalculateChecksum([]byte("test data!"))}
-				session := streaming.NewStreamingSession("session3", chunkHeader, false)
+				session := streaming.NewStreamingSession(context.Background(), "session3", chunkHeader, false)
 				session.Status = streaming.SessionActive
 				session.Propagate = true
 
@@ -402,7 +430,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 			name: "error: ReceiveChunks fails",
 			setupMocks: func(m *serverMocks, stream *testutils.MockBidiStreamServer) {
 				chunkHeader := common.ChunkHeader{ID: "chunk4", Size: 4, Checksum: chunk.CalculateChecksum([]byte("test"))}
-				session := streaming.NewStreamingSession("session4", chunkHeader, false)
+				session := streaming.NewStreamingSession(context.Background(), "session4", chunkHeader, false)
 				session.Status = streaming.SessionActive
 
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil)
@@ -416,7 +444,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 			name: "error: storage failure",
 			setupMocks: func(m *serverMocks, stream *testutils.MockBidiStreamServer) {
 				chunkHeader := common.ChunkHeader{ID: "chunk6", Size: 4, Checksum: chunk.CalculateChecksum([]byte("test"))}
-				session := streaming.NewStreamingSession("session6", chunkHeader, false)
+				session := streaming.NewStreamingSession(context.Background(), "session6", chunkHeader, false)
 				session.Status = streaming.SessionActive
 
 				m.serverStreamer.On("HandleFirstChunk", stream).Return(session, nil)
@@ -431,7 +459,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 			name: "error: replication failure",
 			setupMocks: func(m *serverMocks, stream *testutils.MockBidiStreamServer) {
 				chunkHeader := common.ChunkHeader{ID: "chunk7", Size: 4, Checksum: chunk.CalculateChecksum([]byte("test"))}
-				session := streaming.NewStreamingSession("session7", chunkHeader, false)
+				session := streaming.NewStreamingSession(context.Background(), "session7", chunkHeader, false)
 				session.Status = streaming.SessionActive
 				session.Propagate = true
 
@@ -451,7 +479,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 			name: "error: SendFinalReplicasAck fails",
 			setupMocks: func(m *serverMocks, stream *testutils.MockBidiStreamServer) {
 				chunkHeader := common.ChunkHeader{ID: "chunk8", Size: 4, Checksum: chunk.CalculateChecksum([]byte("test"))}
-				session := streaming.NewStreamingSession("session8", chunkHeader, false)
+				session := streaming.NewStreamingSession(context.Background(), "session8", chunkHeader, false)
 				session.Status = streaming.SessionActive
 				session.Propagate = true
 
@@ -524,7 +552,7 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 			name: "success: download chunk",
 			setupMocks: func(m *serverMocks, stream *testutils.MockStreamServer) {
 				chunkHeader := common.ChunkHeader{ID: "chunk1", Size: 10}
-				session := streaming.NewStreamingSession("session1", chunkHeader, false)
+				session := streaming.NewStreamingSession(context.Background(), "session1", chunkHeader, false)
 
 				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, true)
 				m.sessionManager.On("Delete", session.SessionID).Return()
@@ -543,7 +571,7 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 			name: "success: download large chunk in multiple frames",
 			setupMocks: func(m *serverMocks, stream *testutils.MockStreamServer) {
 				chunkHeader := common.ChunkHeader{ID: "chunk2", Size: 20}
-				session := streaming.NewStreamingSession("session2", chunkHeader, false)
+				session := streaming.NewStreamingSession(context.Background(), "session2", chunkHeader, false)
 
 				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, true)
 				m.sessionManager.On("Delete", session.SessionID).Return()
@@ -575,7 +603,7 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 			name: "error: chunk data retrieval failure",
 			setupMocks: func(m *serverMocks, stream *testutils.MockStreamServer) {
 				chunkHeader := common.ChunkHeader{ID: "chunk3", Size: 10}
-				session := streaming.NewStreamingSession("session3", chunkHeader, false)
+				session := streaming.NewStreamingSession(context.Background(), "session3", chunkHeader, false)
 
 				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, true)
 				m.sessionManager.On("Delete", session.SessionID).Return()
@@ -593,7 +621,7 @@ func TestDataNodeServer_DownloadChunkStream(t *testing.T) {
 			name: "error: stream send failure",
 			setupMocks: func(m *serverMocks, stream *testutils.MockStreamServer) {
 				chunkHeader := common.ChunkHeader{ID: "chunk4", Size: 10}
-				session := streaming.NewStreamingSession("session4", chunkHeader, false)
+				session := streaming.NewStreamingSession(context.Background(), "session4", chunkHeader, false)
 
 				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, true)
 				m.sessionManager.On("Delete", session.SessionID).Return()
