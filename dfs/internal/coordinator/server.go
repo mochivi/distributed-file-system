@@ -2,13 +2,16 @@ package coordinator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mochivi/distributed-file-system/internal/apperr"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
+	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc/codes"
@@ -72,8 +75,11 @@ func (c *Coordinator) DownloadFile(ctx context.Context, pb *proto.DownloadReques
 	// Try to retrieve information about the file location
 	fileInfo, err := c.metaStore.GetFile(req.Path)
 	if err != nil {
-		logger.Error("Failed to get file info", slog.String(common.LogError, err.Error()))
-		return nil, status.Error(codes.NotFound, "file not found")
+		if errors.Is(err, metadata.ErrNotFound) {
+			logger.Error("Failed to get file info", slog.String(common.LogError, err.Error()))
+			return nil, apperr.Wrap(codes.NotFound, "file not found", err)
+		}
+		return nil, fmt.Errorf("failed to get file info: %w", err)
 	}
 
 	// Build chunk sources
@@ -109,8 +115,7 @@ func (c *Coordinator) ListFiles(ctx context.Context, pb *proto.ListRequest) (*pr
 
 	files, err := c.metaStore.ListFiles(req.Directory, true) // hardcoded to always recursive for now
 	if err != nil {
-		logger.Error("Failed to list files", slog.String(common.LogError, err.Error()))
-		return nil, status.Error(codes.Internal, "failed to list files")
+		return nil, fmt.Errorf("failed to list files: %w", err)
 	}
 
 	logger.Info("Replying to client with list of files", slog.Int(common.LogNumFiles, len(files)))
@@ -128,8 +133,10 @@ func (c *Coordinator) DeleteFile(ctx context.Context, pb *proto.DeleteRequest) (
 		slog.String(common.LogFilePath, req.Path))
 
 	if err := c.metaStore.DeleteFile(req.Path); err != nil {
-		logger.Error("Failed to delete file", slog.String(common.LogError, err.Error()))
-		return nil, status.Error(codes.Internal, "failed to delete file")
+		if errors.Is(err, metadata.ErrNotFound) {
+			return nil, apperr.Wrap(codes.NotFound, "file not found", err)
+		}
+		return nil, fmt.Errorf("failed to delete file: %w", err)
 	}
 
 	logger.Info("Deleted file")

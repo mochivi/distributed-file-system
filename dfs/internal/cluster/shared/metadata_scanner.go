@@ -2,6 +2,7 @@ package shared
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -47,8 +48,7 @@ func NewMetadataScannerService(ctx context.Context, store metadata.MetadataStore
 func (s *MetadataScannerService) GetDeletedFiles(ctx context.Context, olderThan time.Time) ([]*common.FileInfo, error) {
 	files, err := s.store.GetDeletedFiles(olderThan)
 	if err != nil {
-		s.logger.Error("Failed to get deleted files", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get deleted files: %w", err)
 	}
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -61,8 +61,7 @@ func (s *MetadataScannerService) GetDeletedFiles(ctx context.Context, olderThan 
 func (s *MetadataScannerService) GetChunksForNode(ctx context.Context, nodeID string) (map[string]*common.ChunkHeader, error) {
 	chunks, err := s.store.GetChunksForNode(nodeID)
 	if err != nil {
-		s.logger.Error("Failed to get chunks for node", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get chunks for node: %w", err)
 	}
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
