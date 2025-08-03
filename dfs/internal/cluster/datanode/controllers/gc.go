@@ -3,6 +3,7 @@ package datanode_controllers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -92,7 +93,7 @@ func (c *OrphanedChunksGCController) run(ctx context.Context) ([]string, error) 
 	// Delegate deletion
 	failed, err := c.store.BulkDelete(ctx, c.config.MaxConcurrentDeletes, orphaned)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to delete chunks: %w", err)
 	}
 
 	return failed, nil
@@ -109,7 +110,7 @@ func getChunks(ctx context.Context, nodeID string, scanner shared.MetadataScanne
 	g.Go(func() error {
 		chunks, err := scanner.GetChunksForNode(ctx, nodeID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get chunks for node: %w", err)
 		}
 		expectedChunks = chunks // It's fine to update directly as there is only one goroutine writing to it
 		return nil
@@ -119,7 +120,7 @@ func getChunks(ctx context.Context, nodeID string, scanner shared.MetadataScanne
 	g.Go(func() error {
 		chunks, err := store.GetHeaders(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get chunk headers: %w", err)
 		}
 		actualChunks = chunks // It's fine to update directly as there is only one goroutine writing to it
 		return nil

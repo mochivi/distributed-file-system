@@ -94,7 +94,7 @@ func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.Dow
 		if errors.Is(err, chunk.ErrInvalidChunkID) {
 			return nil, apperr.InvalidArgument("invalid chunkID", err)
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to get chunk header: %w", err)
 	}
 
 	session := s.sessionManager.NewSession(ctx, chunkHeader, false)
@@ -130,7 +130,7 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 		if errors.Is(err, chunk.ErrInvalidChunkID) {
 			return nil, apperr.InvalidArgument("invalid chunkID", err)
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to delete chunk: %w", err)
 	}
 
 	logger.Info("Chunk deleted successfully")
@@ -259,7 +259,7 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 		if errors.Is(err, chunk.ErrInvalidChunkID) {
 			apperr.InvalidArgument("invalid chunkID", err)
 		}
-		return err
+		return fmt.Errorf("failed to store chunk: %w", err)
 	}
 	logger.Debug("Chunk stored successfully")
 
@@ -315,7 +315,7 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 		if errors.Is(err, encoding.ErrDeserializeHeader) {
 			return apperr.Internal(err)
 		}
-		return err
+		return fmt.Errorf("failed to get chunk data: %w", err)
 	}
 
 	reader := bytes.NewReader(chunkData)
