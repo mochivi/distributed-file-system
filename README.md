@@ -59,7 +59,7 @@ A **distributed file system** written in Go that demonstrates chunk-based storag
 | Tool | Version | Purpose |
 |------|---------|---------|
 | **Go** | 1.24.4+ | Building binaries and running unit tests |
-| **Docker** | 20.10+ | Local multi-node cluster and e2e testing |
+| **Docker** | Latest | Local multi-node cluster and e2e testing |
 | **Protocol Buffers** | Latest | Required only when modifying `.proto` files |
 
 ### Development Tools (Optional)
