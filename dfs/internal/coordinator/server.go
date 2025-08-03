@@ -73,7 +73,7 @@ func (c *Coordinator) DownloadFile(ctx context.Context, pb *proto.DownloadReques
 		slog.String(common.LogFilePath, req.Path))
 
 	// Try to retrieve information about the file location
-	fileInfo, err := c.metaStore.GetFile(req.Path)
+	fileInfo, err := c.metaStore.GetFile(ctx, req.Path)
 	if err != nil {
 		if errors.Is(err, metadata.ErrNotFound) {
 			logger.Error("Failed to get file info", slog.String(common.LogError, err.Error()))
@@ -113,7 +113,7 @@ func (c *Coordinator) ListFiles(ctx context.Context, pb *proto.ListRequest) (*pr
 	_, logger := logging.FromContextWithOperation(ctx, common.OpList,
 		slog.String(common.LogDirectory, req.Directory))
 
-	files, err := c.metaStore.ListFiles(req.Directory, true) // hardcoded to always recursive for now
+	files, err := c.metaStore.ListFiles(ctx, req.Directory, true) // hardcoded to always recursive for now
 	if err != nil {
 		return nil, fmt.Errorf("failed to list files: %w", err)
 	}
@@ -132,7 +132,7 @@ func (c *Coordinator) DeleteFile(ctx context.Context, pb *proto.DeleteRequest) (
 	_, logger := logging.FromContextWithOperation(ctx, common.OpDelete,
 		slog.String(common.LogFilePath, req.Path))
 
-	if err := c.metaStore.DeleteFile(req.Path); err != nil {
+	if err := c.metaStore.DeleteFile(ctx, req.Path); err != nil {
 		if errors.Is(err, metadata.ErrNotFound) {
 			return nil, apperr.Wrap(codes.NotFound, "file not found", err)
 		}
@@ -148,7 +148,7 @@ func (c *Coordinator) ConfirmUpload(ctx context.Context, pb *proto.ConfirmUpload
 	_, logger := logging.FromContextWithOperation(ctx, common.OpCommit,
 		slog.String(common.LogMetadataSessionID, req.SessionID))
 
-	if err := c.metadataManager.commit(req.SessionID, req.ChunkInfos, c.metaStore); err != nil {
+	if err := c.metadataManager.commit(ctx, req.SessionID, req.ChunkInfos, c.metaStore); err != nil {
 		logger.Error("Failed to commit metadata", slog.String(common.LogError, err.Error()))
 		return common.ConfirmUploadResponse{
 			Success: false,

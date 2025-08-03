@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -28,7 +29,7 @@ func NewMetadataLocalStorage() *MetadataDiskStorage {
 	}
 }
 
-func (m *MetadataDiskStorage) GetFile(path string) (*common.FileInfo, error) {
+func (m *MetadataDiskStorage) GetFile(ctx context.Context, path string) (*common.FileInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -40,7 +41,7 @@ func (m *MetadataDiskStorage) GetFile(path string) (*common.FileInfo, error) {
 	return info, nil
 }
 
-func (m *MetadataDiskStorage) PutFile(path string, info *common.FileInfo) error {
+func (m *MetadataDiskStorage) PutFile(ctx context.Context, path string, info *common.FileInfo) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -49,7 +50,7 @@ func (m *MetadataDiskStorage) PutFile(path string, info *common.FileInfo) error 
 	return nil
 }
 
-func (m *MetadataDiskStorage) DeleteFile(path string) error {
+func (m *MetadataDiskStorage) DeleteFile(ctx context.Context, path string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -62,7 +63,7 @@ func (m *MetadataDiskStorage) DeleteFile(path string) error {
 	return nil
 }
 
-func (m *MetadataDiskStorage) ListFiles(directory string, recursive bool) ([]*common.FileInfo, error) {
+func (m *MetadataDiskStorage) ListFiles(ctx context.Context, directory string, recursive bool) ([]*common.FileInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -76,7 +77,7 @@ func (m *MetadataDiskStorage) ListFiles(directory string, recursive bool) ([]*co
 	return files, nil
 }
 
-func (m *MetadataDiskStorage) GetChunksForNode(nodeID string) (map[string]*common.ChunkHeader, error) {
+func (m *MetadataDiskStorage) GetChunksForNode(ctx context.Context, nodeID string) (map[string]*common.ChunkHeader, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -92,7 +93,7 @@ func (m *MetadataDiskStorage) GetChunksForNode(nodeID string) (map[string]*commo
 	return nil, nil
 }
 
-func (m *MetadataDiskStorage) GetDeletedFiles(olderThan time.Time) ([]*common.FileInfo, error) {
+func (m *MetadataDiskStorage) GetDeletedFiles(ctx context.Context, olderThan time.Time) ([]*common.FileInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 

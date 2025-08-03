@@ -1,6 +1,7 @@
 package coordinator
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 	"time"
@@ -34,7 +35,7 @@ func TestTrackUpload(t *testing.T) {
 	// We expect the commit to fail on the metastore call, but not because the session is missing
 	mockStore.On("PutFile", req.Path, mock.Anything).Return(nil)
 
-	err := manager.commit(sessionID, chunkInfos, mockStore)
+	err := manager.commit(context.Background(), sessionID, chunkInfos, mockStore)
 	assert.NoError(t, err, "Commit should not fail because session is missing")
 }
 
@@ -104,7 +105,7 @@ func TestCommit(t *testing.T) {
 			tc.setupManager(manager, tc.sessionID)
 			tc.setupMocks(mockStore)
 
-			err := manager.commit(tc.sessionID, tc.testChunkInfo, mockStore)
+			err := manager.commit(context.Background(), tc.sessionID, tc.testChunkInfo, mockStore)
 
 			if tc.expectErr {
 				assert.Error(t, err)

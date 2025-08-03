@@ -1,6 +1,7 @@
 package coordinator
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,7 +16,7 @@ import (
 
 type MetadataSessionManager interface {
 	trackUpload(sessionID string, req common.UploadRequest, numChunks int)
-	commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error
+	commit(ctx context.Context, sessionID string, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error
 }
 
 type metadataSessionManager struct {
@@ -79,7 +80,7 @@ func (m *metadataSessionManager) trackUpload(sessionID string, req common.Upload
 	m.mu.Unlock()
 }
 
-func (m *metadataSessionManager) commit(sessionID string, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error {
+func (m *metadataSessionManager) commit(ctx context.Context, sessionID string, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -99,7 +100,7 @@ func (m *metadataSessionManager) commit(sessionID string, chunkInfos []common.Ch
 	fileInfo.Chunks = chunkInfos
 
 	m.logger.Info("Committing metadata for file", slog.String("file_path", fileInfo.Path), slog.Int("num_chunks", len(chunkInfos)))
-	if err := metaStore.PutFile(fileInfo.Path, fileInfo); err != nil {
+	if err := metaStore.PutFile(ctx, fileInfo.Path, fileInfo); err != nil {
 		return fmt.Errorf("failed to store file metadata: %w", err)
 	}
 
