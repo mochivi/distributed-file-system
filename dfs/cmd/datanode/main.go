@@ -50,7 +50,7 @@ type container struct {
 
 func setupDependencies(ctx context.Context, cfg *config.DatanodeAppConfig, logger *slog.Logger) *container {
 	chunkSerializer := encoding.NewProtoSerializer()
-	chunkStore, err := chunk.NewChunkDiskStorage(afero.NewOsFs(), cfg.Node.DiskStorage, chunkSerializer, logger)
+	chunkStore, err := chunk.NewChunkDiskStorage(afero.NewOsFs(), cfg.Node.DiskStorage, chunkSerializer)
 	if err != nil {
 		log.Fatal(err.Error())
 	}

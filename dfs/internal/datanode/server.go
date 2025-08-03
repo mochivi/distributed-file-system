@@ -84,12 +84,12 @@ func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.Dow
 	req := common.DownloadChunkRequestFromProto(pb)
 	ctx, logger := logging.FromContextWithOperation(ctx, common.OpDownload, slog.String(common.LogChunkID, req.ChunkID))
 
-	if !s.store.Exists(req.ChunkID) {
+	if !s.store.Exists(ctx, req.ChunkID) {
 		logger.Error("Chunk not found", slog.String(common.LogChunkID, req.ChunkID))
 		return nil, status.Errorf(codes.NotFound, "chunk not found")
 	}
 
-	chunkHeader, err := s.store.GetHeader(req.ChunkID)
+	chunkHeader, err := s.store.GetHeader(ctx, req.ChunkID)
 	if err != nil {
 		if errors.Is(err, chunk.ErrInvalidChunkID) {
 			return nil, apperr.InvalidArgument("invalid chunkID", err)
@@ -118,7 +118,7 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 	req := common.DeleteChunkRequestFromProto(pb)
 	_, logger := logging.FromContextWithOperation(ctx, common.OpDelete, slog.String(common.LogChunkID, req.ChunkID))
 
-	if !s.store.Exists(req.ChunkID) {
+	if !s.store.Exists(ctx, req.ChunkID) {
 		logger.Error("Chunk not found")
 		return common.DeleteChunkResponse{
 			Success: false,
@@ -126,7 +126,7 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 		}.ToProto(), nil
 	}
 
-	if err := s.store.Delete(req.ChunkID); err != nil {
+	if err := s.store.Delete(ctx, req.ChunkID); err != nil {
 		if errors.Is(err, chunk.ErrInvalidChunkID) {
 			return nil, apperr.InvalidArgument("invalid chunkID", err)
 		}
@@ -172,7 +172,7 @@ func (s *DataNodeServer) BulkDeleteChunk(ctx context.Context, pb *proto.BulkDele
 				return
 			}
 
-			if !s.store.Exists(id) {
+			if !s.store.Exists(ctx, id) {
 				results <- result{chunkID: id, success: false, err: fmt.Errorf("chunk not found")}
 				return
 			}
@@ -182,7 +182,7 @@ func (s *DataNodeServer) BulkDeleteChunk(ctx context.Context, pb *proto.BulkDele
 				return
 			}
 
-			if err := s.store.Delete(id); err != nil {
+			if err := s.store.Delete(ctx, id); err != nil {
 				results <- result{chunkID: id, success: false, err: err}
 				return
 			}
@@ -254,7 +254,7 @@ func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto
 	// TODO: implement flushing at session level, not here
 	// TODO: for now, storing entire chunk in buffer and writing all at once
 	logger.Debug("Storing chunk", slog.Int(common.LogChunkSize, len(chunkData)))
-	if err = s.store.Store(session.ChunkHeader, chunkData); err != nil {
+	if err = s.store.Store(ctx, session.ChunkHeader, chunkData); err != nil {
 		session.Fail()
 		if errors.Is(err, chunk.ErrInvalidChunkID) {
 			apperr.InvalidArgument("invalid chunkID", err)
@@ -304,13 +304,13 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 	}
 	defer s.sessionManager.Delete(session.SessionID)
 
-	_, logger := logging.FromContextWith(session.Context(),
+	ctx, logger := logging.FromContextWith(session.Context(),
 		slog.String(common.LogStreamingSessionID, session.SessionID),
 		slog.String(common.LogChunkID, session.ChunkHeader.ID),
 	)
 
 	// TODO: store should return an io.Reader directly
-	chunkData, err := s.store.GetData(session.ChunkHeader.ID)
+	chunkData, err := s.store.GetData(ctx, session.ChunkHeader.ID)
 	if err != nil {
 		if errors.Is(err, encoding.ErrDeserializeHeader) {
 			return apperr.Internal(err)
