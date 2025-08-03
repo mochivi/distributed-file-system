@@ -408,7 +408,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test data!")), stream).Return(nil).Once()
 
 				// inside replicate -- exclude self from selection
-				m.selector.On("SelectBestNodes", N_NODES, selfNode).Return(replicaNodes, true).Once()
+				m.selector.On("SelectBestNodes", N_NODES, selfNode).Return(replicaNodes, nil).Once()
 				m.replication.On("Replicate", m.clientPool, session.ChunkHeader, []byte("test data!"), mock.Anything).Return(replicaNodes, nil).Once()
 				m.clientPool.On("Close", mock.Anything).Once()
 
@@ -467,7 +467,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test"), nil)
 				m.store.On("Store", session.ChunkHeader, []byte("test")).Return(nil)
 				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test")), stream).Return(nil).Once()
-				m.selector.On("SelectBestNodes", N_NODES, selfNode).Return([]*common.NodeInfo{{ID: "node-1"}}, true).Once()
+				m.selector.On("SelectBestNodes", N_NODES, selfNode).Return([]*common.NodeInfo{{ID: "node-1"}}, nil).Once()
 				m.replication.On("Replicate", m.clientPool, session.ChunkHeader, []byte("test"), mock.Anything).Return(nil, assert.AnError)
 				m.sessionManager.On("Delete", session.SessionID).Return()
 				m.clientPool.On("Close", mock.Anything).Return()
@@ -490,7 +490,7 @@ func TestDataNodeServer_UploadChunkStream(t *testing.T) {
 				m.serverStreamer.On("ReceiveChunks", session, stream).Return([]byte("test"), nil)
 				m.store.On("Store", session.ChunkHeader, []byte("test")).Return(nil)
 				m.serverStreamer.On("SendFinalAck", session.SessionID, len([]byte("test")), stream).Return(nil).Once()
-				m.selector.On("SelectBestNodes", N_NODES, selfNode).Return(replicaNodes, true).Once()
+				m.selector.On("SelectBestNodes", N_NODES, selfNode).Return(replicaNodes, nil).Once()
 				m.replication.On("Replicate", m.clientPool, session.ChunkHeader, []byte("test"), mock.Anything).Return(replicaNodes, nil).Once()
 				m.clientPool.On("Close", mock.Anything).Return().Once()
 				m.serverStreamer.On("SendFinalReplicasAck", session, finalReplicaNodes, stream).Return(assert.AnError)

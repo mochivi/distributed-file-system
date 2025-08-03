@@ -324,13 +324,10 @@ func (s *DataNodeServer) HealthCheck(ctx context.Context, pb *proto.HealthCheckR
 
 // Actually replicates the chunk to the given nodes in parallel
 func (s *DataNodeServer) replicate(ctx context.Context, chunkHeader common.ChunkHeader, data []byte) ([]*common.NodeInfo, error) {
-	logger := logging.FromContext(ctx)
-
 	// Select N_NODES possible nodes to replicate to, excluding the current node
-	nodes, ok := s.selector.SelectBestNodes(N_NODES, s.info)
-	if !ok {
-		logger.Error("Not enough nodes to replicate to")
-		return nil, fmt.Errorf("not enough nodes to replicate to")
+	nodes, err := s.selector.SelectBestNodes(N_NODES, s.info)
+	if err != nil {
+		return nil, err
 	}
 
 	// Create clients
@@ -341,6 +338,7 @@ func (s *DataNodeServer) replicate(ctx context.Context, chunkHeader common.Chunk
 	defer clientPool.Close()
 
 	// Replicate to N_REPLICAS nodes
+	// TODO: add context to the replication manager
 	replicaNodes, err := s.replicationManager.Replicate(clientPool, chunkHeader, data, N_REPLICAS-1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to replicate chunk: %v", err)

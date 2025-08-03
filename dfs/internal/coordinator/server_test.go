@@ -55,7 +55,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 			setupMocks: func(mocks *serverMocks) {
 				mocks.nodeSelector.On("SelectBestNodes", 1, &common.NodeInfo{ID: "coordinator"}).Return([]*common.NodeInfo{
 					{ID: "node1", Status: common.NodeHealthy, Host: "127.0.0.1", Port: 8081},
-				}, true)
+				}, nil)
 				mocks.metadataManager.On("trackUpload", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 			},
 			req: &proto.UploadRequest{
@@ -78,7 +78,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 			setupMocks: func(mocks *serverMocks) {
 				mocks.nodeSelector.On("SelectBestNodes", 2, &common.NodeInfo{ID: "coordinator"}).Return([]*common.NodeInfo{
 					{ID: "node1", Status: common.NodeHealthy, Host: "127.0.0.1", Port: 8081},
-				}, true)
+				}, nil)
 				mocks.metadataManager.On("trackUpload", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 			},
 			req: &proto.UploadRequest{
@@ -99,7 +99,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 		{
 			name: "error: node selector not ok",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.nodeSelector.On("SelectBestNodes", 1, &common.NodeInfo{ID: "coordinator"}).Return(nil, false)
+				mocks.nodeSelector.On("SelectBestNodes", 1, &common.NodeInfo{ID: "coordinator"}).Return(nil, cluster.ErrNoAvailableNodes)
 			},
 			req: &proto.UploadRequest{
 				Path:      "test.txt",

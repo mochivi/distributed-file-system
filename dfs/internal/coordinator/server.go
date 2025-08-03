@@ -38,10 +38,10 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 	logger = logging.ExtendLogger(logger, slog.Int(common.LogNumChunks, numChunks))
 
 	// Select some nodes for the client to upload to
-	nodes, ok := c.selector.SelectBestNodes(numChunks, &common.NodeInfo{ID: "coordinator"}) // TODO: this has to be updated
-	if !ok {
-		logger.Error("No available nodes to upload")
-		return nil, status.Error(codes.NotFound, "no available nodes")
+	nodes, err := c.selector.SelectBestNodes(numChunks, &common.NodeInfo{ID: "coordinator"}) // TODO: this has to be updated
+	if err != nil {
+		logger.Error("No available nodes to upload", slog.String(common.LogError, err.Error()))
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
 	chunkPrefix := chunk.HashFilepath(req.Path)
