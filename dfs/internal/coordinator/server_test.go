@@ -470,7 +470,7 @@ func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 			name: "success",
 			setupMocks: func(mocks *serverMocks) {
 				node := &common.NodeInfo{ID: "node1"}
-				mocks.clusterStateHistoryManager.On("GetNode", "node1").Return(node, true).Once()
+				mocks.clusterStateHistoryManager.On("GetNode", "node1").Return(node, nil).Once()
 				mocks.clusterStateHistoryManager.On("GetUpdatesSince", int64(1)).Return([]common.NodeUpdate{}, int64(1), nil).Once()
 			},
 			req: &proto.HeartbeatRequest{
@@ -490,7 +490,7 @@ func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 		{
 			name: "error: node not registered",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.clusterStateHistoryManager.On("GetNode", "unknown-node").Return(nil, false).Once()
+				mocks.clusterStateHistoryManager.On("GetNode", "unknown-node").Return(nil, state.ErrNotFound).Once()
 			},
 			req: &proto.HeartbeatRequest{
 				NodeId: "unknown-node",
@@ -511,7 +511,7 @@ func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 			name: "error: version too old",
 			setupMocks: func(mocks *serverMocks) {
 				node := &common.NodeInfo{ID: "node1"}
-				mocks.clusterStateHistoryManager.On("GetNode", "node1").Return(node, true).Once()
+				mocks.clusterStateHistoryManager.On("GetNode", "node1").Return(node, nil).Once()
 				mocks.clusterStateHistoryManager.On("GetUpdatesSince", int64(0)).Return(nil, int64(5), assert.AnError).Once()
 			},
 			req: &proto.HeartbeatRequest{

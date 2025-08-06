@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/apperr"
+	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
@@ -189,13 +190,16 @@ func (c *Coordinator) DataNodeHeartbeat(ctx context.Context, pb *proto.Heartbeat
 	_, logger := logging.FromContextWithOperation(ctx, common.OpHeartbeat,
 		slog.String(common.LogNodeID, req.NodeID))
 
-	node, exists := c.clusterStateHistoryManager.GetNode(req.NodeID)
-	if !exists {
-		logger.Error("Data node not found")
-		return common.HeartbeatResponse{
-			Success: false,
-			Message: "node is not registered",
-		}.ToProto(), nil
+	node, err := c.clusterStateHistoryManager.GetNode(req.NodeID)
+	if err != nil {
+		if errors.Is(err, state.ErrNotFound) {
+			logger.Error("Data node not found", slog.String(common.LogError, err.Error()))
+			return common.HeartbeatResponse{
+				Success: false,
+				Message: "node is not registered",
+			}.ToProto(), nil
+		}
+		return nil, fmt.Errorf("failed to get data node: %w", err)
 	}
 
 	node.Status = req.Status.Status

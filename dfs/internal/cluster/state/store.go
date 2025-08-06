@@ -16,12 +16,12 @@ func newNodeStore() *nodeStore {
 	}
 }
 
-func (m *nodeStore) getNode(nodeID string) (*common.NodeInfo, bool) {
+func (m *nodeStore) getNode(nodeID string) (*common.NodeInfo, error) {
 	node, ok := m.nodes[nodeID]
 	if !ok {
-		return nil, false
+		return nil, fmt.Errorf("%w: %s", ErrNotFound, nodeID)
 	}
-	return node, true
+	return node, nil
 }
 
 func (m *nodeStore) addNode(node *common.NodeInfo) {
@@ -31,7 +31,7 @@ func (m *nodeStore) addNode(node *common.NodeInfo) {
 func (m *nodeStore) removeNode(nodeID string) error {
 	_, ok := m.nodes[nodeID]
 	if !ok {
-		return fmt.Errorf("node with ID %s not found", nodeID)
+		return fmt.Errorf("%w: %s", ErrNotFound, nodeID)
 	}
 	delete(m.nodes, nodeID)
 	return nil
@@ -40,7 +40,7 @@ func (m *nodeStore) removeNode(nodeID string) error {
 func (m *nodeStore) updateNode(node *common.NodeInfo) error {
 	_, ok := m.nodes[node.ID]
 	if !ok {
-		return fmt.Errorf("node with ID %s not found", node.ID)
+		return fmt.Errorf("%w: %s", ErrNotFound, node.ID)
 	}
 	m.nodes[node.ID] = node
 	return nil

@@ -40,7 +40,7 @@ func NewClusterStateHistoryManager(config config.ClusterStateHistoryManagerConfi
 	}
 }
 
-func (m *clusterStateHistoryManager) GetNode(nodeID string) (*common.NodeInfo, bool) {
+func (m *clusterStateHistoryManager) GetNode(nodeID string) (*common.NodeInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.store.getNode(nodeID)
@@ -57,9 +57,9 @@ func (m *clusterStateHistoryManager) AddNode(node *common.NodeInfo) {
 func (m *clusterStateHistoryManager) RemoveNode(nodeID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	node, ok := m.store.getNode(nodeID)
-	if !ok {
-		return fmt.Errorf("node with ID %s not found", nodeID)
+	node, err := m.store.getNode(nodeID)
+	if err != nil {
+		return err
 	}
 	m.version++
 	m.store.removeNode(nodeID)
@@ -70,9 +70,9 @@ func (m *clusterStateHistoryManager) RemoveNode(nodeID string) error {
 func (m *clusterStateHistoryManager) UpdateNode(node *common.NodeInfo) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	_, ok := m.store.getNode(node.ID)
-	if !ok {
-		return fmt.Errorf("node with ID %s not found", node.ID)
+	_, err := m.store.getNode(node.ID)
+	if err != nil {
+		return err
 	}
 	m.version++
 	m.store.updateNode(node)
@@ -202,8 +202,8 @@ func (m *clusterStateHistoryManager) GetAvailableNodesForChunk(replicaIDs []*com
 	var nodes []*common.NodeInfo
 	for _, replicaNode := range replicaIDs {
 		// Check if the node is still considered available
-		node, ok := m.store.getNode(replicaNode.ID)
-		if ok && node.Status == common.NodeHealthy {
+		node, err := m.store.getNode(replicaNode.ID)
+		if err == nil && node.Status == common.NodeHealthy {
 			nodes = append(nodes, node)
 		}
 	}
