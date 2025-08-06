@@ -39,7 +39,7 @@ type container struct {
 	sessionManager      streaming.SessionManager
 	clusterStateManager state.ClusterStateManager
 	coordinatorFinder   state.CoordinatorFinder
-	nodeSelector        cluster.NodeSelector
+	nodeSelector        state.NodeSelector
 	streamerFactory     streaming.ServerStreamerFactory
 	clientPoolFactory   client_pool.ClientPoolFactory
 
@@ -56,7 +56,7 @@ func setupDependencies(ctx context.Context, cfg *config.DatanodeAppConfig, logge
 	}
 
 	clusterStateManager := state.NewClusterStateManager()
-	nodeSelector := cluster.NewNodeSelector(clusterStateManager)
+	nodeSelector := state.NewNodeSelector(clusterStateManager)
 	streamer := streaming.NewClientStreamer(cfg.Node.Streamer)
 	replicationManager := datanode.NewParalellReplicationService(cfg.Node.Replication, streamer, logger)
 	sessionManager := streaming.NewStreamingSessionManager(cfg.Node.StreamingSession, logger)

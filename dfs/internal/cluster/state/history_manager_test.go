@@ -219,22 +219,22 @@ func TestClusterStateHistoryManager_GetAvailableNodesForChunk(t *testing.T) {
 
 	t.Run("some nodes healthy", func(t *testing.T) {
 		replicaIDs := []*common.NodeInfo{{ID: "node1"}, {ID: "node2"}, {ID: "node3"}}
-		available, ok := manager.GetAvailableNodesForChunk(replicaIDs)
-		assert.True(t, ok)
+		available, err := manager.GetAvailableNodesForChunk(replicaIDs)
+		assert.NoError(t, err)
 		assert.Len(t, available, 2)
 		assert.ElementsMatch(t, []*common.NodeInfo{n1, n3}, available)
 	})
 
 	t.Run("no nodes healthy", func(t *testing.T) {
 		replicaIDs := []*common.NodeInfo{{ID: "node2"}}
-		_, ok := manager.GetAvailableNodesForChunk(replicaIDs)
-		assert.False(t, ok)
+		_, err := manager.GetAvailableNodesForChunk(replicaIDs)
+		assert.ErrorIs(t, err, ErrNoAvailableNodes)
 	})
 
 	t.Run("node not in cluster", func(t *testing.T) {
 		replicaIDs := []*common.NodeInfo{{ID: "node4"}}
-		_, ok := manager.GetAvailableNodesForChunk(replicaIDs)
-		assert.False(t, ok)
+		_, err := manager.GetAvailableNodesForChunk(replicaIDs)
+		assert.ErrorIs(t, err, ErrNoAvailableNodes)
 	})
 }
 

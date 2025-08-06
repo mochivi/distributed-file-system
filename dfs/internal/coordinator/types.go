@@ -1,13 +1,9 @@
 package coordinator
 
 import (
-	"log/slog"
-
-	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
-	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 )
 
@@ -15,7 +11,7 @@ import (
 type container struct {
 	// Coordinates data nodes access
 	clusterStateHistoryManager state.ClusterStateHistoryManager
-	selector                   cluster.NodeSelector
+	selector                   state.NodeSelector
 
 	// Coordinates metadata storage
 	metaStore       metadata.MetadataStore
@@ -23,7 +19,7 @@ type container struct {
 }
 
 func NewContainer(metaStore metadata.MetadataStore, metadataManager MetadataSessionManager,
-	clusterStateHistoryManager state.ClusterStateHistoryManager, selector cluster.NodeSelector) *container {
+	clusterStateHistoryManager state.ClusterStateHistoryManager, selector state.NodeSelector) *container {
 	return &container{
 		metaStore:                  metaStore,
 		metadataManager:            metadataManager,
@@ -35,18 +31,21 @@ func NewContainer(metaStore metadata.MetadataStore, metadataManager MetadataSess
 // Implements proto.CoordinatorServiceServer interface
 type Coordinator struct {
 	proto.UnimplementedCoordinatorServiceServer // Embed
-	*container                                  // Embed dependencies
-
-	config *config.CoordinatorConfig
-	logger *slog.Logger
+	service                                     *service
 }
 
-func NewCoordinator(cfg *config.CoordinatorConfig, container *container, logger *slog.Logger) *Coordinator {
-	// Extend logger
-	coordinatorLogger := logging.ExtendLogger(logger, slog.String("component", "coordinator_server"))
-	return &Coordinator{
-		container: container,
+func NewCoordinator(service *service) *Coordinator {
+	return &Coordinator{service: service}
+}
+
+type service struct {
+	config     *config.CoordinatorConfig
+	*container // Embed dependencies
+}
+
+func NewService(cfg *config.CoordinatorConfig, container *container) *service {
+	return &service{
 		config:    cfg,
-		logger:    coordinatorLogger,
+		container: container,
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
@@ -22,7 +21,7 @@ import (
 
 type serverMocks struct {
 	clusterStateHistoryManager *state.MockClusterStateHistoryManager
-	nodeSelector               *cluster.MockNodeSelector
+	nodeSelector               *state.MockNodeSelector
 	metaStore                  *metadata.MockMetadataStore
 	metadataManager            *MockMetadataSessionManager
 }
@@ -99,7 +98,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 		{
 			name: "error: node selector not ok",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.nodeSelector.On("SelectBestNodes", 1, &common.NodeInfo{ID: "coordinator"}).Return(nil, cluster.ErrNoAvailableNodes)
+				mocks.nodeSelector.On("SelectBestNodes", 1, &common.NodeInfo{ID: "coordinator"}).Return(nil, state.ErrNoAvailableNodes)
 			},
 			req: &proto.UploadRequest{
 				Path:      "test.txt",
@@ -115,7 +114,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mocks := &serverMocks{
-				nodeSelector:               new(cluster.MockNodeSelector),
+				nodeSelector:               new(state.MockNodeSelector),
 				metaStore:                  new(metadata.MockMetadataStore),
 				clusterStateHistoryManager: new(state.MockClusterStateHistoryManager),
 				metadataManager:            new(MockMetadataSessionManager),
@@ -168,7 +167,7 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 				}
 				nodes := []*common.NodeInfo{{ID: "node1", Host: "localhost", Port: 9001, Status: common.NodeHealthy}}
 				mocks.metaStore.On("GetFile", mock.Anything, "test.txt").Return(fileInfo, nil).Once()
-				mocks.clusterStateHistoryManager.On("GetAvailableNodesForChunk", mock.Anything).Return(nodes, true).Once()
+				mocks.clusterStateHistoryManager.On("GetAvailableNodesForChunk", mock.Anything).Return(nodes, nil).Once()
 			},
 			req: &proto.DownloadRequest{Path: "test.txt"},
 			expectedResp: &proto.DownloadResponse{
@@ -201,7 +200,7 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 				}
 				nodes := []*common.NodeInfo{{ID: "node1", Host: "localhost", Port: 9001, Status: common.NodeHealthy}}
 				mocks.metaStore.On("GetFile", mock.Anything, "test.txt").Return(fileInfo, nil).Once()
-				mocks.clusterStateHistoryManager.On("GetAvailableNodesForChunk", mock.Anything).Return(nodes, true)
+				mocks.clusterStateHistoryManager.On("GetAvailableNodesForChunk", mock.Anything).Return(nodes, nil)
 			},
 			req: &proto.DownloadRequest{Path: "test.txt"},
 			expectedResp: &proto.DownloadResponse{
@@ -242,7 +241,7 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 					CreatedAt:  time.Unix(0, 0),
 				}
 				mocks.metaStore.On("GetFile", mock.Anything, "test.txt").Return(fileInfo, nil).Once()
-				mocks.clusterStateHistoryManager.On("GetAvailableNodesForChunk", mock.Anything).Return(nil, false).Once()
+				mocks.clusterStateHistoryManager.On("GetAvailableNodesForChunk", mock.Anything).Return(nil, state.ErrNoAvailableNodes).Once()
 			},
 			req:          &proto.DownloadRequest{Path: "test.txt"},
 			expectedResp: nil,
@@ -256,7 +255,7 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 				clusterStateHistoryManager: new(state.MockClusterStateHistoryManager),
 				metaStore:                  new(metadata.MockMetadataStore),
 				metadataManager:            new(MockMetadataSessionManager),
-				nodeSelector:               new(cluster.MockNodeSelector),
+				nodeSelector:               new(state.MockNodeSelector),
 			}
 			tc.setupMocks(mocks)
 			container := NewContainer(mocks.metaStore, mocks.metadataManager, mocks.clusterStateHistoryManager, mocks.nodeSelector)

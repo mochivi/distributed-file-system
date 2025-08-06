@@ -9,13 +9,12 @@ import (
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
 type MetadataSessionManager interface {
-	trackUpload(sessionID string, req common.UploadRequest, numChunks int)
+	trackUpload(sessionID string, req common.UploadRequest, chunkIDs []string)
 	commit(ctx context.Context, sessionID string, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error
 }
 
@@ -33,7 +32,7 @@ type metadataUploadSession struct {
 }
 
 func NewMetadataSessionManager(commitTimeout time.Duration, logger *slog.Logger) *metadataSessionManager {
-	metadataLogger := logging.ExtendLogger(logger, slog.String("component", "metadata_manager"))
+	metadataLogger := logging.ExtendLogger(logger, slog.String(common.LogComponent, common.ComponentCoordinator))
 	manager := &metadataSessionManager{
 		sessions:      make(map[string]metadataUploadSession),
 		commitTimeout: commitTimeout,
@@ -50,11 +49,11 @@ func newMetadataUploadSession(sessionID string, exp time.Duration, fileInfo *com
 	}
 }
 
-func (m *metadataSessionManager) trackUpload(sessionID string, req common.UploadRequest, numChunks int) {
+func (m *metadataSessionManager) trackUpload(sessionID string, req common.UploadRequest, chunkIDs []string) {
 	// Create chunk info array
-	chunkInfos := make([]common.ChunkInfo, numChunks)
-	for i := range numChunks {
-		chunkID := chunk.FormatChunkID(req.Path, i)
+	chunkInfos := make([]common.ChunkInfo, len(chunkIDs))
+	for i := range chunkIDs {
+		chunkID := chunkIDs[i]
 		chunkInfos[i] = common.ChunkInfo{
 			Header: common.ChunkHeader{
 				ID:       chunkID,
@@ -68,12 +67,13 @@ func (m *metadataSessionManager) trackUpload(sessionID string, req common.Upload
 	fileInfo := &common.FileInfo{
 		Path:       req.Path,
 		Size:       req.Size,
-		ChunkCount: numChunks,
+		ChunkCount: len(chunkIDs),
 		Chunks:     chunkInfos,
 		CreatedAt:  time.Now(),
 		Checksum:   req.Checksum,
 	}
-	m.logger.Info("Tracking upload session", slog.String("session_id", sessionID), slog.String("file_path", req.Path), slog.Int("num_chunks", numChunks))
+	m.logger.Info("Tracking upload session", slog.String(common.LogMetadataSessionID, sessionID),
+		slog.String(common.LogFilePath, req.Path), slog.Int(common.LogNumChunks, len(chunkIDs)))
 
 	m.mu.Lock()
 	m.sessions[sessionID] = newMetadataUploadSession(sessionID, m.commitTimeout, fileInfo)
@@ -99,7 +99,8 @@ func (m *metadataSessionManager) commit(ctx context.Context, sessionID string, c
 	fileInfo := session.fileInfo
 	fileInfo.Chunks = chunkInfos
 
-	m.logger.Info("Committing metadata for file", slog.String("file_path", fileInfo.Path), slog.Int("num_chunks", len(chunkInfos)))
+	m.logger.Info("Committing metadata for file", slog.String(common.LogFilePath, fileInfo.Path),
+		slog.Int(common.LogNumChunks, len(chunkInfos)))
 	if err := metaStore.PutFile(ctx, fileInfo.Path, fileInfo); err != nil {
 		return fmt.Errorf("failed to store file metadata: %w", err)
 	}

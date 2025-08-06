@@ -3,7 +3,6 @@ package datanode
 import (
 	"log/slog"
 
-	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
@@ -20,13 +19,13 @@ type container struct {
 	sessionManager        streaming.SessionManager
 	clusterViewer         state.ClusterStateViewer
 	coordinatorFinder     state.CoordinatorFinder
-	selector              cluster.NodeSelector
+	selector              state.NodeSelector
 	serverStreamerFactory streaming.ServerStreamerFactory
 	clientPoolFactory     client_pool.ClientPoolFactory
 }
 
 func NewContainer(store chunk.ChunkStorage, replicationManager ReplicationProvider, sessionManager streaming.SessionManager,
-	clusterViewer state.ClusterStateViewer, coordinatorFinder state.CoordinatorFinder, selector cluster.NodeSelector,
+	clusterViewer state.ClusterStateViewer, coordinatorFinder state.CoordinatorFinder, selector state.NodeSelector,
 	serverStreamerFactory streaming.ServerStreamerFactory, clientPoolFactory client_pool.ClientPoolFactory) *container {
 
 	return &container{

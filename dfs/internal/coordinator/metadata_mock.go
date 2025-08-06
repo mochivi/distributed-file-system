@@ -12,8 +12,8 @@ type MockMetadataSessionManager struct {
 	mock.Mock
 }
 
-func (m *MockMetadataSessionManager) trackUpload(sessionID string, req common.UploadRequest, numChunks int) {
-	m.Called(sessionID, req, numChunks)
+func (m *MockMetadataSessionManager) trackUpload(sessionID string, req common.UploadRequest, chunkIDs []string) {
+	m.Called(sessionID, req, chunkIDs)
 }
 
 func (m *MockMetadataSessionManager) commit(ctx context.Context, sessionID string, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error {

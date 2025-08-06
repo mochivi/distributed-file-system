@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/stretchr/testify/assert"
@@ -22,16 +23,16 @@ func TestTrackUpload(t *testing.T) {
 		Size:     1024,
 		Checksum: "checksum",
 	}
-	numChunks := 3
+	chunkIDs := chunk.FormatChunkIDs(chunk.HashFilepath(req.Path), 3)
 	sessionID := "test-session"
 
-	manager.trackUpload(sessionID, req, numChunks)
+	manager.trackUpload(sessionID, req, chunkIDs)
 
 	// Use reflection or a test helper to inspect internal state if necessary,
 	// but for this case we can test the outcome via the commit method.
 	// We'll check if the session exists by attempting to commit.
 	mockStore := new(metadata.MockMetadataStore)
-	chunkInfos := make([]common.ChunkInfo, numChunks)
+	chunkInfos := make([]common.ChunkInfo, len(chunkIDs))
 	// We expect the commit to fail on the metastore call, but not because the session is missing
 	mockStore.On("PutFile", mock.Anything, req.Path, mock.Anything).Return(nil)
 
@@ -54,7 +55,7 @@ func TestCommit(t *testing.T) {
 			sessionID:     "test-session-success",
 			commitTimeout: 5 * time.Second,
 			setupManager: func(m *metadataSessionManager, sid string) {
-				m.trackUpload(sid, common.UploadRequest{Path: "/test/success.txt"}, 1)
+				m.trackUpload(sid, common.UploadRequest{Path: "/test/success.txt"}, []string{"chunk1"})
 			},
 			setupMocks: func(ms *metadata.MockMetadataStore) {
 				ms.On("PutFile", mock.Anything, "/test/success.txt", mock.AnythingOfType("*common.FileInfo")).Return(nil).Once()
@@ -75,7 +76,7 @@ func TestCommit(t *testing.T) {
 			sessionID:     "test-session-expired",
 			commitTimeout: 1 * time.Millisecond,
 			setupManager: func(m *metadataSessionManager, sid string) {
-				m.trackUpload(sid, common.UploadRequest{Path: "/test/expired.txt"}, 1)
+				m.trackUpload(sid, common.UploadRequest{Path: "/test/expired.txt"}, []string{"chunk1"})
 				time.Sleep(2 * time.Millisecond) // Ensure session expires
 			},
 			setupMocks: func(ms *metadata.MockMetadataStore) {},
@@ -86,7 +87,7 @@ func TestCommit(t *testing.T) {
 			sessionID:     "test-session-store-failure",
 			commitTimeout: 5 * time.Second,
 			setupManager: func(m *metadataSessionManager, sid string) {
-				m.trackUpload(sid, common.UploadRequest{Path: "/test/store_failure.txt"}, 1)
+				m.trackUpload(sid, common.UploadRequest{Path: "/test/store_failure.txt"}, []string{"chunk1"})
 			},
 			setupMocks: func(ms *metadata.MockMetadataStore) {
 				ms.On("PutFile", mock.Anything, "/test/store_failure.txt", mock.AnythingOfType("*common.FileInfo")).Return(assert.AnError).Once()

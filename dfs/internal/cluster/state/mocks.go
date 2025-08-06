@@ -115,12 +115,12 @@ func (m *MockClusterStateHistoryManager) GetOldestVersionInHistory() int64 {
 	return args.Get(0).(int64)
 }
 
-func (m *MockClusterStateHistoryManager) GetAvailableNodesForChunk(replicaIDs []*common.NodeInfo) ([]*common.NodeInfo, bool) {
+func (m *MockClusterStateHistoryManager) GetAvailableNodesForChunk(replicaIDs []*common.NodeInfo) ([]*common.NodeInfo, error) {
 	args := m.Called(replicaIDs)
 	if args.Get(0) == nil {
-		return nil, args.Bool(1)
+		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*common.NodeInfo), args.Bool(1)
+	return args.Get(0).([]*common.NodeInfo), args.Error(1)
 }
 
 type MockCoordinatorFinder struct {
@@ -162,4 +162,16 @@ func (m *MockCoordinatorFinder) GetLeaderCoordinator() (clients.ICoordinatorClie
 func (m *MockCoordinatorFinder) BootstrapCoordinator() error {
 	args := m.Called()
 	return args.Error(0)
+}
+
+type MockNodeSelector struct {
+	mock.Mock
+}
+
+func (m *MockNodeSelector) SelectBestNodes(numChunks int, self *common.NodeInfo) ([]*common.NodeInfo, error) {
+	args := m.Called(numChunks, self)
+	if args.Get(0) == nil {
+		return nil, ErrNoAvailableNodes
+	}
+	return args.Get(0).([]*common.NodeInfo), args.Error(1)
 }

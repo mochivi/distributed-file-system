@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
@@ -26,7 +25,7 @@ type serverMocks struct {
 	replication       *MockParalellReplicationService
 	clusterViewer     *state.MockClusterStateManager
 	coordinatorFinder *state.MockCoordinatorFinder
-	selector          *cluster.MockNodeSelector
+	selector          *state.MockNodeSelector
 	serverStreamer    *streaming.MockServerStreamer
 	clientPool        *client_pool.MockClientPool
 }
@@ -38,7 +37,7 @@ func newServerMocks() *serverMocks {
 		replication:       &MockParalellReplicationService{},
 		clusterViewer:     &state.MockClusterStateManager{},
 		coordinatorFinder: &state.MockCoordinatorFinder{},
-		selector:          &cluster.MockNodeSelector{},
+		selector:          &state.MockNodeSelector{},
 		serverStreamer:    &streaming.MockServerStreamer{},
 		clientPool:        &client_pool.MockClientPool{},
 	}

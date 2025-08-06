@@ -28,7 +28,7 @@ import (
 type container struct {
 	// gRPC server dependencies
 	clusterStateHistoryManager state.ClusterStateHistoryManager
-	selector                   cluster.NodeSelector
+	selector                   state.NodeSelector
 	metaStore                  metadata.MetadataStore
 	metadataManager            coordinator.MetadataSessionManager // Coordinates when to actually commit metadata
 
@@ -43,7 +43,7 @@ func setupDependencies(ctx context.Context, cfg *config.CoordinatorAppConfig, lo
 	metadataStore := metadata.NewMetadataLocalStorage()
 	metadataManager := coordinator.NewMetadataSessionManager(cfg.Coordinator.Metadata.CommitTimeout, logger)
 	clusterStateHistoryManager := state.NewClusterStateHistoryManager(cfg.Coordinator.State)
-	nodeSelector := cluster.NewNodeSelector(clusterStateHistoryManager)
+	nodeSelector := state.NewNodeSelector(clusterStateHistoryManager)
 
 	// NodeAgent dependencies
 	metadataScanner := shared.NewMetadataScannerService(ctx, metadataStore, logger)
@@ -99,7 +99,8 @@ func main() {
 	// gRPC server setup
 	setupGrpcFunc := func(wg *sync.WaitGroup, errChan chan error) (*grpc.Server, net.Listener) {
 		serverContainer := coordinator.NewContainer(container.metaStore, container.metadataManager, container.clusterStateHistoryManager, container.selector)
-		server := coordinator.NewCoordinator(&appConfig.Coordinator, serverContainer, logger)
+		service := coordinator.NewService(&appConfig.Coordinator, serverContainer)
+		server := coordinator.NewCoordinator(service)
 
 		// gRPC server and register
 		grpcServer := grpc.NewServer(
