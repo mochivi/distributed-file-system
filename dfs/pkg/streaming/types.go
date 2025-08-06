@@ -83,7 +83,7 @@ func NewServerStreamer(sessionManager SessionManager, config config.StreamerConf
 
 // SessionManager is used by the datanode to control currently active sessions
 type SessionManager interface {
-	NewSession(chunkHeader common.ChunkHeader, propagate bool) *streamingSession
+	NewSession(ctx context.Context, chunkHeader common.ChunkHeader, propagate bool) *streamingSession
 	GetSession(sessionID string) (*streamingSession, bool)
 	Store(sessionID string, session *streamingSession) error
 	Load(sessionID string) (*streamingSession, bool)
@@ -114,6 +114,8 @@ const (
 // It could be broken down into uploadStreamingSession and downloadStreamingSession
 // But this unifying approach works for now, even if the download session doesn't use all fields
 type streamingSession struct {
+	ctx context.Context
+
 	SessionID string
 	CreatedAt time.Time
 	ExpiresAt time.Time
@@ -131,8 +133,9 @@ type streamingSession struct {
 	Status SessionStatus
 }
 
-func NewStreamingSession(sessionID string, chunkHeader common.ChunkHeader, propagate bool) *streamingSession {
+func NewStreamingSession(ctx context.Context, sessionID string, chunkHeader common.ChunkHeader, propagate bool) *streamingSession {
 	return &streamingSession{
+		ctx:       ctx,
 		SessionID: sessionID,
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(1 * time.Minute),

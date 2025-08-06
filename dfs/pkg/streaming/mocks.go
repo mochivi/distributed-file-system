@@ -75,8 +75,8 @@ type MockStreamingSessionManager struct {
 	mock.Mock
 }
 
-func (m *MockStreamingSessionManager) NewSession(chunkHeader common.ChunkHeader, propagate bool) *streamingSession {
-	args := m.Called(chunkHeader, propagate)
+func (m *MockStreamingSessionManager) NewSession(ctx context.Context, chunkHeader common.ChunkHeader, propagate bool) *streamingSession {
+	args := m.Called(ctx, chunkHeader, propagate)
 	return args.Get(0).(*streamingSession)
 }
 

@@ -12,21 +12,6 @@ func CalculateChecksum(data []byte) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func CalculateFileChecksumFromPath(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	hash := sha256.New()
-	if _, err := io.Copy(hash, f); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(hash.Sum(nil)), nil
-}
-
 // Reads and resets the file pointer
 func CalculateFileChecksum(file *os.File) (string, error) {
 	// Save current position

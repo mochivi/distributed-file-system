@@ -55,7 +55,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 			setupMocks: func(mocks *serverMocks) {
 				mocks.nodeSelector.On("SelectBestNodes", 1, &common.NodeInfo{ID: "coordinator"}).Return([]*common.NodeInfo{
 					{ID: "node1", Status: common.NodeHealthy, Host: "127.0.0.1", Port: 8081},
-				}, true)
+				}, nil)
 				mocks.metadataManager.On("trackUpload", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 			},
 			req: &proto.UploadRequest{
@@ -78,7 +78,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 			setupMocks: func(mocks *serverMocks) {
 				mocks.nodeSelector.On("SelectBestNodes", 2, &common.NodeInfo{ID: "coordinator"}).Return([]*common.NodeInfo{
 					{ID: "node1", Status: common.NodeHealthy, Host: "127.0.0.1", Port: 8081},
-				}, true)
+				}, nil)
 				mocks.metadataManager.On("trackUpload", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 			},
 			req: &proto.UploadRequest{
@@ -99,7 +99,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 		{
 			name: "error: node selector not ok",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.nodeSelector.On("SelectBestNodes", 1, &common.NodeInfo{ID: "coordinator"}).Return(nil, false)
+				mocks.nodeSelector.On("SelectBestNodes", 1, &common.NodeInfo{ID: "coordinator"}).Return(nil, cluster.ErrNoAvailableNodes)
 			},
 			req: &proto.UploadRequest{
 				Path:      "test.txt",
@@ -167,7 +167,7 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 					Checksum:  "test-checksum",
 				}
 				nodes := []*common.NodeInfo{{ID: "node1", Host: "localhost", Port: 9001, Status: common.NodeHealthy}}
-				mocks.metaStore.On("GetFile", "test.txt").Return(fileInfo, nil).Once()
+				mocks.metaStore.On("GetFile", mock.Anything, "test.txt").Return(fileInfo, nil).Once()
 				mocks.clusterStateHistoryManager.On("GetAvailableNodesForChunk", mock.Anything).Return(nodes, true).Once()
 			},
 			req: &proto.DownloadRequest{Path: "test.txt"},
@@ -200,7 +200,7 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 					CreatedAt: time.Unix(0, 0),
 				}
 				nodes := []*common.NodeInfo{{ID: "node1", Host: "localhost", Port: 9001, Status: common.NodeHealthy}}
-				mocks.metaStore.On("GetFile", "test.txt").Return(fileInfo, nil).Once()
+				mocks.metaStore.On("GetFile", mock.Anything, "test.txt").Return(fileInfo, nil).Once()
 				mocks.clusterStateHistoryManager.On("GetAvailableNodesForChunk", mock.Anything).Return(nodes, true)
 			},
 			req: &proto.DownloadRequest{Path: "test.txt"},
@@ -225,7 +225,7 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 		{
 			name: "error: file not found",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.metaStore.On("GetFile", "test.txt").Return(nil, errors.New("file not found")).Once()
+				mocks.metaStore.On("GetFile", mock.Anything, "test.txt").Return(nil, errors.New("file not found")).Once()
 			},
 			req:          &proto.DownloadRequest{Path: "test.txt"},
 			expectedResp: nil,
@@ -241,7 +241,7 @@ func TestCoordinator_DownloadFile(t *testing.T) {
 					Chunks:     []common.ChunkInfo{{Header: common.ChunkHeader{ID: "chunk1"}, Replicas: []*common.NodeInfo{{ID: "node1"}}}},
 					CreatedAt:  time.Unix(0, 0),
 				}
-				mocks.metaStore.On("GetFile", "test.txt").Return(fileInfo, nil).Once()
+				mocks.metaStore.On("GetFile", mock.Anything, "test.txt").Return(fileInfo, nil).Once()
 				mocks.clusterStateHistoryManager.On("GetAvailableNodesForChunk", mock.Anything).Return(nil, false).Once()
 			},
 			req:          &proto.DownloadRequest{Path: "test.txt"},
@@ -300,7 +300,7 @@ func TestCoordinator_DeleteFile(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.metaStore.On("DeleteFile", "test.txt").Return(nil).Once()
+				mocks.metaStore.On("DeleteFile", mock.Anything, "test.txt").Return(nil).Once()
 			},
 			req:          &proto.DeleteRequest{Path: "test.txt"},
 			expectedResp: &proto.DeleteResponse{Success: true},
@@ -309,7 +309,7 @@ func TestCoordinator_DeleteFile(t *testing.T) {
 		{
 			name: "error: delete fails",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.metaStore.On("DeleteFile", "test.txt").Return(assert.AnError).Once()
+				mocks.metaStore.On("DeleteFile", mock.Anything, "test.txt").Return(assert.AnError).Once()
 			},
 			req:          &proto.DeleteRequest{Path: "test.txt"},
 			expectedResp: nil,
@@ -353,7 +353,7 @@ func TestCoordinator_ConfirmUpload(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.metadataManager.On("commit", "test-session", mock.Anything, mocks.metaStore).Return(nil).Once()
+				mocks.metadataManager.On("commit", mock.Anything, "test-session", mock.Anything, mocks.metaStore).Return(nil).Once()
 			},
 			req: &proto.ConfirmUploadRequest{
 				SessionId: "test-session",
@@ -364,7 +364,7 @@ func TestCoordinator_ConfirmUpload(t *testing.T) {
 		{
 			name: "error: commit fails",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.metadataManager.On("commit", "test-session-fail", mock.Anything, mocks.metaStore).Return(assert.AnError).Once()
+				mocks.metadataManager.On("commit", mock.Anything, "test-session-fail", mock.Anything, mocks.metaStore).Return(assert.AnError).Once()
 			},
 			req: &proto.ConfirmUploadRequest{
 				SessionId: "test-session-fail",
@@ -470,7 +470,7 @@ func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 			name: "success",
 			setupMocks: func(mocks *serverMocks) {
 				node := &common.NodeInfo{ID: "node1"}
-				mocks.clusterStateHistoryManager.On("GetNode", "node1").Return(node, true).Once()
+				mocks.clusterStateHistoryManager.On("GetNode", "node1").Return(node, nil).Once()
 				mocks.clusterStateHistoryManager.On("GetUpdatesSince", int64(1)).Return([]common.NodeUpdate{}, int64(1), nil).Once()
 			},
 			req: &proto.HeartbeatRequest{
@@ -490,7 +490,7 @@ func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 		{
 			name: "error: node not registered",
 			setupMocks: func(mocks *serverMocks) {
-				mocks.clusterStateHistoryManager.On("GetNode", "unknown-node").Return(nil, false).Once()
+				mocks.clusterStateHistoryManager.On("GetNode", "unknown-node").Return(nil, state.ErrNotFound).Once()
 			},
 			req: &proto.HeartbeatRequest{
 				NodeId: "unknown-node",
@@ -511,7 +511,7 @@ func TestCoordinator_DataNodeHeartbeat(t *testing.T) {
 			name: "error: version too old",
 			setupMocks: func(mocks *serverMocks) {
 				node := &common.NodeInfo{ID: "node1"}
-				mocks.clusterStateHistoryManager.On("GetNode", "node1").Return(node, true).Once()
+				mocks.clusterStateHistoryManager.On("GetNode", "node1").Return(node, nil).Once()
 				mocks.clusterStateHistoryManager.On("GetUpdatesSince", int64(0)).Return(nil, int64(5), assert.AnError).Once()
 			},
 			req: &proto.HeartbeatRequest{

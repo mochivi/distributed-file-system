@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 
+	"github.com/mochivi/distributed-file-system/internal/apperr"
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
+	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"github.com/mochivi/distributed-file-system/pkg/streaming"
@@ -28,9 +30,7 @@ const (
 // and create a streaming session for the chunk data stream
 func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.UploadChunkRequest) (*proto.NodeReady, error) {
 	req := common.UploadChunkRequestFromProto(pb)
-
-	logger := logging.OperationLogger(s.logger, "prepare_chunk_upload", slog.String("chunk_id", req.ChunkHeader.ID))
-	logger.Info("Received PrepareChunkUpload request")
+	ctx, logger := logging.FromContextWithOperation(ctx, common.OpUpload, slog.String(common.LogChunkID, req.ChunkHeader.ID))
 
 	// Validate request
 	if req.ChunkHeader.ID == "" || req.ChunkHeader.Size <= 0 {
@@ -51,19 +51,26 @@ func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.Uploa
 	if existing, ok := s.sessionManager.LoadByChunk(req.ChunkHeader.ID); ok {
 		if !existing.Status.IsValid() {
 			s.sessionManager.Delete(existing.SessionID)
+			return common.NodeReady{
+				Accept:  false,
+				Message: "Invalid session",
+			}.ToProto(), nil
 		}
 
 		// If is valid session, return early
 		return common.NodeReady{
 			Accept:    true,
-			Message:   "session already active",
+			Message:   "Session already active",
 			SessionID: existing.SessionID,
 		}.ToProto(), nil
 	}
-	session := s.sessionManager.NewSession(req.ChunkHeader, req.Propagate)
+
+	session := s.sessionManager.NewSession(ctx, req.ChunkHeader, req.Propagate)
 	if err := s.sessionManager.Store(session.SessionID, session); err != nil {
+		logger.Error("failed to store streaming session", slog.String(common.LogError, err.Error()))
 		return nil, status.Errorf(codes.Internal, "failed to store streaming session: %v", err)
 	}
+	logger.Info("Prepared chunk upload", slog.String(common.LogStreamingSessionID, session.SessionID))
 
 	return common.NodeReady{
 		Accept:    true,
@@ -75,26 +82,27 @@ func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.Uploa
 // TODO: add a different session for download, as it is not the same as the upload session
 func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.DownloadChunkRequest) (*proto.DownloadReady, error) {
 	req := common.DownloadChunkRequestFromProto(pb)
+	ctx, logger := logging.FromContextWithOperation(ctx, common.OpDownload, slog.String(common.LogChunkID, req.ChunkID))
 
-	logger := logging.OperationLogger(s.logger, "prepare_chunk_download", slog.String("chunk_id", req.ChunkID))
-	logger.Info("Received PrepareChunkDownload request")
-
-	if !s.store.Exists(req.ChunkID) {
-		logger.Error("Chunk not found", slog.String("chunk_id", req.ChunkID))
+	if !s.store.Exists(ctx, req.ChunkID) {
+		logger.Error("Chunk not found", slog.String(common.LogChunkID, req.ChunkID))
 		return nil, status.Errorf(codes.NotFound, "chunk not found")
 	}
 
-	chunkHeader, err := s.store.GetHeader(req.ChunkID)
+	chunkHeader, err := s.store.GetHeader(ctx, req.ChunkID)
 	if err != nil {
-		logger.Error("Failed to get chunk info", slog.String("error", err.Error()))
-		return nil, status.Errorf(codes.Internal, "failed to get chunk info: %v", err)
+		if errors.Is(err, chunk.ErrInvalidChunkID) {
+			return nil, apperr.InvalidArgument("invalid chunkID", err)
+		}
+		return nil, fmt.Errorf("failed to get chunk header: %w", err)
 	}
 
-	session := s.sessionManager.NewSession(chunkHeader, false)
+	session := s.sessionManager.NewSession(ctx, chunkHeader, false)
 	if err := s.sessionManager.Store(session.SessionID, session); err != nil {
+		logger.Error("Failed to store streaming session", slog.String(common.LogError, err.Error()))
 		return nil, status.Errorf(codes.Internal, "failed to store streaming session: %v", err)
 	}
-	logger.Info("Streaming session created", slog.String("session_id", session.SessionID))
+	logger.Info("Prepared chunk download", slog.String(common.LogStreamingSessionID, session.SessionID))
 
 	return common.DownloadReady{
 		NodeReady: common.NodeReady{
@@ -108,11 +116,9 @@ func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.Dow
 
 func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkRequest) (*proto.DeleteChunkResponse, error) {
 	req := common.DeleteChunkRequestFromProto(pb)
+	_, logger := logging.FromContextWithOperation(ctx, common.OpDelete, slog.String(common.LogChunkID, req.ChunkID))
 
-	logger := logging.OperationLogger(s.logger, "delete_chunk", slog.String("chunk_id", req.ChunkID))
-	logger.Info("Received DeleteChunk request")
-
-	if !s.store.Exists(req.ChunkID) {
+	if !s.store.Exists(ctx, req.ChunkID) {
 		logger.Error("Chunk not found")
 		return common.DeleteChunkResponse{
 			Success: false,
@@ -120,13 +126,14 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 		}.ToProto(), nil
 	}
 
-	if err := s.store.Delete(req.ChunkID); err != nil {
-		logger.Error("Failed to delete chunk", slog.String("error", err.Error()))
-		return nil, status.Errorf(codes.Internal, "failed to delete chunk: %v", err)
+	if err := s.store.Delete(ctx, req.ChunkID); err != nil {
+		if errors.Is(err, chunk.ErrInvalidChunkID) {
+			return nil, apperr.InvalidArgument("invalid chunkID", err)
+		}
+		return nil, fmt.Errorf("failed to delete chunk: %w", err)
 	}
 
 	logger.Info("Chunk deleted successfully")
-
 	return common.DeleteChunkResponse{
 		Success: true,
 		Message: "chunk deleted",
@@ -135,9 +142,7 @@ func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkR
 
 func (s *DataNodeServer) BulkDeleteChunk(ctx context.Context, pb *proto.BulkDeleteChunkRequest) (*proto.BulkDeleteChunkResponse, error) {
 	req := common.BulkDeleteChunkRequestFromProto(pb)
-
-	logger := logging.OperationLogger(s.logger, "bulk_delete_chunk", slog.String("chunk_id", strings.Join(req.ChunkIDs, ",")))
-	logger.Info("Received BulkDeleteChunk request")
+	_, logger := logging.FromContextWithOperation(ctx, common.OpBulkDelete, slog.Int(common.LogNumChunks, len(req.ChunkIDs)))
 
 	ctx, cancel := context.WithTimeout(ctx, s.config.BulkDelete.Timeout)
 	defer cancel()
@@ -167,7 +172,7 @@ func (s *DataNodeServer) BulkDeleteChunk(ctx context.Context, pb *proto.BulkDele
 				return
 			}
 
-			if !s.store.Exists(id) {
+			if !s.store.Exists(ctx, id) {
 				results <- result{chunkID: id, success: false, err: fmt.Errorf("chunk not found")}
 				return
 			}
@@ -177,7 +182,7 @@ func (s *DataNodeServer) BulkDeleteChunk(ctx context.Context, pb *proto.BulkDele
 				return
 			}
 
-			if err := s.store.Delete(id); err != nil {
+			if err := s.store.Delete(ctx, id); err != nil {
 				results <- result{chunkID: id, success: false, err: err}
 				return
 			}
@@ -201,12 +206,17 @@ func (s *DataNodeServer) BulkDeleteChunk(ctx context.Context, pb *proto.BulkDele
 			successCount++
 			continue
 		}
-		logger.Error("Failed to delete chunk", slog.String("chunk_id", result.chunkID), slog.String("error", result.err.Error()))
+		logger.Error("Failed to delete chunk",
+			slog.String(common.LogChunkID, result.chunkID),
+			slog.String(common.LogError, result.err.Error()))
 		failures = append(failures, result.chunkID)
 	}
 
 	success := len(failures) == 0
-	logger.Info("Bulk delete completed", slog.Int("success_count", successCount), slog.Int("failure_count", len(failures)), slog.Bool("success", success))
+	logger.Info("Bulk delete completed",
+		slog.Int(common.LogSuccessCount, successCount),
+		slog.Int(common.LogFailureCount, len(failures)),
+		slog.Bool(common.LogSuccess, success))
 
 	return common.BulkDeleteChunkResponse{
 		Success: success,
@@ -220,52 +230,57 @@ func (s *DataNodeServer) BulkDeleteChunk(ctx context.Context, pb *proto.BulkDele
 // TODO: context awareness for cancelling upload request?
 func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
 	streamProcessor := s.serverStreamerFactory(s.sessionManager, s.config.Streamer)
-	logger := logging.OperationLogger(s.logger, "upload_streaming_session")
 
 	session, err := streamProcessor.HandleFirstChunk(stream)
 	if err != nil {
-		logger.Error("Failed to receive first chunk", slog.String("error", err.Error()))
 		return status.Errorf(codes.Internal, "failed to receive first chunk: %v", err)
 	}
-	logger = logging.ExtendLogger(logger, slog.String("session_id", session.SessionID), slog.String("chunk_id", session.ChunkHeader.ID))
 	defer s.sessionManager.Delete(session.SessionID)
 
-	logger.Debug("starting to receive frames")
+	// Since we are taking out the logger from the context, it already has the necessary parameters attached to it.
+	ctx, logger := logging.FromContextWith(session.Context(),
+		slog.String(common.LogStreamingSessionID, session.SessionID),
+		slog.String(common.LogChunkID, session.ChunkHeader.ID),
+	)
+
+	logger.Debug("Receiving frames")
 	chunkData, err := streamProcessor.ReceiveChunks(session, stream)
 	if err != nil {
-		logger.Error("Failed to receive chunks", slog.String("error", err.Error()))
+		logger.Error("Failed to receive chunk frames", slog.String(common.LogError, err.Error()))
 		session.Fail()
-		return status.Errorf(codes.Internal, "failed to receive chunks: %v", err)
+		return status.Errorf(codes.Internal, "Failed to receive chunk frames: %v", err)
 	}
 
 	// TODO: implement flushing at session level, not here
 	// TODO: for now, storing entire chunk in buffer and writing all at once
-	logger.Debug("Storing chunk", slog.String("chunk_id", session.ChunkHeader.ID), slog.Int("size", len(chunkData)))
-	if err = s.store.Store(session.ChunkHeader, chunkData); err != nil {
-		logger.Error("Failed to store chunk", slog.String("error", err.Error()))
+	logger.Debug("Storing chunk", slog.Int(common.LogChunkSize, len(chunkData)))
+	if err = s.store.Store(ctx, session.ChunkHeader, chunkData); err != nil {
 		session.Fail()
-		return status.Errorf(codes.Internal, "failed to store chunk: %v", err)
+		if errors.Is(err, chunk.ErrInvalidChunkID) {
+			apperr.InvalidArgument("invalid chunkID", err)
+		}
+		return fmt.Errorf("failed to store chunk: %w", err)
 	}
-	logger.Debug("Chunk stored successfully", slog.String("chunk_id", session.ChunkHeader.ID))
+	logger.Debug("Chunk stored successfully")
 
 	if err := streamProcessor.SendFinalAck(session.SessionID, len(chunkData), stream); err != nil {
-		logger.Error("Failed to send final ack", slog.String("error", err.Error()))
+		logger.Error("Failed to send final ack", slog.String(common.LogError, err.Error()))
 		return status.Errorf(codes.Internal, "failed to send final ack: %v", err)
 	}
 	logger.Debug("Final ack sent successfully")
 
 	// If receiving node is primary node, must replicate to other nodes
 	if session.Propagate {
-		replicaNodes, err := s.replicate(session.ChunkHeader, chunkData)
+		replicaNodes, err := s.replicate(ctx, session.ChunkHeader, chunkData)
 		if err != nil {
-			logger.Error("Failed to replicate chunk", slog.String("error", err.Error()))
+			logger.Error("Failed to replicate chunk", slog.String(common.LogError, err.Error()))
 			session.Fail()
 			return status.Errorf(codes.Internal, "failed to replicate chunk: %v", err)
 		}
-		logger.Debug("Chunk replicated successfully", slog.Any("replica_nodes", replicaNodes))
+		logger.Debug("Chunk replicated successfully", slog.Int(common.LogNumReplicas, len(replicaNodes)))
 
 		if err := streamProcessor.SendFinalReplicasAck(session, replicaNodes, stream); err != nil {
-			logger.Error("Failed to send chunk data ack with replicas", slog.String("error", err.Error()))
+			logger.Error("Failed to send chunk data ack with replicas", slog.String(common.LogError, err.Error()))
 			session.Fail()
 			return status.Errorf(codes.Internal, "failed to send final acknowledgement with replica information: %v", err)
 		}
@@ -282,23 +297,28 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid download stream request: %v", err)
 	}
-	logger := logging.OperationLogger(s.logger, "download_streaming_session", slog.String("session_id", req.SessionID))
 
 	session, exists := s.sessionManager.GetSession(req.SessionID)
 	if !exists {
-		logger.Error("Invalid download session", slog.String("received", req.SessionID))
 		return status.Errorf(codes.NotFound, "invalid download session for ID: %s", req.SessionID)
 	}
-	defer s.sessionManager.Delete(session.SessionID) // Clean up
+	defer s.sessionManager.Delete(session.SessionID)
+
+	ctx, logger := logging.FromContextWith(session.Context(),
+		slog.String(common.LogStreamingSessionID, session.SessionID),
+		slog.String(common.LogChunkID, session.ChunkHeader.ID),
+	)
 
 	// TODO: store should return an io.Reader directly
-	chunkData, err := s.store.GetData(session.ChunkHeader.ID)
+	chunkData, err := s.store.GetData(ctx, session.ChunkHeader.ID)
 	if err != nil {
-		logger.Error("Could not retrieve chunk", slog.String("error", err.Error()))
-		return status.Errorf(codes.Internal, "could not retrieve chunk %s: %v", session.ChunkHeader.ID, err)
+		if errors.Is(err, encoding.ErrDeserializeHeader) {
+			return apperr.Internal(err)
+		}
+		return fmt.Errorf("failed to get chunk data: %w", err)
 	}
-	reader := bytes.NewReader(chunkData)
 
+	reader := bytes.NewReader(chunkData)
 	if err := streaming.SendChunkFrames(reader, req.ChunkStreamSize, session.ChunkHeader.ID,
 		session.SessionID, len(chunkData), stream); err != nil {
 		return handleStreamingError(err, logger)
@@ -314,14 +334,11 @@ func (s *DataNodeServer) HealthCheck(ctx context.Context, pb *proto.HealthCheckR
 }
 
 // Actually replicates the chunk to the given nodes in parallel
-func (s *DataNodeServer) replicate(chunkHeader common.ChunkHeader, data []byte) ([]*common.NodeInfo, error) {
-	logger := logging.OperationLogger(s.logger, "replicate_chunk", slog.String("chunk_id", chunkHeader.ID))
-
+func (s *DataNodeServer) replicate(ctx context.Context, chunkHeader common.ChunkHeader, data []byte) ([]*common.NodeInfo, error) {
 	// Select N_NODES possible nodes to replicate to, excluding the current node
-	nodes, ok := s.selector.SelectBestNodes(N_NODES, s.info)
-	if !ok {
-		logger.Error("Not enough nodes to replicate to")
-		return nil, fmt.Errorf("not enough nodes to replicate to")
+	nodes, err := s.selector.SelectBestNodes(N_NODES, s.info)
+	if err != nil {
+		return nil, err
 	}
 
 	// Create clients
@@ -332,6 +349,7 @@ func (s *DataNodeServer) replicate(chunkHeader common.ChunkHeader, data []byte) 
 	defer clientPool.Close()
 
 	// Replicate to N_REPLICAS nodes
+	// TODO: add context to the replication manager
 	replicaNodes, err := s.replicationManager.Replicate(clientPool, chunkHeader, data, N_REPLICAS-1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to replicate chunk: %v", err)
@@ -356,7 +374,7 @@ func handleStreamingError(err error, logger *slog.Logger) error {
 			slog.String("error", streamErr.Err.Error()))
 	} else {
 		// Fallback for unexpected error types
-		logger.Error("Unexpected streaming error", slog.String("error", err.Error()))
+		logger.Error("Unexpected streaming error", slog.String(common.LogError, err.Error()))
 	}
 
 	// Translate error

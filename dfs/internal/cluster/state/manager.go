@@ -10,7 +10,7 @@ import (
 // Read-only interface
 type ClusterStateViewer interface {
 	ListNodes(n ...int) ([]*common.NodeInfo, int64)
-	GetNode(nodeID string) (*common.NodeInfo, bool)
+	GetNode(nodeID string) (*common.NodeInfo, error)
 }
 
 // Complete interface
@@ -38,7 +38,7 @@ func NewClusterStateManager() *clusterStateManager {
 	}
 }
 
-func (v *clusterStateManager) GetNode(nodeID string) (*common.NodeInfo, bool) {
+func (v *clusterStateManager) GetNode(nodeID string) (*common.NodeInfo, error) {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return v.store.getNode(nodeID)

@@ -3,6 +3,7 @@ package datanode_controllers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/cluster/shared"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
-	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 )
 
 type OrphanedChunksGCProvider interface {
@@ -22,14 +23,14 @@ type OrphanedChunksGCController struct {
 	ctx     context.Context
 	cancel  context.CancelCauseFunc
 	scanner shared.MetadataScannerProvider
-	store   storage.ChunkStorage // maybe abstract later
-	running bool                 // No need for mutex as a single goroutine runs the GC
+	store   chunk.ChunkStorage // maybe abstract later
+	running bool               // No need for mutex as a single goroutine runs the GC
 	config  *config.OrphanedChunksGCControllerConfig
 	nodeID  string // Must be replaced with some reader of nodeInformation, which could be updated, nodeID should be immutable but it is a good pattern
 	logger  *slog.Logger
 }
 
-func NewOrphanedChunksGCController(ctx context.Context, scanner shared.MetadataScannerProvider, store storage.ChunkStorage,
+func NewOrphanedChunksGCController(ctx context.Context, scanner shared.MetadataScannerProvider, store chunk.ChunkStorage,
 	config *config.OrphanedChunksGCControllerConfig, nodeID string, logger *slog.Logger) *OrphanedChunksGCController {
 	ctx, cancel := context.WithCancelCause(ctx)
 	return &OrphanedChunksGCController{
@@ -92,14 +93,14 @@ func (c *OrphanedChunksGCController) run(ctx context.Context) ([]string, error) 
 	// Delegate deletion
 	failed, err := c.store.BulkDelete(ctx, c.config.MaxConcurrentDeletes, orphaned)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to delete chunks: %w", err)
 	}
 
 	return failed, nil
 }
 
 func getChunks(ctx context.Context, nodeID string, scanner shared.MetadataScannerProvider,
-	store storage.ChunkStorage) (map[string]*common.ChunkHeader, map[string]common.ChunkHeader, error) {
+	store chunk.ChunkStorage) (map[string]*common.ChunkHeader, map[string]common.ChunkHeader, error) {
 
 	g, ctx := errgroup.WithContext(ctx)
 	var actualChunks map[string]common.ChunkHeader
@@ -109,7 +110,7 @@ func getChunks(ctx context.Context, nodeID string, scanner shared.MetadataScanne
 	g.Go(func() error {
 		chunks, err := scanner.GetChunksForNode(ctx, nodeID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get chunks for node: %w", err)
 		}
 		expectedChunks = chunks // It's fine to update directly as there is only one goroutine writing to it
 		return nil
@@ -119,7 +120,7 @@ func getChunks(ctx context.Context, nodeID string, scanner shared.MetadataScanne
 	g.Go(func() error {
 		chunks, err := store.GetHeaders(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get chunk headers: %w", err)
 		}
 		actualChunks = chunks // It's fine to update directly as there is only one goroutine writing to it
 		return nil

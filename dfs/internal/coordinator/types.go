@@ -6,7 +6,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/config"
-	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 )
@@ -18,11 +18,11 @@ type container struct {
 	selector                   cluster.NodeSelector
 
 	// Coordinates metadata storage
-	metaStore       storage.MetadataStore
+	metaStore       metadata.MetadataStore
 	metadataManager MetadataSessionManager // Coordinates when to actually commit metadata
 }
 
-func NewContainer(metaStore storage.MetadataStore, metadataManager MetadataSessionManager,
+func NewContainer(metaStore metadata.MetadataStore, metadataManager MetadataSessionManager,
 	clusterStateHistoryManager state.ClusterStateHistoryManager, selector cluster.NodeSelector) *container {
 	return &container{
 		metaStore:                  metaStore,

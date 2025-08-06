@@ -4,9 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"io"
-	"log/slog"
-
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
@@ -20,8 +17,7 @@ func newTestStorage(t *testing.T) *ChunkDiskStorage {
 	t.Helper()
 	memFs := afero.NewMemMapFs()
 	serializer := encoding.NewProtoSerializer()
-	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
-	store, err := NewChunkDiskStorage(memFs, config.DiskStorageConfig{RootDir: "/chunks"}, serializer, logger)
+	store, err := NewChunkDiskStorage(memFs, config.DiskStorageConfig{RootDir: "/chunks"}, serializer)
 	require.NoError(t, err)
 	return store
 }
@@ -32,7 +28,7 @@ func TestChunkDiskStorage_StoreAndGet(t *testing.T) {
 		header      common.ChunkHeader
 		data        []byte
 		expectErr   bool
-		expectedErr string
+		expectedErr error
 	}{
 		{
 			name:   "success: store and get chunk",
@@ -44,7 +40,7 @@ func TestChunkDiskStorage_StoreAndGet(t *testing.T) {
 			header:      common.ChunkHeader{ID: "invalid", Index: 0, Size: int64(3)},
 			data:        []byte("bad"),
 			expectErr:   true,
-			expectedErr: "invalid chunk ID format",
+			expectedErr: ErrInvalidChunkID,
 		},
 	}
 
@@ -52,16 +48,16 @@ func TestChunkDiskStorage_StoreAndGet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			store := newTestStorage(t)
 			tc.header.Size = int64(len(tc.data))
-			err := store.Store(tc.header, tc.data)
+			err := store.Store(context.Background(), tc.header, tc.data)
 			if tc.expectErr {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tc.expectedErr)
+				assert.ErrorIs(t, err, tc.expectedErr)
 				return
 			}
 			require.NoError(t, err)
 
 			// happy-path: verify Get returns same header and data
-			gotHeader, gotData, err := store.Get(tc.header.ID)
+			gotHeader, gotData, err := store.Get(context.Background(), tc.header.ID)
 			require.NoError(t, err)
 			assert.Equal(t, tc.header.ID, gotHeader.ID)
 			assert.Equal(t, tc.header.Size, gotHeader.Size)
@@ -74,16 +70,16 @@ func TestChunkDiskStorage_DeleteAndExists(t *testing.T) {
 	store := newTestStorage(t)
 	header := common.ChunkHeader{ID: "0a0b0c0d0e0f1011_1", Index: 1, Size: int64(4)}
 	data := []byte("data")
-	require.NoError(t, store.Store(header, data))
+	require.NoError(t, store.Store(context.Background(), header, data))
 
-	assert.True(t, store.Exists(header.ID))
+	assert.True(t, store.Exists(context.Background(), header.ID))
 
 	// delete
-	require.NoError(t, store.Delete(header.ID))
-	assert.False(t, store.Exists(header.ID))
+	require.NoError(t, store.Delete(context.Background(), header.ID))
+	assert.False(t, store.Exists(context.Background(), header.ID))
 
 	// deleting again should error (fs remove no such file)
-	err := store.Delete(header.ID)
+	err := store.Delete(context.Background(), header.ID)
 	assert.Error(t, err)
 }
 
@@ -92,10 +88,10 @@ func TestChunkDiskStorage_List(t *testing.T) {
 	ids := []string{"aaaaaaaaaaaaaaaa_0", "bbbbbbbbbbbbbbbb_1", "cccccccccccccccc_2"}
 	for _, id := range ids {
 		hdr := common.ChunkHeader{ID: id, Index: 0, Size: int64(1)}
-		require.NoError(t, store.Store(hdr, []byte("x")))
+		require.NoError(t, store.Store(context.Background(), hdr, []byte("x")))
 	}
 
-	listed, err := store.List()
+	listed, err := store.List(context.Background())
 	require.NoError(t, err)
 	assert.ElementsMatch(t, ids, listed)
 }
@@ -105,7 +101,7 @@ func TestChunkDiskStorage_GetHeaders(t *testing.T) {
 	ids := []string{"1111111111111111_0", "2222222222222222_1"}
 	for _, id := range ids {
 		hdr := common.ChunkHeader{ID: id, Index: 0, Size: int64(1)}
-		require.NoError(t, store.Store(hdr, []byte("z")))
+		require.NoError(t, store.Store(context.Background(), hdr, []byte("z")))
 	}
 
 	ctx := context.Background()
@@ -128,7 +124,7 @@ func TestChunkDiskStorage_BulkDelete(t *testing.T) {
 	store := newTestStorage(t)
 	presentID := "9999999999999999_0"
 	hdr := common.ChunkHeader{ID: presentID, Index: 0, Size: int64(1)}
-	require.NoError(t, store.Store(hdr, []byte("a")))
+	require.NoError(t, store.Store(context.Background(), hdr, []byte("a")))
 
 	ids := []string{presentID, "deadbeefdeadbeef_0"}
 	failed, err := store.BulkDelete(context.Background(), 2, ids)
@@ -138,5 +134,5 @@ func TestChunkDiskStorage_BulkDelete(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to delete")
 	assert.ElementsMatch(t, []string{"deadbeefdeadbeef_0"}, failed)
 	// presentID should be gone
-	assert.False(t, store.Exists(presentID))
+	assert.False(t, store.Exists(context.Background(), presentID))
 }

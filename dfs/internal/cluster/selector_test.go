@@ -1,9 +1,8 @@
-package cluster_test
+package cluster
 
 import (
 	"testing"
 
-	"github.com/mochivi/distributed-file-system/internal/cluster"
 	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +23,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 		n             int
 		nodesToReturn []*common.NodeInfo
 		expectedNodes []*common.NodeInfo
-		expectedOk    bool
+		expectedErr   error
 	}{
 		{
 			name:          "success: select 2 healthy nodes",
@@ -34,7 +33,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 				{ID: "node-3", Status: common.NodeHealthy},
 				{ID: "node-4", Status: common.NodeHealthy},
 			},
-			expectedOk: true,
+			expectedErr: nil,
 		},
 		{
 			name:          "success: select 3 healthy nodes except self",
@@ -44,7 +43,7 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 				{ID: "node-3", Status: common.NodeHealthy},
 				{ID: "node-4", Status: common.NodeHealthy},
 			},
-			expectedOk: true,
+			expectedErr: nil,
 		},
 		{
 			name:          "success: request 6 nodes, but only 2 are healthy",
@@ -54,14 +53,14 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 				{ID: "node-3", Status: common.NodeHealthy},
 				{ID: "node-4", Status: common.NodeHealthy},
 			},
-			expectedOk: true,
+			expectedErr: nil,
 		},
 		{
 			name:          "error: request 0 nodes",
 			n:             0,
 			nodesToReturn: nodes,
 			expectedNodes: nil,
-			expectedOk:    false,
+			expectedErr:   ErrNoAvailableNodes,
 		},
 		{
 			name: "error: no healthy nodes available",
@@ -71,14 +70,14 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 				{ID: "node-2", Status: common.NodeUnhealthy},
 			},
 			expectedNodes: nil,
-			expectedOk:    false,
+			expectedErr:   ErrNoAvailableNodes,
 		},
 		{
 			name:          "error: no nodes in cluster",
 			n:             1,
 			nodesToReturn: []*common.NodeInfo{},
 			expectedNodes: nil,
-			expectedOk:    false,
+			expectedErr:   ErrNoAvailableNodes,
 		},
 	}
 
@@ -87,10 +86,10 @@ func TestNodeSelector_SelectBestNodes(t *testing.T) {
 			mockViewer := &state.MockClusterStateManager{}
 			mockViewer.On("ListNodes", mock.Anything).Return(tc.nodesToReturn, int64(len(tc.nodesToReturn))).Maybe()
 
-			selector := cluster.NewNodeSelector(mockViewer)
-			selectedNodes, ok := selector.SelectBestNodes(tc.n, &common.NodeInfo{ID: "node-1"})
+			selector := NewNodeSelector(mockViewer)
+			selectedNodes, err := selector.SelectBestNodes(tc.n, &common.NodeInfo{ID: "node-1"})
 
-			assert.Equal(t, tc.expectedOk, ok)
+			assert.Equal(t, tc.expectedErr, err)
 			assert.ElementsMatch(t, tc.expectedNodes, selectedNodes)
 			mockViewer.AssertExpectations(t)
 		})

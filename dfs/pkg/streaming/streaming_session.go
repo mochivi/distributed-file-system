@@ -2,6 +2,7 @@ package streaming
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -40,6 +41,10 @@ func (s *streamingSession) finalizeSession() error {
 	}
 
 	return nil
+}
+
+func (s *streamingSession) Context() context.Context {
+	return s.ctx
 }
 
 func (s *streamingSession) Fail() {

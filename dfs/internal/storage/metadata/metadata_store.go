@@ -1,12 +1,15 @@
 package metadata
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
+	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
 const BASE_DIR = "./metadata"
@@ -28,43 +31,58 @@ func NewMetadataLocalStorage() *MetadataDiskStorage {
 	}
 }
 
-func (m *MetadataDiskStorage) GetFile(path string) (*common.FileInfo, error) {
+func (m *MetadataDiskStorage) GetFile(ctx context.Context, path string) (*common.FileInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
+	_, logger := logging.FromContextWithOperation(ctx, common.OpGetFile,
+		slog.String(common.LogFilePath, path))
+
 	info, ok := m.cache[path]
 	if !ok {
-		return nil, fmt.Errorf("file not found: %s", path)
+		return nil, fmt.Errorf("%w: %s", ErrNotFound, path)
 	}
 
+	logger.Debug("Retrieved file from cache")
 	return info, nil
 }
 
-func (m *MetadataDiskStorage) PutFile(path string, info *common.FileInfo) error {
+func (m *MetadataDiskStorage) PutFile(ctx context.Context, path string, info *common.FileInfo) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	_, logger := logging.FromContextWithOperation(ctx, common.OpPutFile,
+		slog.String(common.LogFilePath, path))
 
 	m.cache[path] = info
 
+	logger.Debug("Put file into cache")
 	return nil
 }
 
-func (m *MetadataDiskStorage) DeleteFile(path string) error {
+func (m *MetadataDiskStorage) DeleteFile(ctx context.Context, path string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	_, logger := logging.FromContextWithOperation(ctx, common.OpDeleteFile,
+		slog.String(common.LogFilePath, path))
+
 	if _, ok := m.cache[path]; !ok {
-		return fmt.Errorf("file not found: %s", path)
+		return fmt.Errorf("%w: %s", ErrNotFound, path)
 	}
 
 	delete(m.cache, path)
 
+	logger.Debug("Deleted file from cache")
 	return nil
 }
 
-func (m *MetadataDiskStorage) ListFiles(directory string, recursive bool) ([]*common.FileInfo, error) {
+func (m *MetadataDiskStorage) ListFiles(ctx context.Context, directory string, recursive bool) ([]*common.FileInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	_, logger := logging.FromContextWithOperation(ctx, common.OpListFiles,
+		slog.String(common.LogDirectory, directory))
 
 	files := make([]*common.FileInfo, 0)
 	for _, info := range m.cache {
@@ -73,12 +91,16 @@ func (m *MetadataDiskStorage) ListFiles(directory string, recursive bool) ([]*co
 		}
 	}
 
+	logger.Debug("Listed files from cache", slog.Int(common.LogNumFiles, len(files)))
 	return files, nil
 }
 
-func (m *MetadataDiskStorage) GetChunksForNode(nodeID string) (map[string]*common.ChunkHeader, error) {
+func (m *MetadataDiskStorage) GetChunksForNode(ctx context.Context, nodeID string) (map[string]*common.ChunkHeader, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	_, logger := logging.FromContextWithOperation(ctx, common.OpGetChunksForNode,
+		slog.String(common.LogNodeID, nodeID))
 
 	chunks := make(map[string]*common.ChunkHeader)
 	for _, info := range m.cache {
@@ -89,12 +111,15 @@ func (m *MetadataDiskStorage) GetChunksForNode(nodeID string) (map[string]*commo
 		}
 	}
 
+	logger.Debug("Retrieved chunks for node", slog.Int(common.LogNumChunks, len(chunks)))
 	return nil, nil
 }
 
-func (m *MetadataDiskStorage) GetDeletedFiles(olderThan time.Time) ([]*common.FileInfo, error) {
+func (m *MetadataDiskStorage) GetDeletedFiles(ctx context.Context, olderThan time.Time) ([]*common.FileInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	_, logger := logging.FromContextWithOperation(ctx, common.OpGetDeletedFiles)
 
 	deletedFiles := make([]*common.FileInfo, 0)
 	for _, info := range m.cache {
@@ -105,5 +130,6 @@ func (m *MetadataDiskStorage) GetDeletedFiles(olderThan time.Time) ([]*common.Fi
 		}
 	}
 
+	logger.Debug("Retrieved deleted files", slog.Int(common.LogNumFiles, len(deletedFiles)))
 	return deletedFiles, nil
 }

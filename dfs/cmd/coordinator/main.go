@@ -16,8 +16,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/coordinator"
-	"github.com/mochivi/distributed-file-system/internal/launcher"
-	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/internal/grpcutil"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
@@ -30,7 +29,7 @@ type container struct {
 	// gRPC server dependencies
 	clusterStateHistoryManager state.ClusterStateHistoryManager
 	selector                   cluster.NodeSelector
-	metaStore                  storage.MetadataStore
+	metaStore                  metadata.MetadataStore
 	metadataManager            coordinator.MetadataSessionManager // Coordinates when to actually commit metadata
 
 	// Node Agent dependencies
@@ -103,7 +102,12 @@ func main() {
 		server := coordinator.NewCoordinator(&appConfig.Coordinator, serverContainer, logger)
 
 		// gRPC server and register
-		grpcServer := grpc.NewServer()
+		grpcServer := grpc.NewServer(
+			grpc.ChainUnaryInterceptor(
+				grpcutil.NewLoggingInterceptor(rootLogger),
+				grpcutil.ErrorsInterceptor,
+			),
+		)
 		proto.RegisterCoordinatorServiceServer(grpcServer, server)
 
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", appConfig.Coordinator.Port))
@@ -129,7 +133,7 @@ func main() {
 	}
 
 	// Launch gRPC server and node agent -- automatically handles graceful shutdown
-	if err := launcher.Launch(ctx, cancel, logger, setupGrpcFunc, launchNodeAgentFunc, 15*time.Second); err != nil {
+	if err := grpcutil.Launch(ctx, cancel, logger, setupGrpcFunc, launchNodeAgentFunc, 15*time.Second); err != nil {
 		log.Fatalf("Failed to launch coordinator: %v", err)
 	}
 }

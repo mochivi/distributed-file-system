@@ -24,94 +24,102 @@ import (
 type ChunkDiskStorage struct {
 	fs         afero.Fs
 	config     config.DiskStorageConfig
-	logger     *slog.Logger
 	serializer encoding.ChunkSerializer
 }
 
-func NewChunkDiskStorage(fs afero.Fs, config config.DiskStorageConfig, serializer encoding.ChunkSerializer, logger *slog.Logger) (*ChunkDiskStorage, error) {
-	storageLogger := logging.ExtendLogger(logger, slog.String("component", "chunk_storage"))
+func NewChunkDiskStorage(fs afero.Fs, config config.DiskStorageConfig, serializer encoding.ChunkSerializer) (*ChunkDiskStorage, error) {
 	if err := fs.MkdirAll(config.RootDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create rootDir for chunk disk storage: %w", err)
+		return nil, NewFsError("failed to create rootDir", err, StorageBackendDisk)
 	}
-	storageLogger.Debug("Created chunk disk storage rootDir", slog.String("root_dir", config.RootDir))
+
 	return &ChunkDiskStorage{
 		fs:         fs,
 		config:     config,
-		logger:     storageLogger,
 		serializer: serializer,
 	}, nil
 }
 
-func (d *ChunkDiskStorage) Store(chunkHeader common.ChunkHeader, data []byte) error {
+func (d *ChunkDiskStorage) Store(ctx context.Context, chunkHeader common.ChunkHeader, data []byte) error {
 	fullPath, err := d.getChunkPath(chunkHeader.ID)
 	if err != nil {
 		return err
 	}
+
+	_, logger := logging.FromContextWithOperation(ctx, common.OpPutChunk,
+		slog.String(common.LogChunkID, chunkHeader.ID),
+		slog.String(common.LogFilePath, fullPath))
 
 	// Extract the directory path from the full file path
 	dirPath := filepath.Dir(fullPath)
 
 	// Create all necessary directories (including nested ones)
 	if err := d.fs.MkdirAll(dirPath, 0755); err != nil {
-		return fmt.Errorf("failed to create directory structure %s: %w", dirPath, err)
+		return NewFsError("failed to create directory", err, StorageBackendDisk)
 	}
 
 	// Open file for writing
 	file, err := d.fs.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open chunk file %s: %w", fullPath, err)
+		return NewFsError("failed to open file", err, StorageBackendDisk)
 	}
 	defer file.Close()
 
 	// Serialize and write the header
 	serializedHeader, err := d.serializer.SerializeHeader(chunkHeader)
 	if err != nil {
-		return fmt.Errorf("failed to serialize chunk: %w", err)
+		return err
 	}
 
 	// Write header + data to file
 	if _, err := file.Write(serializedHeader); err != nil {
-		return fmt.Errorf("failed to write header to file: %w", err)
+		return NewFsError("failed to write header", err, StorageBackendDisk)
 	}
 	if _, err := file.Write(data); err != nil {
-		return fmt.Errorf("failed to write chunk data to file: %w", err)
+		return NewFsError("failed to write data to file", err, StorageBackendDisk)
 	}
 
-	d.logger.Debug("Stored chunk", slog.String("chunk_id", chunkHeader.ID), slog.String("path", fullPath))
+	logger.Debug("Stored chunk")
 	return nil
 }
 
 // Get returns the data of a chunk with the header.
-func (d *ChunkDiskStorage) Get(chunkID string) (common.ChunkHeader, []byte, error) {
+func (d *ChunkDiskStorage) Get(ctx context.Context, chunkID string) (common.ChunkHeader, []byte, error) {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return common.ChunkHeader{}, nil, err
 	}
 
-	header, err := d.GetHeader(chunkID)
+	ctx, logger := logging.FromContextWithOperation(ctx, common.OpGetChunk,
+		slog.String(common.LogChunkID, chunkID),
+		slog.String(common.LogFilePath, fullPath))
+
+	header, err := d.GetHeader(ctx, chunkID)
 	if err != nil {
-		return common.ChunkHeader{}, nil, fmt.Errorf("failed to get chunk header: %w", err)
+		return common.ChunkHeader{}, nil, err
 	}
 
-	data, err := d.GetData(chunkID)
+	data, err := d.GetData(ctx, chunkID)
 	if err != nil {
-		return common.ChunkHeader{}, nil, fmt.Errorf("failed to get chunk data: %w", err)
+		return common.ChunkHeader{}, nil, err
 	}
 
-	d.logger.Debug("Retrieved chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
+	logger.Debug("Retrieved chunk")
 	return header, data, nil
 }
 
 // GetData returns the data of a chunk without the header.
-func (d *ChunkDiskStorage) GetData(chunkID string) ([]byte, error) {
+func (d *ChunkDiskStorage) GetData(ctx context.Context, chunkID string) ([]byte, error) {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return nil, err
 	}
+	_, logger := logging.FromContextWithOperation(ctx, common.OpGetData,
+		slog.String(common.LogChunkID, chunkID),
+		slog.String(common.LogFilePath, fullPath))
 
 	file, err := d.fs.Open(fullPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read chunk file %s: %w", fullPath, err)
+		return nil, NewFsError("failed to read chunk file", err, StorageBackendDisk)
 	}
 
 	// Consume the header with the same logic used when deserialising.
@@ -125,27 +133,32 @@ func (d *ChunkDiskStorage) GetData(chunkID string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read chunk data: %w", err)
 	}
 
-	d.logger.Debug("Retrieved chunk data", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
+	logger.Debug("Retrieved chunk data")
 	return data, nil
 }
 
 // GetHeader returns the header of a chunk.
-func (d *ChunkDiskStorage) GetHeader(chunkID string) (common.ChunkHeader, error) {
+func (d *ChunkDiskStorage) GetHeader(ctx context.Context, chunkID string) (common.ChunkHeader, error) {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return common.ChunkHeader{}, err
 	}
+	_, logger := logging.FromContextWithOperation(ctx, common.OpGetHeader,
+		slog.String(common.LogChunkID, chunkID),
+		slog.String(common.LogFilePath, fullPath))
 
 	file, err := d.fs.Open(fullPath)
 	if err != nil {
-		return common.ChunkHeader{}, fmt.Errorf("failed to read chunk file %s: %w", fullPath, err)
+		return common.ChunkHeader{}, NewFsError("failed to read chunk file", err, StorageBackendDisk)
 	}
 	defer file.Close()
 
 	header, err := d.serializer.DeserializeHeader(file)
 	if err != nil {
-		return common.ChunkHeader{}, fmt.Errorf("failed to deserialize chunk header: %w", err)
+		return common.ChunkHeader{}, err
 	}
+
+	logger.Debug("Retrieved chunk header")
 	return header, nil
 }
 
@@ -155,13 +168,13 @@ func (d *ChunkDiskStorage) GetHeader(chunkID string) (common.ChunkHeader, error)
 // TODO: in the future, it would be valuable to return the accumulated errors of corrupted files
 // TODO: or, at least take action for those items in some way
 func (d *ChunkDiskStorage) GetHeaders(ctx context.Context) (map[string]common.ChunkHeader, error) {
-	maxWorkers := 10
+	ctx, logger := logging.FromContextWithOperation(ctx, common.OpGetHeaders)
 
 	// Queue work into channel
+	maxWorkers := 10
 	paths := make([]string, 0, maxWorkers)
 	if err := afero.Walk(d.fs, d.config.RootDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
-			d.logger.Warn("Corrupted file", slog.String("path", path), slog.String("error", err.Error()))
 			return nil
 		}
 		if info.IsDir() {
@@ -170,7 +183,7 @@ func (d *ChunkDiskStorage) GetHeaders(ctx context.Context) (map[string]common.Ch
 		paths = append(paths, path)
 		return nil
 	}); err != nil {
-		return nil, err
+		return nil, NewFsError("failed to walk chunk directory", err, StorageBackendDisk)
 	}
 
 	sem := make(chan struct{}, maxWorkers)
@@ -198,14 +211,14 @@ func (d *ChunkDiskStorage) GetHeaders(ctx context.Context) (map[string]common.Ch
 
 			file, err := d.fs.Open(p)
 			if err != nil {
-				resultCh <- result{err: fmt.Errorf("failed to read chunk header %s: %w", p, err)}
+				resultCh <- result{err: NewFsError("failed to open chunk file", err, StorageBackendDisk)}
 				return
 			}
 			defer file.Close()
 
 			header, err := d.serializer.DeserializeHeader(file)
 			if err != nil {
-				resultCh <- result{err: fmt.Errorf("failed to deserialize chunk header: %w", err)}
+				resultCh <- result{err: err}
 				return
 			}
 
@@ -228,6 +241,7 @@ outer:
 				break outer
 			}
 			if res.err != nil {
+				logger.Warn("Corrupted file", slog.String(common.LogChunkID, res.header.ID), slog.String(common.LogError, res.err.Error()))
 				continue // No action on reading errors for now
 			}
 			// This should be fine as there is only one file per chunk ID, so no overwrites
@@ -237,16 +251,21 @@ outer:
 		}
 	}
 
+	logger.Debug("Retrieved chunk headers", slog.Int(common.LogNumChunks, len(headers)))
 	return headers, nil
 }
 
-func (d *ChunkDiskStorage) Delete(chunkID string) error {
+func (d *ChunkDiskStorage) Delete(ctx context.Context, chunkID string) error {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return err
 	}
+	_, logger := logging.FromContextWithOperation(ctx, common.OpDeleteChunk,
+		slog.String(common.LogChunkID, chunkID),
+		slog.String(common.LogFilePath, fullPath))
+
 	if err := d.fs.Remove(fullPath); err != nil {
-		return err
+		return NewFsError("failed to delete chunk", err, StorageBackendDisk)
 	}
 
 	// Clean up empty parent directories.
@@ -256,18 +275,18 @@ func (d *ChunkDiskStorage) Delete(chunkID string) error {
 		if err != nil {
 			// Log error but don't fail the whole operation,
 			// as the file is already deleted.
-			return err
+			return NewFsError("failed to check if directory is empty", err, StorageBackendDisk)
 		}
 		if !empty {
 			break
 		}
 		if err := d.fs.Remove(dirPath); err != nil {
-			return err
+			return NewFsError("failed to remove empty directory", err, StorageBackendDisk)
 		}
 		dirPath = filepath.Dir(dirPath)
 	}
 
-	d.logger.Debug("Deleted chunk", slog.String("chunk_id", chunkID), slog.String("path", fullPath))
+	logger.Debug("Deleted chunk")
 	return nil
 }
 
@@ -281,6 +300,8 @@ func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes 
 	if len(chunkIDs) == 0 {
 		return nil, nil
 	}
+	ctx, logger := logging.FromContextWithOperation(ctx, common.OpBulkDelete,
+		slog.Int(common.LogNumChunks, len(chunkIDs)))
 
 	sem := make(chan struct{}, maxConcurrentDeletes)
 	var wg sync.WaitGroup
@@ -313,7 +334,7 @@ func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes 
 			}
 
 			// Delete chunk
-			err := d.Delete(id)
+			err := d.Delete(ctx, id)
 			resultCh <- result{id: id, err: err}
 		}(chunkID)
 	}
@@ -337,6 +358,7 @@ func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes 
 
 	// Success: all chunks were deleted
 	if len(deleted) == len(chunkIDs) {
+		logger.Debug("Bulk deleted chunks", slog.Int(common.LogNumChunks, len(deleted)))
 		return nil, nil
 	}
 
@@ -353,10 +375,11 @@ func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes 
 		failedSlice = append(failedSlice, id)
 	}
 
+	logger.Debug(fmt.Sprintf("Bulk deleted %d out of %d requested chunks", len(deleted), len(chunkIDs)))
 	return failedSlice, fmt.Errorf("failed to delete %d out of %d chunks", len(failed), len(chunkIDs))
 }
 
-func (d *ChunkDiskStorage) Exists(chunkID string) bool {
+func (d *ChunkDiskStorage) Exists(ctx context.Context, chunkID string) bool {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return false
@@ -366,7 +389,8 @@ func (d *ChunkDiskStorage) Exists(chunkID string) bool {
 }
 
 // TODO: results could be cached to avoid re-reading the directory every time if it is called often
-func (d *ChunkDiskStorage) List() ([]string, error) {
+func (d *ChunkDiskStorage) List(ctx context.Context) ([]string, error) {
+	_, logger := logging.FromContextWithOperation(ctx, common.OpListChunks)
 	var chunks []string
 
 	err := afero.Walk(d.fs, d.config.RootDir, func(path string, info fs.FileInfo, err error) error {
@@ -380,9 +404,10 @@ func (d *ChunkDiskStorage) List() ([]string, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, NewFsError("failed to list chunks", err, StorageBackendDisk)
 	}
 
+	logger.Debug("Listed chunks", slog.Int(common.LogNumChunks, len(chunks)))
 	return chunks, nil
 }
 
@@ -390,21 +415,21 @@ func (d *ChunkDiskStorage) List() ([]string, error) {
 func (d *ChunkDiskStorage) validateChunkID(chunkID string) error {
 	parts := strings.Split(chunkID, "_")
 	if len(parts) != 2 {
-		return fmt.Errorf("invalid chunk ID format: %s", chunkID)
+		return errors.New("invalid format")
 	}
 
 	// Ensure the first part (path hash) is valid hex and 8 bytes long
 	decoded, err := hex.DecodeString(parts[0])
 	if err != nil {
-		return fmt.Errorf("invalid path hash in chunk ID: %s", chunkID)
+		return errors.New("invalid path hash")
 	}
 	if len(decoded) != 8 {
-		return fmt.Errorf("invalid path hash length in chunk ID: %s", chunkID)
+		return errors.New("invalid path hash length")
 	}
 
 	// Second part should be a number
 	if _, err := strconv.Atoi(parts[1]); err != nil {
-		return fmt.Errorf("invalid chunk number in ID: %s", chunkID)
+		return errors.New("invalid chunk number")
 	}
 
 	return nil
@@ -414,7 +439,7 @@ func (d *ChunkDiskStorage) validateChunkID(chunkID string) error {
 // For example, a chunkID of "f1d2d2f924e9..." will be stored at "<rootDir>/f1/d2/f1d2d2f924e9...".
 func (d *ChunkDiskStorage) getChunkPath(chunkID string) (string, error) {
 	if err := d.validateChunkID(chunkID); err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %s", ErrInvalidChunkID, chunkID)
 	}
 
 	// Use the first 4 characters of the path hash to create 2 levels of directories

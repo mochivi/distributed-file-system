@@ -27,12 +27,12 @@ func HashFilepath(path string) string {
 func ParseChunkID(chunkID string) (string, int, error) {
 	parts := strings.Split(chunkID, "_")
 	if len(parts) != 2 {
-		return "", 0, fmt.Errorf("invalid chunk ID format: %s", chunkID)
+		return "", 0, fmt.Errorf("%w: invalid format: %s", ErrInvalidChunkID, chunkID)
 	}
 
 	chunkIndex, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return "", 0, fmt.Errorf("invalid chunk number in ID: %s", chunkID)
+		return "", 0, fmt.Errorf("%w: invalid chunk index: %s", ErrInvalidChunkID, chunkID)
 	}
 
 	return parts[0], chunkIndex, nil

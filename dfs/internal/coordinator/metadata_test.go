@@ -1,6 +1,7 @@
 package coordinator
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 	"time"
@@ -32,9 +33,9 @@ func TestTrackUpload(t *testing.T) {
 	mockStore := new(metadata.MockMetadataStore)
 	chunkInfos := make([]common.ChunkInfo, numChunks)
 	// We expect the commit to fail on the metastore call, but not because the session is missing
-	mockStore.On("PutFile", req.Path, mock.Anything).Return(nil)
+	mockStore.On("PutFile", mock.Anything, req.Path, mock.Anything).Return(nil)
 
-	err := manager.commit(sessionID, chunkInfos, mockStore)
+	err := manager.commit(context.Background(), sessionID, chunkInfos, mockStore)
 	assert.NoError(t, err, "Commit should not fail because session is missing")
 }
 
@@ -56,7 +57,7 @@ func TestCommit(t *testing.T) {
 				m.trackUpload(sid, common.UploadRequest{Path: "/test/success.txt"}, 1)
 			},
 			setupMocks: func(ms *metadata.MockMetadataStore) {
-				ms.On("PutFile", "/test/success.txt", mock.AnythingOfType("*common.FileInfo")).Return(nil).Once()
+				ms.On("PutFile", mock.Anything, "/test/success.txt", mock.AnythingOfType("*common.FileInfo")).Return(nil).Once()
 			},
 			expectErr:     false,
 			testChunkInfo: []common.ChunkInfo{{Replicas: []*common.NodeInfo{{ID: "node1"}}}},
@@ -88,7 +89,7 @@ func TestCommit(t *testing.T) {
 				m.trackUpload(sid, common.UploadRequest{Path: "/test/store_failure.txt"}, 1)
 			},
 			setupMocks: func(ms *metadata.MockMetadataStore) {
-				ms.On("PutFile", "/test/store_failure.txt", mock.AnythingOfType("*common.FileInfo")).Return(assert.AnError).Once()
+				ms.On("PutFile", mock.Anything, "/test/store_failure.txt", mock.AnythingOfType("*common.FileInfo")).Return(assert.AnError).Once()
 			},
 			expectErr:     true,
 			testChunkInfo: []common.ChunkInfo{{Replicas: []*common.NodeInfo{{ID: "node1"}}}},
@@ -104,7 +105,7 @@ func TestCommit(t *testing.T) {
 			tc.setupManager(manager, tc.sessionID)
 			tc.setupMocks(mockStore)
 
-			err := manager.commit(tc.sessionID, tc.testChunkInfo, mockStore)
+			err := manager.commit(context.Background(), tc.sessionID, tc.testChunkInfo, mockStore)
 
 			if tc.expectErr {
 				assert.Error(t, err)

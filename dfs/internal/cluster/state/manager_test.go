@@ -28,6 +28,8 @@ func TestClusterStateManager_AddNode(t *testing.T) {
 		initialVersion  int64
 		expectedCount   int
 		expectedVersion int64
+		expectErr       bool
+		expectedErr     error
 	}{
 		{
 			name:            "add first node",
@@ -36,6 +38,8 @@ func TestClusterStateManager_AddNode(t *testing.T) {
 			initialVersion:  0,
 			expectedCount:   1,
 			expectedVersion: 1,
+			expectErr:       false,
+			expectedErr:     nil,
 		},
 		{
 			name:            "add second node",
@@ -44,6 +48,8 @@ func TestClusterStateManager_AddNode(t *testing.T) {
 			initialVersion:  1,
 			expectedCount:   2,
 			expectedVersion: 2,
+			expectErr:       false,
+			expectedErr:     nil,
 		},
 		{
 			name:            "add existing node (should overwrite)",
@@ -52,6 +58,8 @@ func TestClusterStateManager_AddNode(t *testing.T) {
 			initialVersion:  1,
 			expectedCount:   1,
 			expectedVersion: 2,
+			expectErr:       false,
+			expectedErr:     nil,
 		},
 	}
 
@@ -66,8 +74,13 @@ func TestClusterStateManager_AddNode(t *testing.T) {
 			assert.Equal(t, tt.expectedCount, len(nodes))
 			assert.Equal(t, tt.expectedVersion, version)
 
-			gotNode, ok := manager.GetNode(tt.nodeToAdd.ID)
-			assert.True(t, ok)
+			gotNode, err := manager.GetNode(tt.nodeToAdd.ID)
+			if tt.expectErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err)
+			} else {
+				assert.NoError(t, err)
+			}
 			assert.Equal(t, tt.nodeToAdd.Host, gotNode.Host)
 		})
 	}
@@ -81,17 +94,35 @@ func TestClusterStateManager_GetNode(t *testing.T) {
 	tests := []struct {
 		name         string
 		nodeID       string
-		expectFound  bool
+		expectErr    bool
 		expectedNode *common.NodeInfo
+		expectedErr  error
 	}{
-		{"get existing node", "node1", true, node1},
-		{"get non-existent node", "node2", false, nil},
+		{
+			name:         "get existing node",
+			nodeID:       "node1",
+			expectErr:    false,
+			expectedNode: node1,
+			expectedErr:  nil,
+		},
+		{
+			name:         "get non-existent node",
+			nodeID:       "node2",
+			expectErr:    true,
+			expectedNode: nil,
+			expectedErr:  ErrNotFound,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			node, found := manager.GetNode(tt.nodeID)
-			assert.Equal(t, tt.expectFound, found)
+			node, err := manager.GetNode(tt.nodeID)
+			if tt.expectErr {
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
 			assert.Equal(t, tt.expectedNode, node)
 		})
 	}
@@ -178,9 +209,28 @@ func TestClusterStateManager_UpdateNode(t *testing.T) {
 		expectErr       bool
 		expectedVersion int64
 		expectedHost    string
+		expectedErr     error
 	}{
-		{"update existing node", updatedNode1, []*common.NodeInfo{node1}, 1, false, 2, "updated-host"},
-		{"update non-existent node", &common.NodeInfo{ID: "node2"}, []*common.NodeInfo{node1}, 1, true, 1, ""},
+		{
+			name:            "update existing node",
+			nodeToUpdate:    updatedNode1,
+			initialNodes:    []*common.NodeInfo{node1},
+			initialVersion:  1,
+			expectErr:       false,
+			expectedVersion: 2,
+			expectedHost:    "updated-host",
+			expectedErr:     nil,
+		},
+		{
+			name:            "update non-existent node",
+			nodeToUpdate:    &common.NodeInfo{ID: "node2"},
+			initialNodes:    []*common.NodeInfo{node1},
+			initialVersion:  1,
+			expectErr:       true,
+			expectedVersion: 1,
+			expectedHost:    "",
+			expectedErr:     ErrNotFound,
+		},
 	}
 
 	for _, tt := range tests {
@@ -194,8 +244,8 @@ func TestClusterStateManager_UpdateNode(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				gotNode, ok := manager.GetNode(tt.nodeToUpdate.ID)
-				assert.True(t, ok)
+				gotNode, err := manager.GetNode(tt.nodeToUpdate.ID)
+				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedHost, gotNode.Host)
 			}
 
@@ -255,8 +305,8 @@ func TestClusterStateManager_ApplyUpdates(t *testing.T) {
 			expectedCount:   1,
 			expectedVersion: 1,
 			finalCheck: func(t *testing.T, m *clusterStateManager) {
-				_, ok := m.GetNode("node1")
-				assert.True(t, ok)
+				_, err := m.GetNode("node1")
+				assert.NoError(t, err)
 			},
 		},
 		{
@@ -269,8 +319,8 @@ func TestClusterStateManager_ApplyUpdates(t *testing.T) {
 			expectedCount:   0,
 			expectedVersion: 2,
 			finalCheck: func(t *testing.T, m *clusterStateManager) {
-				_, ok := m.GetNode("node1")
-				assert.False(t, ok)
+				_, err := m.GetNode("node1")
+				assert.Error(t, err)
 			},
 		},
 		{
@@ -283,8 +333,8 @@ func TestClusterStateManager_ApplyUpdates(t *testing.T) {
 			expectedCount:   1,
 			expectedVersion: 2,
 			finalCheck: func(t *testing.T, m *clusterStateManager) {
-				n, ok := m.GetNode("node1")
-				assert.True(t, ok)
+				n, err := m.GetNode("node1")
+				assert.NoError(t, err)
 				assert.Equal(t, "updated", n.Host)
 			},
 		},
@@ -300,10 +350,10 @@ func TestClusterStateManager_ApplyUpdates(t *testing.T) {
 			expectedCount:   1,
 			expectedVersion: 3,
 			finalCheck: func(t *testing.T, m *clusterStateManager) {
-				_, ok := m.GetNode("node1")
-				assert.False(t, ok)
-				_, ok = m.GetNode("node2")
-				assert.True(t, ok)
+				_, err := m.GetNode("node1")
+				assert.Error(t, err)
+				_, err = m.GetNode("node2")
+				assert.NoError(t, err)
 			},
 		},
 		{

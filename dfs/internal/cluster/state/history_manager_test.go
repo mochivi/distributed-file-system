@@ -40,8 +40,8 @@ func TestClusterStateHistoryManager_AddNode(t *testing.T) {
 	manager.AddNode(node1)
 
 	// Check node
-	gotNode, ok := manager.GetNode("node1")
-	assert.True(t, ok)
+	gotNode, err := manager.GetNode("node1")
+	assert.NoError(t, err)
 	assert.Equal(t, node1, gotNode)
 
 	// Check version
@@ -63,8 +63,8 @@ func TestClusterStateHistoryManager_RemoveNode(t *testing.T) {
 	err := manager.RemoveNode("node1") // Version 2
 	assert.NoError(t, err)
 
-	_, ok := manager.GetNode("node1")
-	assert.False(t, ok)
+	_, err = manager.GetNode("node1")
+	assert.Error(t, err)
 	assert.Equal(t, int64(2), manager.GetCurrentVersion())
 
 	updates, _, _ := manager.GetUpdatesSince(1)
@@ -86,8 +86,8 @@ func TestClusterStateHistoryManager_UpdateNode(t *testing.T) {
 	err := manager.UpdateNode(updatedNode1) // Version 2
 	assert.NoError(t, err)
 
-	gotNode, ok := manager.GetNode("node1")
-	assert.True(t, ok)
+	gotNode, err := manager.GetNode("node1")
+	assert.NoError(t, err)
 	assert.Equal(t, "host2", gotNode.Host)
 	assert.Equal(t, int64(2), manager.GetCurrentVersion())
 
@@ -192,8 +192,8 @@ func TestClusterStateHistoryManager_ApplyUpdates(t *testing.T) {
 	assert.Len(t, nodes, 1)
 	assert.Equal(t, "node2", nodes[0].ID)
 
-	_, ok := manager.GetNode("node1")
-	assert.False(t, ok)
+	_, err := manager.GetNode("node1")
+	assert.Error(t, err)
 }
 
 func TestClusterStateHistoryManager_InitializeNodes(t *testing.T) {

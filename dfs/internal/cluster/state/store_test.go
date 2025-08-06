@@ -20,19 +20,19 @@ func TestNodeStore_AddAndGetNode(t *testing.T) {
 
 	// Add and get
 	store.addNode(node1)
-	gotNode, ok := store.getNode("node1")
-	assert.True(t, ok)
+	gotNode, err := store.getNode("node1")
+	assert.NoError(t, err)
 	assert.Equal(t, node1, gotNode)
 
 	// Get non-existent
-	_, ok = store.getNode("non-existent")
-	assert.False(t, ok)
+	_, err = store.getNode("non-existent")
+	assert.Error(t, err)
 
 	// Overwrite existing
 	node1Updated := &common.NodeInfo{ID: "node1", Host: "host1-updated"}
 	store.addNode(node1Updated)
-	gotNode, ok = store.getNode("node1")
-	assert.True(t, ok)
+	gotNode, err = store.getNode("node1")
+	assert.NoError(t, err)
 	assert.Equal(t, "host1-updated", gotNode.Host)
 }
 
@@ -44,13 +44,13 @@ func TestNodeStore_RemoveNode(t *testing.T) {
 	// Remove existing
 	err := store.removeNode("node1")
 	assert.NoError(t, err)
-	_, ok := store.getNode("node1")
-	assert.False(t, ok)
+	_, err = store.getNode("node1")
+	assert.Error(t, err)
 
 	// Remove non-existent
 	err = store.removeNode("non-existent")
 	assert.Error(t, err)
-	assert.EqualError(t, err, "node with ID non-existent not found")
+	assert.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestNodeStore_UpdateNode(t *testing.T) {
@@ -62,14 +62,14 @@ func TestNodeStore_UpdateNode(t *testing.T) {
 	node1Updated := &common.NodeInfo{ID: "node1", Host: "host1-updated"}
 	err := store.updateNode(node1Updated)
 	assert.NoError(t, err)
-	gotNode, ok := store.getNode("node1")
-	assert.True(t, ok)
+	gotNode, err := store.getNode("node1")
+	assert.NoError(t, err)
 	assert.Equal(t, "host1-updated", gotNode.Host)
 
 	// Update non-existent
 	err = store.updateNode(&common.NodeInfo{ID: "non-existent"})
 	assert.Error(t, err)
-	assert.EqualError(t, err, "node with ID non-existent not found")
+	assert.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestNodeStore_ListNodes(t *testing.T) {
@@ -123,15 +123,15 @@ func TestNodeStore_InitializeNodes(t *testing.T) {
 	nodes := store.listNodes()
 	assert.Len(t, nodes, 2)
 
-	_, ok := store.getNode("old-node")
-	assert.False(t, ok, "old node should be gone")
+	_, err := store.getNode("old-node")
+	assert.Error(t, err, "old node should be gone")
 
-	gotNode1, ok := store.getNode("node1")
-	assert.True(t, ok)
+	gotNode1, err := store.getNode("node1")
+	assert.NoError(t, err)
 	assert.Equal(t, newNodes[0], gotNode1)
 
-	gotNode2, ok := store.getNode("node2")
-	assert.True(t, ok)
+	gotNode2, err := store.getNode("node2")
+	assert.NoError(t, err)
 	assert.Equal(t, newNodes[1], gotNode2)
 
 	// Initialize with empty slice

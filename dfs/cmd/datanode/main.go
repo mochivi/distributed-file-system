@@ -19,8 +19,7 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 	"github.com/mochivi/distributed-file-system/internal/datanode"
-	"github.com/mochivi/distributed-file-system/internal/launcher"
-	"github.com/mochivi/distributed-file-system/internal/storage"
+	"github.com/mochivi/distributed-file-system/internal/grpcutil"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/internal/storage/encoding"
 	"github.com/mochivi/distributed-file-system/internal/storage/metadata"
@@ -35,7 +34,7 @@ import (
 
 type container struct {
 	// shared or grpc server dependencies
-	chunkStore          storage.ChunkStorage
+	chunkStore          chunk.ChunkStorage
 	replicationManager  datanode.ReplicationProvider
 	sessionManager      streaming.SessionManager
 	clusterStateManager state.ClusterStateManager
@@ -45,13 +44,13 @@ type container struct {
 	clientPoolFactory   client_pool.ClientPoolFactory
 
 	// Node Agent dependencies
-	metadataStore   storage.MetadataStore
+	metadataStore   metadata.MetadataStore
 	metadataScanner shared.MetadataScannerProvider
 }
 
 func setupDependencies(ctx context.Context, cfg *config.DatanodeAppConfig, logger *slog.Logger) *container {
 	chunkSerializer := encoding.NewProtoSerializer()
-	chunkStore, err := chunk.NewChunkDiskStorage(afero.NewOsFs(), cfg.Node.DiskStorage, chunkSerializer, logger)
+	chunkStore, err := chunk.NewChunkDiskStorage(afero.NewOsFs(), cfg.Node.DiskStorage, chunkSerializer)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -146,7 +145,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	logger := logging.ExtendLogger(rootLogger, slog.String("node_id", datanodeInfo.ID))
+	logger := logging.ExtendLogger(rootLogger,
+		slog.String(common.LogComponent, common.ComponentDatanode),
+		slog.String(common.LogNodeID, datanodeInfo.ID))
 
 	// Root context and cancel function for coordinated shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -160,7 +161,12 @@ func main() {
 			container.clusterStateManager, container.coordinatorFinder, container.nodeSelector, container.streamerFactory, container.clientPoolFactory)
 		server := datanode.NewDataNodeServer(&datanodeInfo, appConfig.Node, serverContainer, logger)
 
-		grpcServer := grpc.NewServer()
+		grpcServer := grpc.NewServer(
+			grpc.ChainUnaryInterceptor(
+				grpcutil.NewLoggingInterceptor(rootLogger),
+				grpcutil.ErrorsInterceptor,
+			),
+		)
 		proto.RegisterDataNodeServiceServer(grpcServer, server)
 
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", datanodePort))
@@ -185,7 +191,7 @@ func main() {
 		}()
 	}
 
-	if err := launcher.Launch(ctx, cancel, logger, setupGrpcFunc, launchNodeAgentFunc, 15*time.Second); err != nil {
+	if err := grpcutil.Launch(ctx, cancel, logger, setupGrpcFunc, launchNodeAgentFunc, 15*time.Second); err != nil {
 		log.Fatalf("Failed to launch datanode: %v", err)
 	}
 }

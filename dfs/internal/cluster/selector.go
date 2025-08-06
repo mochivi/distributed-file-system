@@ -6,7 +6,7 @@ import (
 )
 
 type NodeSelector interface {
-	SelectBestNodes(n int, self *common.NodeInfo) ([]*common.NodeInfo, bool)
+	SelectBestNodes(n int, self *common.NodeInfo) ([]*common.NodeInfo, error)
 }
 
 type nodeSelector struct {
@@ -20,9 +20,9 @@ func NewNodeSelector(clusterViewer state.ClusterStateViewer) *nodeSelector {
 }
 
 // TODO: configure for overlap between chunks for the same node in cases there are few available datanodes
-func (s *nodeSelector) SelectBestNodes(n int, self *common.NodeInfo) ([]*common.NodeInfo, bool) {
+func (s *nodeSelector) SelectBestNodes(n int, self *common.NodeInfo) ([]*common.NodeInfo, error) {
 	if n <= 0 {
-		return nil, false
+		return nil, ErrNoAvailableNodes
 	}
 
 	nodes, _ := s.clusterViewer.ListNodes()
@@ -38,8 +38,8 @@ func (s *nodeSelector) SelectBestNodes(n int, self *common.NodeInfo) ([]*common.
 	}
 
 	if len(selectedNodes) == 0 {
-		return nil, false
+		return nil, ErrNoAvailableNodes
 	}
 
-	return selectedNodes, true
+	return selectedNodes, nil
 }
