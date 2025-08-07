@@ -98,7 +98,7 @@ func (c *Coordinator) ConfirmUpload(ctx context.Context, pb *proto.ConfirmUpload
 	ctx, _ = logging.FromContextWithOperation(ctx, common.OpCommit,
 		slog.String(common.LogMetadataSessionID, req.SessionID))
 
-	resp, err := c.service.commitMetadata(ctx, req)
+	resp, err := c.service.confirmUpload(ctx, req)
 	if err != nil {
 		return nil, err
 	}

@@ -101,7 +101,7 @@ func (s *service) deleteFile(ctx context.Context, req common.DeleteRequest) (com
 	return common.DeleteResponse{Success: true}, nil
 }
 
-func (s *service) commitMetadata(ctx context.Context, req common.ConfirmUploadRequest) (common.ConfirmUploadResponse, error) {
+func (s *service) confirmUpload(ctx context.Context, req common.ConfirmUploadRequest) (common.ConfirmUploadResponse, error) {
 	logger := logging.FromContext(ctx)
 
 	if err := s.metadataManager.commit(ctx, req.SessionID, req.ChunkInfos, s.metaStore); err != nil {
@@ -135,7 +135,10 @@ func (s *service) heartbeat(ctx context.Context, req common.HeartbeatRequest) (c
 
 	node, err := s.clusterStateHistoryManager.GetNode(req.NodeID)
 	if err != nil {
-		return common.HeartbeatResponse{}, fmt.Errorf("failed to get data node: %w", err)
+		return common.HeartbeatResponse{
+			Success: false,
+			Message: "node is not registered",
+		}, nil
 	}
 
 	node.Status = req.Status.Status
@@ -143,7 +146,13 @@ func (s *service) heartbeat(ctx context.Context, req common.HeartbeatRequest) (c
 
 	updates, currentVersion, err := s.clusterStateHistoryManager.GetUpdatesSince(req.LastSeenVersion)
 	if err != nil {
-		return common.HeartbeatResponse{}, fmt.Errorf("version too old: %w", err)
+		return common.HeartbeatResponse{
+			Success:            true,
+			Message:            "version too old",
+			RequiresFullResync: true,
+			FromVersion:        req.LastSeenVersion,
+			ToVersion:          currentVersion,
+		}, nil
 	}
 
 	logger.Debug("Replying to data node with updates", slog.Int(common.LogNumUpdates, len(updates)))
