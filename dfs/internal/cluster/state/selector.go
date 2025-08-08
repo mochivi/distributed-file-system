@@ -1,7 +1,6 @@
-package cluster
+package state
 
 import (
-	"github.com/mochivi/distributed-file-system/internal/cluster/state"
 	"github.com/mochivi/distributed-file-system/internal/common"
 )
 
@@ -10,10 +9,10 @@ type NodeSelector interface {
 }
 
 type nodeSelector struct {
-	clusterViewer state.ClusterStateViewer
+	clusterViewer ClusterStateViewer
 }
 
-func NewNodeSelector(clusterViewer state.ClusterStateViewer) *nodeSelector {
+func NewNodeSelector(clusterViewer ClusterStateViewer) *nodeSelector {
 	return &nodeSelector{
 		clusterViewer: clusterViewer,
 	}

@@ -52,6 +52,7 @@ I am happy to provide guidance, answer questions and help everyone willing to co
 * Log using `pkg/logging` helpers; avoid `fmt.Println` in production code.
 * Make sure functions are small and testable. 
 * Dependency injection pattern is your friend.
+* Error handling: refer to [Protocol Error Handling Documentation](docs/protocol.md#error-handling-and-recovery)
 
 ---
 

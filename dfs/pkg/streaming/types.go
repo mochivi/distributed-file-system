@@ -59,8 +59,8 @@ type ServerStreamerFactory func(sessionManager SessionManager, config config.Str
 type ServerStreamer interface {
 
 	// Upload side -- receiving chunks
-	HandleFirstChunk(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) (*streamingSession, error)
-	ReceiveChunks(session *streamingSession, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) ([]byte, error)
+	HandleFirstChunkFrame(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) (*streamingSession, error)
+	ReceiveChunkFrames(session *streamingSession, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) ([]byte, error)
 	SendFinalAck(sessionID string, bytesReceived int, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error
 	SendFinalReplicasAck(session *streamingSession, replicaNodes []*common.NodeInfo, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error
 
@@ -84,12 +84,12 @@ func NewServerStreamer(sessionManager SessionManager, config config.StreamerConf
 // SessionManager is used by the datanode to control currently active sessions
 type SessionManager interface {
 	NewSession(ctx context.Context, chunkHeader common.ChunkHeader, propagate bool) *streamingSession
-	GetSession(sessionID string) (*streamingSession, bool)
+	GetSession(sessionID string) (*streamingSession, error)
 	Store(sessionID string, session *streamingSession) error
-	Load(sessionID string) (*streamingSession, bool)
+	Load(sessionID string) (*streamingSession, error)
 	Delete(sessionID string)
 	ExistsForChunk(chunkID string) bool
-	LoadByChunk(chunkID string) (*streamingSession, bool)
+	LoadByChunk(chunkID string) (*streamingSession, error)
 }
 
 type SessionStatus int

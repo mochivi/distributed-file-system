@@ -39,6 +39,7 @@ const (
 	LogNumFiles    = "num_files"
 	LogNumChunks   = "num_chunks"
 	LogNumReplicas = "num_replicas"
+	LogNumFailed   = "num_failed"
 
 	// Streaming/Frame logging
 	LogOffset = "offset"
@@ -50,9 +51,7 @@ const (
 	LogSuccess      = "success"
 	LogSuccessCount = "success_count"
 	LogFailureCount = "failure_count"
-
-	// Storage related params
-
+	LogNumUpdates   = "num_updates"
 )
 
 // Component names
@@ -73,6 +72,7 @@ const (
 	OpDelete     = "delete"
 	OpBulkDelete = "bulk_delete"
 	OpList       = "list"
+	OpListNodes  = "list_nodes"
 	OpCommit     = "commit"
 	OpRegister   = "register"
 	OpReplicate  = "replicate"

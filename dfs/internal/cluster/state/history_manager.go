@@ -1,7 +1,6 @@
 package state
 
 import (
-	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -16,7 +15,7 @@ type ClusterStateHistoryManager interface {
 	GetUpdatesSince(sinceVersion int64) ([]common.NodeUpdate, int64, error)
 	IsVersionTooOld(version int64) bool
 	GetOldestVersionInHistory() int64
-	GetAvailableNodesForChunk(replicaIDs []*common.NodeInfo) ([]*common.NodeInfo, bool)
+	GetAvailableNodesForChunk(replicaIDs []*common.NodeInfo) ([]*common.NodeInfo, error)
 }
 
 type clusterStateHistoryManager struct {
@@ -109,7 +108,7 @@ func (m *clusterStateHistoryManager) GetUpdatesSince(sinceVersion int64) ([]comm
 	// Check if requested version is too old (not in our history buffer)
 	oldestVersion := m.GetOldestVersionInHistory()
 	if sinceVersion < oldestVersion {
-		return nil, 0, fmt.Errorf("version %d too old, oldest available: %d", sinceVersion, oldestVersion)
+		return nil, 0, ErrVersionTooOld
 	}
 
 	// If already up to date
@@ -195,7 +194,7 @@ func (m *clusterStateHistoryManager) InitializeNodes(nodes []*common.NodeInfo, c
 	m.version = currentVersion
 }
 
-func (m *clusterStateHistoryManager) GetAvailableNodesForChunk(replicaIDs []*common.NodeInfo) ([]*common.NodeInfo, bool) {
+func (m *clusterStateHistoryManager) GetAvailableNodesForChunk(replicaIDs []*common.NodeInfo) ([]*common.NodeInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -209,10 +208,10 @@ func (m *clusterStateHistoryManager) GetAvailableNodesForChunk(replicaIDs []*com
 	}
 
 	if len(nodes) == 0 {
-		return nil, false
+		return nil, ErrNoAvailableNodes
 	}
 
-	return nodes, true
+	return nodes, nil
 }
 
 func (m *clusterStateHistoryManager) addToHistory(updateType common.NodeUpdateType, node *common.NodeInfo) {

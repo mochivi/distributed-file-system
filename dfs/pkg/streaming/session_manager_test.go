@@ -71,8 +71,8 @@ func TestStreamingSessionManager_Store(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				storedSession, ok := sm.Load(tc.sessionToStore.SessionID)
-				assert.True(t, ok)
+				storedSession, err := sm.Load(tc.sessionToStore.SessionID)
+				assert.NoError(t, err)
 				assert.Equal(t, tc.sessionToStore, storedSession)
 			}
 		})
@@ -85,7 +85,7 @@ func TestStreamingSessionManager_Load(t *testing.T) {
 		name            string
 		initialState    map[string]*streamingSession
 		sessionIDToLoad string
-		expectFound     bool
+		expectedErr     error
 		expectedSession *streamingSession
 	}{
 		{
@@ -94,14 +94,14 @@ func TestStreamingSessionManager_Load(t *testing.T) {
 				"session1": session1,
 			},
 			sessionIDToLoad: "session1",
-			expectFound:     true,
+			expectedErr:     nil,
 			expectedSession: session1,
 		},
 		{
 			name:            "failure: session not found",
 			initialState:    make(map[string]*streamingSession),
 			sessionIDToLoad: "non-existent",
-			expectFound:     false,
+			expectedErr:     ErrSessionNotFound,
 			expectedSession: nil,
 		},
 	}
@@ -111,9 +111,9 @@ func TestStreamingSessionManager_Load(t *testing.T) {
 			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError, true))
 			sm.sessions = tc.initialState
 
-			session, found := sm.Load(tc.sessionIDToLoad)
+			session, err := sm.Load(tc.sessionIDToLoad)
 
-			assert.Equal(t, tc.expectFound, found)
+			assert.Equal(t, tc.expectedErr, err)
 			assert.Equal(t, tc.expectedSession, session)
 		})
 	}
@@ -128,15 +128,15 @@ func TestStreamingSessionManager_Delete(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Make sure it's there
-	_, ok := sm.Load(session.SessionID)
-	assert.True(t, ok)
+	_, err = sm.Load(session.SessionID)
+	assert.NoError(t, err)
 
 	// Delete it
 	sm.Delete(session.SessionID)
 
 	// Make sure it's gone
-	_, ok = sm.Load(session.SessionID)
-	assert.False(t, ok)
+	_, err = sm.Load(session.SessionID)
+	assert.Error(t, err)
 }
 
 func TestStreamingSessionManager_ExistsForChunk(t *testing.T) {
@@ -188,7 +188,7 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 		name            string
 		initialState    map[string]*streamingSession
 		chunkID         string
-		expectFound     bool
+		expectedErr     error
 		expectedSession *streamingSession
 	}{
 		{
@@ -198,7 +198,7 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 				"session2": newTestSession("session2", "chunk2", SessionActive),
 			},
 			chunkID:         "chunk1",
-			expectFound:     true,
+			expectedErr:     nil,
 			expectedSession: session1,
 		},
 		{
@@ -207,7 +207,7 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 				"session2": newTestSession("session2", "chunk2", SessionActive),
 			},
 			chunkID:         "chunk-non-existent",
-			expectFound:     false,
+			expectedErr:     ErrSessionNotFound,
 			expectedSession: nil,
 		},
 	}
@@ -217,8 +217,8 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 			sm := NewStreamingSessionManager(config.DefaultStreamingSessionManagerConfig(), logging.NewTestLogger(slog.LevelError, true))
 			sm.sessions = tc.initialState
 
-			session, found := sm.LoadByChunk(tc.chunkID)
-			assert.Equal(t, tc.expectFound, found)
+			session, err := sm.LoadByChunk(tc.chunkID)
+			assert.Equal(t, tc.expectedErr, err)
 			assert.Equal(t, tc.expectedSession, session)
 		})
 	}
@@ -241,8 +241,8 @@ func TestStreamingSessionManager_Concurrency(t *testing.T) {
 
 			_ = sm.Store(sessionID, session)
 
-			loadedSession, ok := sm.Load(sessionID)
-			if ok {
+			loadedSession, err := sm.Load(sessionID)
+			if err == nil {
 				assert.Equal(t, sessionID, loadedSession.SessionID)
 			}
 

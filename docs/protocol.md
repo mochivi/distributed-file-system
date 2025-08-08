@@ -272,7 +272,91 @@ Replication is handled transparently within the `UploadChunkStream` RPC:
 
 ## Error Handling and Recovery
 
-TODO: define and categorize protocol errors
+The protocol uses a layered error-handling strategy:
+
+- Service layer returns business outcomes (success and message) via response fields on RPCs that define them.
+- Transport layer maps well-known sentinel errors to specific responses or gRPC status codes.
+- The error interceptor `dfs/internal/grpcutil/interceptors.go` allows for translation of structured application errors.
+- The error interceptor also defaults unknown errors to internal server error kinds.
+
+#### Layers and flow
+
+- Service (business logic): Prefer returning domain results using `success` and `message` fields when the RPC response supports it (e.g., `ConfirmUploadResponse`, `DeleteResponse`, `RegisterDataNodeResponse`, `HeartbeatResponse`).
+- Transport (server handlers): Handle sentinel errors explicitly and either:
+  - Convert to a structured response (e.g., heartbeat requires full resync), or
+  - Convert to a gRPC status using app errors (e.g., NotFound).
+- Interceptor: Converts `AppError` or `AppErrorTranslator` to gRPC status; otherwise returns `Internal`.
+
+Examples:
+
+```go
+// dfs/internal/coordinator/server.go
+resp, err := c.service.uploadFile(ctx, req)
+if err != nil {
+	if errors.Is(err, state.ErrNoAvailableNodes) {
+		return nil, apperr.Wrap(codes.NotFound, "no available nodes", err)
+	}
+	return nil, err
+}
+```
+
+```go
+// dfs/internal/coordinator/server.go
+if errors.Is(err, metadata.ErrNotFound) {
+	return nil, apperr.Wrap(codes.NotFound, "file not found in metadata store", err)
+}
+if errors.Is(err, state.ErrNoAvailableNodes) {
+	return nil, apperr.Wrap(codes.NotFound, "no available nodes", err)
+}
+```
+
+```go
+// dfs/internal/coordinator/server.go
+if errors.Is(err, state.ErrNotFound) {
+	return common.HeartbeatResponse{Success: false, Message: "node is not registered"}.ToProto(), nil
+}
+if errors.Is(err, state.ErrVersionTooOld) {
+	return &proto.HeartbeatResponse{Success: true, Message: "version too old", RequiresFullResync: true}, nil
+}
+```
+
+```go
+// dfs/internal/grpcutil/interceptors.go
+// ErrorsInterceptor translates errors to gRPC status.
+if errTranslator, ok := err.(apperr.AppErrorTranslator); ok {
+	appErr := errTranslator.ToAppError()
+	return nil, status.Error(appErr.Code, appErr.Message)
+}
+if errors.As(err, &appErr) {
+	return nil, status.Error(appErr.Code, appErr.Message)
+}
+return nil, status.Error(codes.Internal, "an unexpected internal error occurred")
+```
+
+#### Sentinel errors (handled in transport)
+
+- state.ErrNoAvailableNodes: mapped to `NotFound` (e.g., `UploadFile`, `DownloadFile`).
+- metadata.ErrNotFound: mapped to `NotFound` (e.g., `DownloadFile`, `DeleteFile`).
+- state.ErrNotFound: for heartbeats, returned as a successful RPC with `success=false, message="node is not registered"`.
+- state.ErrVersionTooOld: for heartbeats, returned as a successful RPC with `requires_full_resync=true`.
+
+#### Service-layer business errors
+
+For RPCs with `success`/`message` fields, service methods should encode business outcomes without surfacing transport errors. Examples:
+- `ConfirmUpload`: return `success=false` with a user-facing message on validation failures.
+- `DeleteFile`: return a structured `DeleteResponse`; only escalate to errors for transport-level or unexpected failures.
+
+#### Unexpected or opaque errors
+
+- Use `apperr.Wrap(...)` for known mappings; otherwise return the original error.
+- The interceptor converts `AppError` or `AppErrorTranslator` into proper gRPC statuses.
+- Any other error becomes a generic `Internal` error to the client, with details hidden.
+
+Guidelines:
+- Prefer structured responses (success/message) where proto supports it. Use it for business logic errors.
+- Use sentinel errors for cross-layer control flow and handle them in the server handlers (transport e.g `server.go` files).
+- Use `AppError` for explicit status mapping; let the interceptor translate.
+- Avoid leaking internal error details; rely on the interceptor for generic internal failures.
 
 ---
 

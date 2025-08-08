@@ -29,12 +29,13 @@ func (m *serverStreamerMocks) assertExpectations(t *testing.T) {
 
 func TestServerStreamer_HandleFirstChunk(t *testing.T) {
 	testCases := []struct {
-		name           string
-		setupMocks     func(*serverStreamerMocks)
-		chunkData      *proto.ChunkDataStream
-		expectErr      bool
-		expectedErr    string
-		expectedStatus codes.Code
+		name                string
+		setupMocks          func(*serverStreamerMocks)
+		chunkData           *proto.ChunkDataStream
+		expectErr           bool
+		expectedSentinelErr error
+		expectedCustomErr   error
+		expectedStatus      codes.Code
 	}{
 		{
 			name: "success: valid first chunk",
@@ -59,7 +60,7 @@ func TestServerStreamer_HandleFirstChunk(t *testing.T) {
 					Status:          SessionActive,
 					runningChecksum: sha256.New(),
 				}
-				mocks.sessionManager.On("GetSession", "test-session").Return(session, true).Once()
+				mocks.sessionManager.On("GetSession", "test-session").Return(session, nil).Once()
 
 				successfulAck := &common.ChunkDataAck{
 					SessionID:     chunk.SessionId,
@@ -83,21 +84,21 @@ func TestServerStreamer_HandleFirstChunk(t *testing.T) {
 			setupMocks: func(mocks *serverStreamerMocks) {
 				mocks.stream.On("Recv").Return(nil, io.EOF).Once()
 			},
-			chunkData:   nil,
-			expectErr:   true,
-			expectedErr: "failed to receive chunk data: EOF",
+			chunkData:           nil,
+			expectErr:           true,
+			expectedSentinelErr: io.EOF,
 		},
 		{
 			name: "error: receive error",
 			setupMocks: func(mocks *serverStreamerMocks) {
 				mocks.stream.On("Recv").Return(nil, errors.New("network error")).Once()
 			},
-			chunkData:   nil,
-			expectErr:   true,
-			expectedErr: "failed to receive chunk data: network error",
+			chunkData:         nil,
+			expectErr:         true,
+			expectedCustomErr: NewStreamReceiveError("", 0, errors.New("network error")),
 		},
 		{
-			name: "error: invalid session",
+			name: "error: session not found",
 			setupMocks: func(mocks *serverStreamerMocks) {
 				chunk := &proto.ChunkDataStream{
 					SessionId: "test-session",
@@ -107,11 +108,11 @@ func TestServerStreamer_HandleFirstChunk(t *testing.T) {
 					IsFinal:   false,
 				}
 				mocks.stream.On("Recv").Return(chunk, nil).Once()
-				mocks.sessionManager.On("GetSession", "test-session").Return(nil, false).Once()
+				mocks.sessionManager.On("GetSession", "test-session").Return(nil, ErrSessionNotFound).Once()
 			},
-			chunkData:   nil,
-			expectErr:   true,
-			expectedErr: "invalid session",
+			chunkData:         nil,
+			expectErr:         true,
+			expectedCustomErr: NewStreamReceiveError("test-session", 0, ErrSessionNotFound),
 		},
 	}
 
@@ -127,12 +128,14 @@ func TestServerStreamer_HandleFirstChunk(t *testing.T) {
 				sessionManager: mocks.sessionManager,
 			}
 
-			session, err := streamer.HandleFirstChunk(mocks.stream)
+			session, err := streamer.HandleFirstChunkFrame(mocks.stream)
 
 			if tc.expectErr {
 				assert.Error(t, err)
-				if tc.expectedErr != "" {
-					assert.Contains(t, err.Error(), tc.expectedErr)
+				if tc.expectedCustomErr != nil {
+					assert.ErrorAs(t, err, &tc.expectedCustomErr)
+				} else {
+					assert.ErrorIs(t, err, tc.expectedSentinelErr)
 				}
 			} else {
 				assert.NoError(t, err)
@@ -146,11 +149,13 @@ func TestServerStreamer_HandleFirstChunk(t *testing.T) {
 
 func TestServerStreamer_ReceiveChunks(t *testing.T) {
 	testCases := []struct {
-		name           string
-		setupMocks     func(*serverStreamerMocks)
-		session        *streamingSession
-		expectErr      bool
-		expectedBuffer []byte
+		name                string
+		setupMocks          func(*serverStreamerMocks)
+		session             *streamingSession
+		expectErr           bool
+		expectedSentinelErr error
+		expectedCustomErr   error
+		expectedBuffer      []byte
 	}{
 		{
 			name: "success: multiple chunks received and assembled",
@@ -164,11 +169,9 @@ func TestServerStreamer_ReceiveChunks(t *testing.T) {
 				// Expected successful acknowledgments
 				ack1 := &common.ChunkDataAck{SessionID: "test-session", Success: true, BytesReceived: 5, ReadyForNext: true}
 				ack2 := &common.ChunkDataAck{SessionID: "test-session", Success: true, BytesReceived: 10, ReadyForNext: true}
-				// finalAck := &common.ChunkDataAck{SessionID: "test-session", Success: true, Message: "Chunk received successfully", BytesReceived: 10}
 
 				mocks.stream.On("Send", ack1.ToProto()).Return(nil).Once()
 				mocks.stream.On("Send", ack2.ToProto()).Return(nil).Once()
-				// mocks.stream.On("Send", finalAck.ToProto()).Return(nil).Once() // Final ACK for the last chunk
 			},
 			session: &streamingSession{
 				SessionID: "test-session",
@@ -202,7 +205,8 @@ func TestServerStreamer_ReceiveChunks(t *testing.T) {
 				runningChecksum: sha256.New(),
 				Status:          SessionActive,
 			},
-			expectErr: true,
+			expectErr:         true,
+			expectedCustomErr: NewStreamReceiveError("test-session", 0, errors.New("network error")),
 		},
 		{
 			name: "error: session write error",
@@ -222,7 +226,8 @@ func TestServerStreamer_ReceiveChunks(t *testing.T) {
 				runningChecksum: sha256.New(),
 				Status:          SessionActive,
 			},
-			expectErr: true,
+			expectErr:         true,
+			expectedCustomErr: NewChunkFrameWriteError("test-session", "test-chunk", 1, errors.New("data out of order")),
 		},
 	}
 
@@ -242,10 +247,15 @@ func TestServerStreamer_ReceiveChunks(t *testing.T) {
 				sessionManager: mocks.sessionManager,
 			}
 
-			data, err := streamer.ReceiveChunks(session, mocks.stream)
+			data, err := streamer.ReceiveChunkFrames(session, mocks.stream)
 
 			if tc.expectErr {
 				assert.Error(t, err)
+				if tc.expectedCustomErr != nil {
+					assert.ErrorAs(t, err, &tc.expectedCustomErr)
+				} else {
+					assert.ErrorIs(t, err, tc.expectedSentinelErr)
+				}
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedBuffer, data)
@@ -273,12 +283,13 @@ func TestServerStreamer_ReceiveChunks(t *testing.T) {
 
 func TestServerStreamer_sendAck(t *testing.T) {
 	testCases := []struct {
-		name          string
-		setupMocks    func(*serverStreamerMocks)
-		chunk         common.ChunkDataStream
-		bytesReceived int
-		expectErr     bool
-		expectedErr   string
+		name                string
+		setupMocks          func(*serverStreamerMocks)
+		chunk               common.ChunkDataStream
+		bytesReceived       int
+		expectErr           bool
+		expectedSentinelErr error
+		expectedCustomErr   error
 	}{
 		{
 			name: "success: send acknowledgment",
@@ -319,9 +330,9 @@ func TestServerStreamer_sendAck(t *testing.T) {
 				Offset:    0,
 				IsFinal:   false,
 			},
-			bytesReceived: 10,
-			expectErr:     true,
-			expectedErr:   "failed to send acknowledgment",
+			bytesReceived:     10,
+			expectErr:         true,
+			expectedCustomErr: NewStreamSendError("test-session", "test-chunk", 0, errors.New("send failed")),
 		},
 	}
 
@@ -341,8 +352,10 @@ func TestServerStreamer_sendAck(t *testing.T) {
 
 			if tc.expectErr {
 				assert.Error(t, err)
-				if tc.expectedErr != "" {
-					assert.Contains(t, err.Error(), tc.expectedErr)
+				if tc.expectedCustomErr != nil {
+					assert.ErrorAs(t, err, &tc.expectedCustomErr)
+				} else {
+					assert.ErrorIs(t, err, tc.expectedSentinelErr)
 				}
 			} else {
 				assert.NoError(t, err)
@@ -355,10 +368,11 @@ func TestServerStreamer_sendAck(t *testing.T) {
 
 func TestServerStreamer_handleFinalChunk(t *testing.T) {
 	testCases := []struct {
-		name        string
-		session     *streamingSession
-		expectErr   bool
-		expectedErr string
+		name                string
+		session             *streamingSession
+		expectErr           bool
+		expectedSentinelErr error
+		expectedCustomErr   error
 	}{
 		{
 			name: "success: finalize session",
@@ -388,8 +402,8 @@ func TestServerStreamer_handleFinalChunk(t *testing.T) {
 				Status:          SessionActive,
 				runningChecksum: sha256.New(),
 			},
-			expectErr:   true,
-			expectedErr: "checksum mismatch",
+			expectErr:           true,
+			expectedSentinelErr: ErrChecksumMismatch,
 		},
 	}
 
@@ -409,8 +423,10 @@ func TestServerStreamer_handleFinalChunk(t *testing.T) {
 
 			if tc.expectErr {
 				assert.Error(t, err)
-				if tc.expectedErr != "" {
-					assert.Contains(t, err.Error(), tc.expectedErr)
+				if tc.expectedCustomErr != nil {
+					assert.ErrorAs(t, err, &tc.expectedCustomErr)
+				} else {
+					assert.ErrorIs(t, err, tc.expectedSentinelErr)
 				}
 			} else {
 				assert.NoError(t, err)
@@ -421,12 +437,13 @@ func TestServerStreamer_handleFinalChunk(t *testing.T) {
 
 func TestServerStreamer_sendFinalAck(t *testing.T) {
 	testCases := []struct {
-		name          string
-		setupMocks    func(*serverStreamerMocks)
-		chunk         common.ChunkDataStream
-		bytesReceived int
-		expectErr     bool
-		expectedErr   string
+		name                string
+		setupMocks          func(*serverStreamerMocks)
+		chunk               common.ChunkDataStream
+		bytesReceived       int
+		expectErr           bool
+		expectedSentinelErr error
+		expectedCustomErr   error
 	}{
 		{
 			name: "success: send final acknowledgment",
@@ -455,9 +472,9 @@ func TestServerStreamer_sendFinalAck(t *testing.T) {
 				Offset:    0,
 				IsFinal:   true,
 			},
-			bytesReceived: 10,
-			expectErr:     true,
-			expectedErr:   "failed to send acknowledgment",
+			bytesReceived:     10,
+			expectErr:         true,
+			expectedCustomErr: NewStreamSendError("test-session", "test-chunk", 0, errors.New("send failed")),
 		},
 	}
 
@@ -477,8 +494,10 @@ func TestServerStreamer_sendFinalAck(t *testing.T) {
 
 			if tc.expectErr {
 				assert.Error(t, err)
-				if tc.expectedErr != "" {
-					assert.Contains(t, err.Error(), tc.expectedErr)
+				if tc.expectedCustomErr != nil {
+					assert.ErrorAs(t, err, &tc.expectedCustomErr)
+				} else {
+					assert.ErrorIs(t, err, tc.expectedSentinelErr)
 				}
 			} else {
 				assert.NoError(t, err)
@@ -491,12 +510,13 @@ func TestServerStreamer_sendFinalAck(t *testing.T) {
 
 func TestServerStreamer_SendFinalReplicasAck(t *testing.T) {
 	testCases := []struct {
-		name         string
-		setupMocks   func(*serverStreamerMocks)
-		session      *streamingSession
-		replicaNodes []*common.NodeInfo
-		expectErr    bool
-		expectedErr  string
+		name                string
+		setupMocks          func(*serverStreamerMocks)
+		session             *streamingSession
+		replicaNodes        []*common.NodeInfo
+		expectErr           bool
+		expectedSentinelErr error
+		expectedCustomErr   error
 	}{
 		{
 			name: "success: send final replicas acknowledgment",
@@ -538,9 +558,9 @@ func TestServerStreamer_SendFinalReplicasAck(t *testing.T) {
 				},
 				Status: SessionActive,
 			},
-			replicaNodes: []*common.NodeInfo{},
-			expectErr:    true,
-			expectedErr:  "failed to send chunk data ack with replicas",
+			replicaNodes:      []*common.NodeInfo{},
+			expectErr:         true,
+			expectedCustomErr: NewStreamSendError("test-session", "test-chunk", 0, errors.New("send failed")),
 		},
 	}
 
@@ -560,8 +580,10 @@ func TestServerStreamer_SendFinalReplicasAck(t *testing.T) {
 
 			if tc.expectErr {
 				assert.Error(t, err)
-				if tc.expectedErr != "" {
-					assert.Contains(t, err.Error(), tc.expectedErr)
+				if tc.expectedCustomErr != nil {
+					assert.ErrorAs(t, err, &tc.expectedCustomErr)
+				} else {
+					assert.ErrorIs(t, err, tc.expectedSentinelErr)
 				}
 			} else {
 				assert.NoError(t, err)

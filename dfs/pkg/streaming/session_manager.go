@@ -2,7 +2,6 @@ package streaming
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -31,22 +30,22 @@ func (sm *streamingSessionManager) NewSession(ctx context.Context, chunkHeader c
 	return session
 }
 
-func (sm *streamingSessionManager) GetSession(sessionID string) (*streamingSession, bool) {
+func (sm *streamingSessionManager) GetSession(sessionID string) (*streamingSession, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
 	session, ok := sm.sessions[sessionID]
 	if !ok {
-		return nil, false
+		return nil, ErrSessionNotFound
 	}
 
 	// Check if expired
 	if time.Now().After(session.ExpiresAt) {
 		sm.Delete(sessionID)
-		return nil, false
+		return nil, ErrSessionExpired
 	}
 
-	return session, true
+	return session, nil
 }
 
 func (sm *streamingSessionManager) Store(sessionID string, session *streamingSession) error {
@@ -55,7 +54,7 @@ func (sm *streamingSessionManager) Store(sessionID string, session *streamingSes
 
 	for _, s := range sm.sessions {
 		if s.ChunkHeader.ID == session.ChunkHeader.ID && s.Status == SessionActive {
-			return fmt.Errorf("session for chunk %s already exists", session.ChunkHeader.ID)
+			return ErrSessionAlreadyExists
 		}
 	}
 
@@ -63,15 +62,14 @@ func (sm *streamingSessionManager) Store(sessionID string, session *streamingSes
 	return nil
 }
 
-func (sm *streamingSessionManager) Load(sessionID string) (*streamingSession, bool) {
+func (sm *streamingSessionManager) Load(sessionID string) (*streamingSession, error) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	session, ok := sm.sessions[sessionID]
 	if !ok {
-		sm.logger.Error("Session not found", slog.String("session_id", sessionID), slog.Any("available_sessions", sm.sessions))
-		return nil, false
+		return nil, ErrSessionNotFound
 	}
-	return session, true
+	return session, nil
 }
 
 func (sm *streamingSessionManager) Delete(sessionID string) {
@@ -92,14 +90,14 @@ func (sm *streamingSessionManager) ExistsForChunk(chunkID string) bool {
 	return false
 }
 
-func (sm *streamingSessionManager) LoadByChunk(chunkID string) (*streamingSession, bool) {
+func (sm *streamingSessionManager) LoadByChunk(chunkID string) (*streamingSession, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
 	for _, session := range sm.sessions {
 		if session.ChunkHeader.ID == chunkID {
-			return session, true
+			return session, nil
 		}
 	}
-	return nil, false
+	return nil, ErrSessionNotFound
 }

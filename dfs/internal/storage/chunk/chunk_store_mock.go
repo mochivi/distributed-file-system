@@ -55,9 +55,9 @@ func (m *MockChunkStore) BulkDelete(ctx context.Context, maxConcurrentDeletes in
 	return args.Get(0).([]string), args.Error(1)
 }
 
-func (m *MockChunkStore) Exists(ctx context.Context, chunkID string) bool {
+func (m *MockChunkStore) Exists(ctx context.Context, chunkID string) error {
 	args := m.Called(ctx, chunkID)
-	return args.Bool(0)
+	return args.Error(0)
 }
 
 func (m *MockChunkStore) List(ctx context.Context) ([]string, error) {

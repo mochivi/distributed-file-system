@@ -8,34 +8,35 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // ------ Upload - data flowing from client ------
 
-func (s *serverStreamer) HandleFirstChunk(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) (*streamingSession, error) {
+func (s *serverStreamer) HandleFirstChunkFrame(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) (*streamingSession, error) {
 	chunkpb, err := stream.Recv()
 	if err != nil {
-		return nil, fmt.Errorf("failed to receive chunk data: %w", err) // code internal
+		if errors.Is(err, io.EOF) {
+			return nil, err
+		}
+		return nil, NewStreamReceiveError("", 0, err)
 	}
 
 	chunk := common.ChunkDataStreamFromProto(chunkpb)
 
-	session, exists := s.sessionManager.GetSession(chunk.SessionID)
-	if !exists {
-		return nil, fmt.Errorf("invalid session") // code not found
+	session, err := s.sessionManager.GetSession(chunk.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", err, chunk.SessionID)
 	}
 
 	// start streaming session and write first chunk
 	session.startStreamingSession()
 	if err := session.write(chunk); err != nil {
-		return nil, fmt.Errorf("failed to write chunk: %w", err) // code internal
+		return nil, NewChunkFrameWriteError("", chunk.ChunkID, chunk.Offset, err)
 	}
 
 	// Send first ack
 	if err := s.sendAck(chunk, session.offset, stream); err != nil {
-		return nil, err // code internal
+		return nil, err
 	}
 
 	// If the first chunk is the final chunk, handle it and return early.
@@ -51,12 +52,11 @@ func (s *serverStreamer) HandleFirstChunk(stream grpc.BidiStreamingServer[proto.
 	return session, nil
 }
 
-func (s *serverStreamer) ReceiveChunks(session *streamingSession,
+func (s *serverStreamer) ReceiveChunkFrames(session *streamingSession,
 	stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) ([]byte, error) {
 
 	for {
 		chunkpb, err := stream.Recv()
-
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -67,16 +67,16 @@ func (s *serverStreamer) ReceiveChunks(session *streamingSession,
 		chunk := common.ChunkDataStreamFromProto(chunkpb)
 
 		if err := session.write(chunk); err != nil {
-			return nil, fmt.Errorf("failed to write chunk: %w", err) // code internal
+			return nil, NewChunkFrameWriteError(session.SessionID, chunk.ChunkID, chunk.Offset, err)
 		}
 
 		if err := s.sendAck(chunk, session.offset, stream); err != nil {
-			return nil, err // todo
+			return nil, err
 		}
 
 		if chunk.IsFinal {
 			if err := s.handleFinalChunk(session); err != nil {
-				return nil, err // todo
+				return nil, err
 			}
 			break // caller will send final ack later
 		}
@@ -96,7 +96,7 @@ func (s *serverStreamer) sendAck(chunk common.ChunkDataStream, bytesReceived int
 	}
 
 	if err := stream.Send(ack.ToProto()); err != nil {
-		return fmt.Errorf("failed to send acknowledgment: %w", err) // code internal
+		return NewStreamSendError(chunk.SessionID, chunk.ChunkID, int64(chunk.Offset), err)
 	}
 
 	return nil
@@ -105,9 +105,8 @@ func (s *serverStreamer) sendAck(chunk common.ChunkDataStream, bytesReceived int
 func (s *serverStreamer) handleFinalChunk(session *streamingSession) error {
 	err := session.finalizeSession()
 	if err != nil {
-		return err // code internal
+		return err // checksum did not match at the end
 	}
-
 	return nil
 }
 
@@ -122,7 +121,7 @@ func (s *serverStreamer) SendFinalAck(sessionID string, bytesReceived int,
 	}
 
 	if err := stream.Send(finalAck.ToProto()); err != nil {
-		return fmt.Errorf("failed to send acknowledgment: %w", err)
+		return fmt.Errorf("%w: %s", ErrAckSendFailed, sessionID)
 	}
 
 	return nil
@@ -140,7 +139,7 @@ func (s *serverStreamer) SendFinalReplicasAck(session *streamingSession, replica
 	}
 
 	if err := stream.Send(finalReplicasAck.ToProto()); err != nil {
-		return status.Errorf(codes.Internal, "failed to send chunk data ack with replicas: %v", err)
+		return fmt.Errorf("%w: %s", ErrAckSendFailed, session.SessionID)
 	}
 	return nil
 }
@@ -160,7 +159,7 @@ func SendChunkFrames(reader io.Reader, streamFrameSize int, chunkID, sessionID s
 			break // We've sent the entire file.
 		}
 		if err != nil {
-			return NewChunkReadError(sessionID, chunkID, offset, err)
+			return NewChunkFrameReadError(sessionID, chunkID, offset, err)
 		}
 
 		if err := stream.Send(&proto.ChunkDataStream{

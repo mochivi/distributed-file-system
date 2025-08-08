@@ -379,13 +379,19 @@ func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes 
 	return failedSlice, fmt.Errorf("failed to delete %d out of %d chunks", len(failed), len(chunkIDs))
 }
 
-func (d *ChunkDiskStorage) Exists(ctx context.Context, chunkID string) bool {
+func (d *ChunkDiskStorage) Exists(ctx context.Context, chunkID string) error {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
-		return false
+		return err
 	}
 	_, err = d.fs.Stat(fullPath)
-	return !errors.Is(err, fs.ErrNotExist)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return NewFsError("chunk not found", err, StorageBackendDisk)
+		}
+		return NewFsError("failed to check if chunk exists", err, StorageBackendDisk)
+	}
+	return nil
 }
 
 // TODO: results could be cached to avoid re-reading the directory every time if it is called often
