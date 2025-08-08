@@ -157,9 +157,11 @@ func main() {
 
 	// Setup gRPC server
 	setupGrpcFunc := func(wg *sync.WaitGroup, errChan chan error) (*grpc.Server, net.Listener) {
-		serverContainer := datanode.NewContainer(container.chunkStore, container.replicationManager, container.sessionManager,
+		serviceContainer := datanode.NewContainer(container.chunkStore, container.replicationManager, container.sessionManager,
 			container.clusterStateManager, container.coordinatorFinder, container.nodeSelector, container.streamerFactory, container.clientPoolFactory)
-		server := datanode.NewDataNodeServer(&datanodeInfo, appConfig.Node, serverContainer, logger)
+
+		service := datanode.NewService(appConfig.Node, &datanodeInfo, serviceContainer)
+		server := datanode.NewDataNodeServer(service)
 
 		grpcServer := grpc.NewServer(
 			grpc.ChainUnaryInterceptor(

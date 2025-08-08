@@ -72,11 +72,11 @@ func TestChunkDiskStorage_DeleteAndExists(t *testing.T) {
 	data := []byte("data")
 	require.NoError(t, store.Store(context.Background(), header, data))
 
-	assert.True(t, store.Exists(context.Background(), header.ID))
+	assert.NoError(t, store.Exists(context.Background(), header.ID))
 
 	// delete
 	require.NoError(t, store.Delete(context.Background(), header.ID))
-	assert.False(t, store.Exists(context.Background(), header.ID))
+	assert.Error(t, store.Exists(context.Background(), header.ID))
 
 	// deleting again should error (fs remove no such file)
 	err := store.Delete(context.Background(), header.ID)
@@ -134,5 +134,5 @@ func TestChunkDiskStorage_BulkDelete(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to delete")
 	assert.ElementsMatch(t, []string{"deadbeefdeadbeef_0"}, failed)
 	// presentID should be gone
-	assert.False(t, store.Exists(context.Background(), presentID))
+	assert.Error(t, store.Exists(context.Background(), presentID))
 }

@@ -26,6 +26,6 @@ type ChunkStorage interface {
 
 	Delete(ctx context.Context, chunkID string) error
 	BulkDelete(ctx context.Context, maxConcurrentDeletes int, chunkIDs []string) ([]string, error)
-	Exists(ctx context.Context, chunkID string) bool
+	Exists(ctx context.Context, chunkID string) error
 	List(ctx context.Context) ([]string, error)
 }

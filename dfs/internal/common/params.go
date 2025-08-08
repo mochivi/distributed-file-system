@@ -39,6 +39,7 @@ const (
 	LogNumFiles    = "num_files"
 	LogNumChunks   = "num_chunks"
 	LogNumReplicas = "num_replicas"
+	LogNumFailed   = "num_failed"
 
 	// Streaming/Frame logging
 	LogOffset = "offset"
