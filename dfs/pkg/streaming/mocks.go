@@ -16,7 +16,7 @@ type MockServerStreamer struct {
 	mock.Mock
 }
 
-func (m *MockServerStreamer) HandleFirstChunk(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) (*streamingSession, error) {
+func (m *MockServerStreamer) HandleFirstChunkFrame(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) (*streamingSession, error) {
 	args := m.Called(stream)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -29,7 +29,7 @@ func (m *MockServerStreamer) Config() config.StreamerConfig {
 	return args.Get(0).(config.StreamerConfig)
 }
 
-func (m *MockServerStreamer) ReceiveChunks(session *streamingSession, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) ([]byte, error) {
+func (m *MockServerStreamer) ReceiveChunkFrames(session *streamingSession, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) ([]byte, error) {
 	args := m.Called(session, stream)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -80,12 +80,12 @@ func (m *MockStreamingSessionManager) NewSession(ctx context.Context, chunkHeade
 	return args.Get(0).(*streamingSession)
 }
 
-func (m *MockStreamingSessionManager) GetSession(sessionID string) (*streamingSession, bool) {
+func (m *MockStreamingSessionManager) GetSession(sessionID string) (*streamingSession, error) {
 	args := m.Called(sessionID)
 	if args.Get(0) == nil {
-		return nil, false
+		return nil, args.Error(1)
 	}
-	return args.Get(0).(*streamingSession), args.Bool(1)
+	return args.Get(0).(*streamingSession), args.Error(1)
 }
 
 func (m *MockStreamingSessionManager) Store(sessionID string, session *streamingSession) error {
@@ -93,12 +93,12 @@ func (m *MockStreamingSessionManager) Store(sessionID string, session *streaming
 	return args.Error(0)
 }
 
-func (m *MockStreamingSessionManager) Load(sessionID string) (*streamingSession, bool) {
+func (m *MockStreamingSessionManager) Load(sessionID string) (*streamingSession, error) {
 	args := m.Called(sessionID)
 	if args.Get(0) == nil {
-		return nil, false
+		return nil, args.Error(1)
 	}
-	return args.Get(0).(*streamingSession), args.Bool(1)
+	return args.Get(0).(*streamingSession), args.Error(1)
 }
 
 func (m *MockStreamingSessionManager) Delete(sessionID string) {
@@ -110,10 +110,10 @@ func (m *MockStreamingSessionManager) ExistsForChunk(chunkID string) bool {
 	return args.Bool(0)
 }
 
-func (m *MockStreamingSessionManager) LoadByChunk(chunkID string) (*streamingSession, bool) {
+func (m *MockStreamingSessionManager) LoadByChunk(chunkID string) (*streamingSession, error) {
 	args := m.Called(chunkID)
 	if args.Get(0) == nil {
-		return nil, false
+		return nil, args.Error(1)
 	}
-	return args.Get(0).(*streamingSession), args.Bool(1)
+	return args.Get(0).(*streamingSession), args.Error(1)
 }

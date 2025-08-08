@@ -15,7 +15,10 @@ import (
 func (s *serverStreamer) HandleFirstChunkFrame(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) (*streamingSession, error) {
 	chunkpb, err := stream.Recv()
 	if err != nil {
-		return nil, NewChunkFrameReadError("", chunkpb.ChunkId, chunkpb.Offset, err)
+		if errors.Is(err, io.EOF) {
+			return nil, err
+		}
+		return nil, NewStreamReceiveError("", 0, err)
 	}
 
 	chunk := common.ChunkDataStreamFromProto(chunkpb)
@@ -54,7 +57,6 @@ func (s *serverStreamer) ReceiveChunkFrames(session *streamingSession,
 
 	for {
 		chunkpb, err := stream.Recv()
-
 		if errors.Is(err, io.EOF) {
 			break
 		}
