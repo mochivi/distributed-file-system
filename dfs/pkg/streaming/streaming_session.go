@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
 )
@@ -22,7 +21,7 @@ func (s *streamingSession) write(chunk common.ChunkDataStream) error {
 	}
 
 	if chunk.Offset != s.offset {
-		return fmt.Errorf("data out of order")
+		return errors.New("data out of order")
 	}
 
 	s.runningChecksum.Write(chunk.Data)
@@ -37,7 +36,7 @@ func (s *streamingSession) finalizeSession() error {
 	expectedHash, _ := hex.DecodeString(s.Checksum)
 
 	if !bytes.Equal(computedHash, expectedHash) {
-		return errors.New("checksum mismatch")
+		return ErrChecksumMismatch
 	}
 
 	return nil

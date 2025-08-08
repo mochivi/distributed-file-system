@@ -10,7 +10,9 @@ import (
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 	"github.com/mochivi/distributed-file-system/pkg/proto"
+	"github.com/mochivi/distributed-file-system/pkg/streaming"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
 
 // TODO: make this configurable by the client
@@ -27,6 +29,9 @@ func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.Uploa
 
 	resp, err := s.service.prepareChunkUpload(ctx, req)
 	if err != nil {
+		if errors.Is(err, streaming.ErrSessionAlreadyExists) {
+			return nil, apperr.Internal(err) // Tried to create a duplicate session -- the session ID is server generated, so something went wrong
+		}
 		return nil, err
 	}
 	return resp.ToProto(), nil
@@ -41,6 +46,9 @@ func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.Dow
 	if err != nil {
 		if errors.Is(err, chunk.ErrInvalidChunkID) {
 			return nil, apperr.InvalidArgument("invalid chunk ID", err)
+		}
+		if errors.Is(err, streaming.ErrSessionAlreadyExists) {
+			return nil, apperr.Internal(err) // Tried to create a duplicate session -- the session ID is server generated, so something went wrong
 		}
 		return nil, err
 	}
@@ -78,7 +86,19 @@ func (s *DataNodeServer) BulkDeleteChunk(ctx context.Context, pb *proto.BulkDele
 // TODO: add logging to session? So that we can pull the context from the prepare chunk upload request
 func (s *DataNodeServer) UploadChunkStream(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
 	if err := s.service.uploadChunkStream(stream); err != nil {
-		return apperr.Internal(err) // all possible errors are internal
+		if errors.Is(err, streaming.ErrSessionNotFound) {
+			return apperr.Wrap(codes.NotFound, "session not found", err)
+		}
+		if errors.Is(err, streaming.ErrSessionExpired) {
+			return apperr.Wrap(codes.NotFound, "session expired", err)
+		}
+		if errors.Is(err, streaming.ErrChecksumMismatch) {
+			return apperr.Internal(err)
+		}
+		if errors.Is(err, streaming.ErrAckSendFailed) {
+			return apperr.Internal(err)
+		}
+		return err
 	}
 	return nil
 }
@@ -89,7 +109,13 @@ func (s *DataNodeServer) DownloadChunkStream(pb *proto.DownloadStreamRequest, st
 		return apperr.InvalidArgument("invalid download stream request", err)
 	}
 	if err := s.service.downloadChunkStream(req, stream); err != nil {
-		return apperr.Internal(err) // all possible errors are internal
+		if errors.Is(err, streaming.ErrSessionNotFound) {
+			return apperr.Wrap(codes.NotFound, "session not found", err)
+		}
+		if errors.Is(err, streaming.ErrSessionExpired) {
+			return apperr.Wrap(codes.NotFound, "session expired", err)
+		}
+		return err
 	}
 	return nil
 }

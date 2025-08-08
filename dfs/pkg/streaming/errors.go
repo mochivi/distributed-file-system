@@ -5,17 +5,25 @@ import (
 	"fmt"
 )
 
-// Define sentinel errors for different error categories
 var (
 	// Data source errors
 	ErrFrameReadFailed  = errors.New("failed to read frame from chunk source")
 	ErrFrameWriteFailed = errors.New("failed to write frame to session buffer")
+	ErrChecksumMismatch = errors.New("checksum mismatch")
 
 	// Network/streaming errors
 	ErrStreamSendFailed    = errors.New("failed to send stream frame")
 	ErrStreamReceiveFailed = errors.New("failed to receive stream frame")
 	ErrStreamClosed        = errors.New("stream was closed unexpectedly")
 	ErrStreamTimeout       = errors.New("stream operation timed out")
+
+	// Session management errors
+	ErrSessionNotFound      = errors.New("session not found")
+	ErrSessionExpired       = errors.New("session expired")
+	ErrSessionAlreadyExists = errors.New("session already exists")
+
+	// Ack errors
+	ErrAckSendFailed = errors.New("failed to send ack")
 )
 
 type StreamingError struct {
@@ -39,7 +47,7 @@ func (e *StreamingError) Unwrap() error {
 }
 
 // Helper constructors for common error scenarios
-func NewChunkReadError(sessionID, chunkID string, offset int64, err error) *StreamingError {
+func NewChunkFrameReadError(sessionID, chunkID string, offset int64, err error) *StreamingError {
 	return &StreamingError{
 		Op:        "chunk_frame_read",
 		Err:       fmt.Errorf("%w: %v", ErrFrameReadFailed, err),
@@ -49,7 +57,7 @@ func NewChunkReadError(sessionID, chunkID string, offset int64, err error) *Stre
 	}
 }
 
-func NewChunkWriteError(sessionID, chunkID string, offset int, err error) *StreamingError {
+func NewChunkFrameWriteError(sessionID, chunkID string, offset int, err error) *StreamingError {
 	return &StreamingError{
 		Op:        "chunk_frame_write",
 		Err:       fmt.Errorf("%w: %v", ErrFrameWriteFailed, err),

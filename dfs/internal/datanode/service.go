@@ -25,15 +25,20 @@ func (s *service) prepareChunkUpload(ctx context.Context, req common.UploadChunk
 		return common.NodeReady{Accept: false, Message: "Insufficient storage capacity"}, nil
 	}
 
-	if existing, ok := s.sessionManager.LoadByChunk(req.ChunkHeader.ID); ok {
+	logger.Debug("Checking if session already exists from chunkID")
+	if existing, err := s.sessionManager.LoadByChunk(req.ChunkHeader.ID); err == nil {
 		if !existing.Status.IsValid() {
 			s.sessionManager.Delete(existing.SessionID)
+			logger.Debug("Deleted invalid session", slog.String(common.LogStreamingSessionID, existing.SessionID))
 			return common.NodeReady{Accept: false, Message: "Invalid session"}, nil
 		}
+
 		// If is valid session, return early
+		logger.Debug("Session already active", slog.String(common.LogStreamingSessionID, existing.SessionID))
 		return common.NodeReady{Accept: true, Message: "Session already active", SessionID: existing.SessionID}, nil
 	}
 
+	logger.Debug("Creating new session")
 	session := s.sessionManager.NewSession(ctx, req.ChunkHeader, req.Propagate)
 	if err := s.sessionManager.Store(session.SessionID, session); err != nil {
 		return common.NodeReady{}, fmt.Errorf("failed to store streaming session: %w", err)
@@ -154,7 +159,7 @@ func (s *service) bulkDeleteChunk(ctx context.Context, req common.BulkDeleteChun
 func (s *service) uploadChunkStream(stream proto.DataNodeService_UploadChunkStreamServer) error {
 	streamProcessor := s.serverStreamerFactory(s.sessionManager, s.config.Streamer)
 
-	session, err := streamProcessor.HandleFirstChunk(stream)
+	session, err := streamProcessor.HandleFirstChunkFrame(stream)
 	if err != nil {
 		return fmt.Errorf("failed to receive first chunk frame: %w", err)
 	}
@@ -164,7 +169,7 @@ func (s *service) uploadChunkStream(stream proto.DataNodeService_UploadChunkStre
 
 	// Receive frames
 	logger.Debug("Receiving chunk frames")
-	chunkData, err := streamProcessor.ReceiveChunks(session, stream)
+	chunkData, err := streamProcessor.ReceiveChunkFrames(session, stream)
 	if err != nil {
 		session.Fail()
 		return fmt.Errorf("failed to receive chunk frames: %w", err)
@@ -190,7 +195,7 @@ func (s *service) uploadChunkStream(stream proto.DataNodeService_UploadChunkStre
 		}
 		if err := streamProcessor.SendFinalReplicasAck(session, replicaNodes, stream); err != nil {
 			session.Fail()
-			return fmt.Errorf("failed to send final acknowledgement with replica information: %w", err)
+			return fmt.Errorf("failed to send final ack with replicas: %w", err)
 		}
 	}
 
@@ -199,9 +204,9 @@ func (s *service) uploadChunkStream(stream proto.DataNodeService_UploadChunkStre
 }
 
 func (s *service) downloadChunkStream(req common.DownloadStreamRequest, stream proto.DataNodeService_DownloadChunkStreamServer) error {
-	session, exists := s.sessionManager.GetSession(req.SessionID)
-	if !exists {
-		return fmt.Errorf("invalid download session for ID: %s", req.SessionID)
+	session, err := s.sessionManager.GetSession(req.SessionID)
+	if err != nil {
+		return fmt.Errorf("invalid download session for ID: %s: %w", req.SessionID, err)
 	}
 	defer s.sessionManager.Delete(session.SessionID)
 	logger := logging.FromContext(session.Context())
@@ -220,7 +225,7 @@ func (s *service) downloadChunkStream(req common.DownloadStreamRequest, stream p
 	logger.Debug("Sending chunk frames to peer")
 	reader := bytes.NewReader(chunkData)
 	if err := streaming.SendChunkFrames(reader, req.ChunkStreamSize, session.ChunkHeader.ID, session.SessionID, len(chunkData), stream); err != nil {
-		return err
+		return fmt.Errorf("failed to send chunk frames: %w", err)
 	}
 	return nil
 }
@@ -238,13 +243,13 @@ func (s *service) replicate(ctx context.Context, chunkHeader common.ChunkHeader,
 
 	clientPool, err := s.clientPoolFactory(nodes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create client pool: %v", err)
+		return nil, fmt.Errorf("failed to create client pool: %w", err)
 	}
 	defer clientPool.Close()
 
 	replicaNodes, err := s.replicationManager.Replicate(clientPool, chunkHeader, data, N_REPLICAS-1)
 	if err != nil {
-		return nil, fmt.Errorf("failed to replicate chunk: %v", err)
+		return nil, fmt.Errorf("failed to replicate chunk: %w", err)
 	}
 	replicaNodes = append(replicaNodes, s.info)
 	return replicaNodes, nil
