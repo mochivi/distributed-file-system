@@ -21,7 +21,10 @@ import (
 // 3. Store metadata about the file. Will set metadata with a validation wrappper, expects confirmation from client
 // 3. Reply with where the client should upload each chunk (primary + replicas).
 func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (*proto.UploadResponse, error) {
-	req := common.UploadRequestFromProto(pb)
+	req, err := common.UploadRequestFromProto(pb)
+	if err != nil {
+		return nil, apperr.InvalidArgument("Request validation failed", err)
+	}
 	ctx, _ = logging.FromContextWithOperation(ctx, common.OpUpload,
 		slog.String(common.LogFilePath, req.Path),
 		slog.Int(common.LogFileSize, req.Size),

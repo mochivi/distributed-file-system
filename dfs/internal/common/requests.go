@@ -313,22 +313,36 @@ type UploadRequest struct {
 	Checksum  string // File sha256 checksum
 }
 
-func UploadRequestFromProto(pb *proto.UploadRequest) UploadRequest {
-	return UploadRequest{
+func UploadRequestFromProto(pb *proto.UploadRequest) (UploadRequest, error) {
+	uploadRequest := UploadRequest{
 		Path:      pb.Path,
 		Size:      int(pb.Size),
 		ChunkSize: int(pb.ChunkSize),
 		Checksum:  pb.Checksum,
 	}
+	if err := uploadRequest.validate(); err != nil {
+		return UploadRequest{}, err
+	}
+	return uploadRequest, nil
 }
 
-func (ur UploadRequest) ToProto() *proto.UploadRequest {
+func (r *UploadRequest) ToProto() *proto.UploadRequest {
 	return &proto.UploadRequest{
-		Path:      ur.Path,
-		Size:      int64(ur.Size),
-		ChunkSize: int64(ur.ChunkSize),
-		Checksum:  ur.Checksum,
+		Path:      r.Path,
+		Size:      int64(r.Size),
+		ChunkSize: int64(r.ChunkSize),
+		Checksum:  r.Checksum,
 	}
+}
+
+func (r UploadRequest) validate() error {
+	if r.ChunkSize < 1*1024*1024 { // 1MB minimun chunksize allowed
+		return fmt.Errorf("%w: chunkSize cannot be lower than 1MB", ErrValidation)
+	}
+	if r.ChunkSize > 128*1024*1024 { // 128MB maximum chunksize allowed
+		return fmt.Errorf("%w: chunksize cannot be larger than 128MB", ErrValidation)
+	}
+	return nil
 }
 
 type UploadResponse struct {

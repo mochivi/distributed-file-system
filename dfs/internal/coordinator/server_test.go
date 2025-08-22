@@ -25,16 +25,17 @@ func (m *serverMocks) assertExpectations(t *testing.T) {
 }
 
 func TestCoordinator_UploadFile(t *testing.T) {
-	testReq := &proto.UploadRequest{
+	defaultTestReq := &proto.UploadRequest{
 		Path:      "test.txt",
-		ChunkSize: 1 * 1024 * 1024,
-		Size:      (1 * 1024 * 1024) - 1, // 1MB - 1B
+		ChunkSize: 1 * 1024 * 1024,       // 1MB chunksize
+		Size:      (1 * 1024 * 1024) - 1, // 1MB - 1B (only one chunk required)
 		Checksum:  "test-checksum",
 	}
 
 	testCases := []struct {
 		name         string
 		setupMock    func(*serverMocks)
+		req          *proto.UploadRequest
 		expectedResp *proto.UploadResponse
 		expectedErr  error
 		expectErr    bool
@@ -49,6 +50,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 						Nodes:     []*common.NodeInfo{{ID: "node1", Status: common.NodeHealthy, Host: "127.0.0.1", Port: 8081}},
 					}, nil).Once()
 			},
+			req: defaultTestReq,
 			expectedResp: &proto.UploadResponse{
 				SessionId: "test-session",
 				ChunkIds:  []string{chunk.FormatChunkID("test.txt", 0)},
@@ -58,11 +60,38 @@ func TestCoordinator_UploadFile(t *testing.T) {
 			expectErr:   false,
 		},
 		{
+			name:      "error: validation: chunksize too small",
+			setupMock: func(mocks *serverMocks) {},
+			req: &proto.UploadRequest{
+				Path:      "test.txt",
+				ChunkSize: 0.5 * 1024 * 1024, // 0.5MB chunksize
+				Size:      (1 * 1024 * 1024) - 1,
+				Checksum:  "test-checksum",
+			},
+			expectedResp: nil,
+			expectedErr:  common.ErrValidation,
+			expectErr:    true,
+		},
+		{
+			name:      "error: validation: chunksize too large",
+			setupMock: func(mocks *serverMocks) {},
+			req: &proto.UploadRequest{
+				Path:      "test.txt",
+				ChunkSize: 129 * 1024 * 1024, // 129MB chunksize
+				Size:      (1 * 1024 * 1024) - 1,
+				Checksum:  "test-checksum",
+			},
+			expectedResp: nil,
+			expectedErr:  common.ErrValidation,
+			expectErr:    true,
+		},
+		{
 			name: "error: no available nodes",
 			setupMock: func(mocks *serverMocks) {
 				mocks.service.On("uploadFile", mock.Anything, mock.Anything).
 					Return(common.UploadResponse{}, state.ErrNoAvailableNodes).Once()
 			},
+			req:          defaultTestReq,
 			expectedResp: nil,
 			expectedErr:  state.ErrNoAvailableNodes,
 			expectErr:    true,
@@ -73,6 +102,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 				mocks.service.On("uploadFile", mock.Anything, mock.Anything).
 					Return(common.UploadResponse{}, assert.AnError).Once()
 			},
+			req:          defaultTestReq,
 			expectedResp: nil,
 			expectedErr:  assert.AnError,
 			expectErr:    true,
@@ -85,7 +115,7 @@ func TestCoordinator_UploadFile(t *testing.T) {
 			tc.setupMock(mocks)
 
 			coordinator := NewCoordinator(mocks.service)
-			resp, err := coordinator.UploadFile(context.Background(), testReq)
+			resp, err := coordinator.UploadFile(context.Background(), tc.req)
 
 			if tc.expectErr {
 				assert.Error(t, err)
