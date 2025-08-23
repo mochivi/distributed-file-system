@@ -14,7 +14,7 @@ import (
 
 func newTestSession(sessionID, chunkID string, status SessionStatus) *streamingSession {
 	return &streamingSession{
-		SessionID: sessionID,
+		SessionID: common.StreamingSessionID(sessionID),
 		ChunkHeader: common.ChunkHeader{
 			ID: chunkID,
 		},
@@ -32,19 +32,19 @@ func TestNewStreamingSessionManager(t *testing.T) {
 func TestStreamingSessionManager_Store(t *testing.T) {
 	testCases := []struct {
 		name           string
-		initialState   map[string]*streamingSession
+		initialState   map[common.StreamingSessionID]*streamingSession
 		sessionToStore *streamingSession
 		expectErr      bool
 	}{
 		{
 			name:           "success: store new session",
-			initialState:   make(map[string]*streamingSession),
+			initialState:   make(map[common.StreamingSessionID]*streamingSession),
 			sessionToStore: newTestSession("session1", "chunk1", SessionActive),
 			expectErr:      false,
 		},
 		{
 			name: "error: session for chunk already exists",
-			initialState: map[string]*streamingSession{
+			initialState: map[common.StreamingSessionID]*streamingSession{
 				"existing-session": newTestSession("existing-session", "chunk1", SessionActive),
 			},
 			sessionToStore: newTestSession("new-session", "chunk1", SessionActive),
@@ -52,7 +52,7 @@ func TestStreamingSessionManager_Store(t *testing.T) {
 		},
 		{
 			name: "success: session for chunk exists but not active",
-			initialState: map[string]*streamingSession{
+			initialState: map[common.StreamingSessionID]*streamingSession{
 				"existing-session": newTestSession("existing-session", "chunk1", SessionCompleted),
 			},
 			sessionToStore: newTestSession("new-session", "chunk1", SessionActive),
@@ -83,24 +83,24 @@ func TestStreamingSessionManager_Load(t *testing.T) {
 	session1 := newTestSession("session1", "chunk1", SessionActive)
 	testCases := []struct {
 		name            string
-		initialState    map[string]*streamingSession
-		sessionIDToLoad string
+		initialState    map[common.StreamingSessionID]*streamingSession
+		sessionIDToLoad common.StreamingSessionID
 		expectedErr     error
 		expectedSession *streamingSession
 	}{
 		{
 			name: "success: session found",
-			initialState: map[string]*streamingSession{
-				"session1": session1,
+			initialState: map[common.StreamingSessionID]*streamingSession{
+				session1.SessionID: session1,
 			},
-			sessionIDToLoad: "session1",
+			sessionIDToLoad: session1.SessionID,
 			expectedErr:     nil,
 			expectedSession: session1,
 		},
 		{
 			name:            "failure: session not found",
-			initialState:    make(map[string]*streamingSession),
-			sessionIDToLoad: "non-existent",
+			initialState:    make(map[common.StreamingSessionID]*streamingSession),
+			sessionIDToLoad: common.NewStreamingSessionID(),
 			expectedErr:     ErrSessionNotFound,
 			expectedSession: nil,
 		},
@@ -142,13 +142,13 @@ func TestStreamingSessionManager_Delete(t *testing.T) {
 func TestStreamingSessionManager_ExistsForChunk(t *testing.T) {
 	testCases := []struct {
 		name         string
-		initialState map[string]*streamingSession
+		initialState map[common.StreamingSessionID]*streamingSession
 		chunkID      string
 		expectExists bool
 	}{
 		{
 			name: "exists and active",
-			initialState: map[string]*streamingSession{
+			initialState: map[common.StreamingSessionID]*streamingSession{
 				"session1": newTestSession("session1", "chunk1", SessionActive),
 			},
 			chunkID:      "chunk1",
@@ -156,7 +156,7 @@ func TestStreamingSessionManager_ExistsForChunk(t *testing.T) {
 		},
 		{
 			name: "exists but not active",
-			initialState: map[string]*streamingSession{
+			initialState: map[common.StreamingSessionID]*streamingSession{
 				"session1": newTestSession("session1", "chunk1", SessionCompleted),
 			},
 			chunkID:      "chunk1",
@@ -164,7 +164,7 @@ func TestStreamingSessionManager_ExistsForChunk(t *testing.T) {
 		},
 		{
 			name:         "does not exist",
-			initialState: make(map[string]*streamingSession),
+			initialState: make(map[common.StreamingSessionID]*streamingSession),
 			chunkID:      "chunk-non-existent",
 			expectExists: false,
 		},
@@ -186,14 +186,14 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		initialState    map[string]*streamingSession
+		initialState    map[common.StreamingSessionID]*streamingSession
 		chunkID         string
 		expectedErr     error
 		expectedSession *streamingSession
 	}{
 		{
 			name: "success: found",
-			initialState: map[string]*streamingSession{
+			initialState: map[common.StreamingSessionID]*streamingSession{
 				"session1": session1,
 				"session2": newTestSession("session2", "chunk2", SessionActive),
 			},
@@ -203,7 +203,7 @@ func TestStreamingSessionManager_LoadByChunk(t *testing.T) {
 		},
 		{
 			name: "not found",
-			initialState: map[string]*streamingSession{
+			initialState: map[common.StreamingSessionID]*streamingSession{
 				"session2": newTestSession("session2", "chunk2", SessionActive),
 			},
 			chunkID:         "chunk-non-existent",
@@ -234,16 +234,16 @@ func TestStreamingSessionManager_Concurrency(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 
-			sessionID := fmt.Sprintf("session-%d", i)
+			sessionID := common.NewStreamingSessionID()
 			chunkID := fmt.Sprintf("chunk-%d", i%10)
 
-			session := newTestSession(sessionID, chunkID, SessionActive)
+			session := newTestSession(sessionID.String(), chunkID, SessionActive)
 
-			_ = sm.Store(sessionID, session)
+			_ = sm.Store(session.SessionID, session)
 
-			loadedSession, err := sm.Load(sessionID)
+			loadedSession, err := sm.Load(session.SessionID)
 			if err == nil {
-				assert.Equal(t, sessionID, loadedSession.SessionID)
+				assert.Equal(t, session.SessionID, loadedSession.SessionID)
 			}
 
 			// 3. ExistsForChunk
@@ -253,7 +253,7 @@ func TestStreamingSessionManager_Concurrency(t *testing.T) {
 			sm.LoadByChunk(chunkID)
 
 			// 5. Delete
-			sm.Delete(sessionID)
+			sm.Delete(session.SessionID)
 		}(i)
 	}
 

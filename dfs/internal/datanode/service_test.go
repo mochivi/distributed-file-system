@@ -519,7 +519,7 @@ func TestDataNodeService_DownloadChunkStream(t *testing.T) {
 				chunkHeader := common.ChunkHeader{ID: "chunk1", Size: 10}
 				session := streaming.NewStreamingSession(context.Background(), "session1", chunkHeader, false)
 
-				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, nil)
+				m.sessionManager.On("GetSession", mock.AnythingOfType("common.StreamingSessionID")).Return(session, nil)
 				m.sessionManager.On("Delete", session.SessionID).Return()
 				m.store.On("GetData", mock.Anything, chunkHeader.ID).Return([]byte("test data!"), nil)
 			},
@@ -527,7 +527,7 @@ func TestDataNodeService_DownloadChunkStream(t *testing.T) {
 				stream.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(nil).Once()
 			},
 			req: common.DownloadStreamRequest{
-				SessionID:       "session1",
+				SessionID:       common.StreamingSessionID("session1"),
 				ChunkStreamSize: 1024,
 			},
 			expectErr: false,
@@ -538,7 +538,7 @@ func TestDataNodeService_DownloadChunkStream(t *testing.T) {
 				chunkHeader := common.ChunkHeader{ID: "chunk2", Size: 20}
 				session := streaming.NewStreamingSession(context.Background(), "session2", chunkHeader, false)
 
-				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, nil)
+				m.sessionManager.On("GetSession", mock.AnythingOfType("common.StreamingSessionID")).Return(session, nil)
 				m.sessionManager.On("Delete", session.SessionID).Return()
 				m.store.On("GetData", mock.Anything, chunkHeader.ID).Return([]byte("this is a test chunk"), nil)
 			},
@@ -546,7 +546,7 @@ func TestDataNodeService_DownloadChunkStream(t *testing.T) {
 				stream.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(nil).Times(2)
 			},
 			req: common.DownloadStreamRequest{
-				SessionID:       "session2",
+				SessionID:       common.StreamingSessionID("session2"),
 				ChunkStreamSize: 10, // Small buffer to force multiple sends
 			},
 			expectErr: false,
@@ -554,11 +554,11 @@ func TestDataNodeService_DownloadChunkStream(t *testing.T) {
 		{
 			name: "error: session not found",
 			setupMocks: func(m *serviceMocks, stream *testutils.MockStreamServer) {
-				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(nil, streaming.ErrSessionNotFound)
+				m.sessionManager.On("GetSession", mock.AnythingOfType("common.StreamingSessionID")).Return(nil, streaming.ErrSessionNotFound)
 			},
 			setupStreams: func(stream *testutils.MockStreamServer) {},
 			req: common.DownloadStreamRequest{
-				SessionID:       "not-found-session",
+				SessionID:       common.StreamingSessionID("not-found-session"),
 				ChunkStreamSize: 1024,
 			},
 			expectErr: true,
@@ -566,11 +566,11 @@ func TestDataNodeService_DownloadChunkStream(t *testing.T) {
 		{
 			name: "error: session expired",
 			setupMocks: func(m *serviceMocks, stream *testutils.MockStreamServer) {
-				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(nil, streaming.ErrSessionExpired)
+				m.sessionManager.On("GetSession", mock.AnythingOfType("common.StreamingSessionID")).Return(nil, streaming.ErrSessionExpired)
 			},
 			setupStreams: func(stream *testutils.MockStreamServer) {},
 			req: common.DownloadStreamRequest{
-				SessionID:       "expired-session",
+				SessionID:       common.StreamingSessionID("expired-session"),
 				ChunkStreamSize: 1024,
 			},
 			expectErr: true,
@@ -581,13 +581,13 @@ func TestDataNodeService_DownloadChunkStream(t *testing.T) {
 				chunkHeader := common.ChunkHeader{ID: "chunk3", Size: 10}
 				session := streaming.NewStreamingSession(context.Background(), "session3", chunkHeader, false)
 
-				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, nil)
+				m.sessionManager.On("GetSession", mock.AnythingOfType("common.StreamingSessionID")).Return(session, nil)
 				m.sessionManager.On("Delete", session.SessionID).Return()
 				m.store.On("GetData", mock.Anything, chunkHeader.ID).Return(nil, assert.AnError)
 			},
 			setupStreams: func(stream *testutils.MockStreamServer) {},
 			req: common.DownloadStreamRequest{
-				SessionID:       "session3",
+				SessionID:       common.StreamingSessionID("session3"),
 				ChunkStreamSize: 1024,
 			},
 			expectErr: true,
@@ -598,7 +598,7 @@ func TestDataNodeService_DownloadChunkStream(t *testing.T) {
 				chunkHeader := common.ChunkHeader{ID: "chunk4", Size: 10}
 				session := streaming.NewStreamingSession(context.Background(), "session4", chunkHeader, false)
 
-				m.sessionManager.On("GetSession", mock.AnythingOfType("string")).Return(session, nil)
+				m.sessionManager.On("GetSession", mock.AnythingOfType("common.StreamingSessionID")).Return(session, nil)
 				m.sessionManager.On("Delete", session.SessionID).Return()
 				m.store.On("GetData", mock.Anything, chunkHeader.ID).Return([]byte("test data!"), nil)
 			},
@@ -606,7 +606,7 @@ func TestDataNodeService_DownloadChunkStream(t *testing.T) {
 				stream.On("Send", mock.AnythingOfType("*proto.ChunkDataStream")).Return(assert.AnError)
 			},
 			req: common.DownloadStreamRequest{
-				SessionID:       "session4",
+				SessionID:       common.StreamingSessionID("session4"),
 				ChunkStreamSize: 1024,
 			},
 			expectErr: true,

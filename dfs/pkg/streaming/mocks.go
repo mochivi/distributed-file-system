@@ -37,7 +37,7 @@ func (m *MockServerStreamer) ReceiveChunkFrames(session *streamingSession, strea
 	return args.Get(0).([]byte), args.Error(1)
 }
 
-func (m *MockServerStreamer) SendFinalAck(sessionID string, bytesReceived int, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
+func (m *MockServerStreamer) SendFinalAck(sessionID common.StreamingSessionID, bytesReceived int, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
 	args := m.Called(sessionID, bytesReceived, stream)
 	return args.Error(0)
 }
@@ -80,7 +80,7 @@ func (m *MockStreamingSessionManager) NewSession(ctx context.Context, chunkHeade
 	return args.Get(0).(*streamingSession)
 }
 
-func (m *MockStreamingSessionManager) GetSession(sessionID string) (*streamingSession, error) {
+func (m *MockStreamingSessionManager) GetSession(sessionID common.StreamingSessionID) (*streamingSession, error) {
 	args := m.Called(sessionID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -88,12 +88,12 @@ func (m *MockStreamingSessionManager) GetSession(sessionID string) (*streamingSe
 	return args.Get(0).(*streamingSession), args.Error(1)
 }
 
-func (m *MockStreamingSessionManager) Store(sessionID string, session *streamingSession) error {
+func (m *MockStreamingSessionManager) Store(sessionID common.StreamingSessionID, session *streamingSession) error {
 	args := m.Called(sessionID, session)
 	return args.Error(0)
 }
 
-func (m *MockStreamingSessionManager) Load(sessionID string) (*streamingSession, error) {
+func (m *MockStreamingSessionManager) Load(sessionID common.StreamingSessionID) (*streamingSession, error) {
 	args := m.Called(sessionID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -101,7 +101,7 @@ func (m *MockStreamingSessionManager) Load(sessionID string) (*streamingSession,
 	return args.Get(0).(*streamingSession), args.Error(1)
 }
 
-func (m *MockStreamingSessionManager) Delete(sessionID string) {
+func (m *MockStreamingSessionManager) Delete(sessionID common.StreamingSessionID) {
 	m.Called(sessionID)
 }
 

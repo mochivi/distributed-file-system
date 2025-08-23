@@ -38,7 +38,7 @@ func TestDownloader_downloadChunk(t *testing.T) {
 		name        string
 		setupMocks  func(*downloaderMocks, *clients.MockDataNodeClient)
 		chunkHeader common.ChunkHeader
-		sessionID   string
+		sessionID   common.StreamingSessionID
 		expectErr   bool
 	}{
 		{
@@ -57,7 +57,7 @@ func TestDownloader_downloadChunk(t *testing.T) {
 				Size:     12,
 				Checksum: "test-checksum",
 			},
-			sessionID: "download-session",
+			sessionID: common.NewStreamingSessionID(),
 			expectErr: false,
 		},
 		{
@@ -75,7 +75,7 @@ func TestDownloader_downloadChunk(t *testing.T) {
 				Size:     12,
 				Checksum: "test-checksum",
 			},
-			sessionID: "download-session",
+			sessionID: common.NewStreamingSessionID(),
 			expectErr: true,
 		},
 	}
@@ -207,7 +207,7 @@ func TestDownloader_processWork(t *testing.T) {
 			setupMocks: func(mocks *downloaderMocks, mockClient *clients.MockDataNodeClient) {
 				// client pool
 				mocks.clientPool.On("Len").Return(1).Once()
-				downloadReady := common.DownloadReady{NodeReady: common.NodeReady{Accept: true, SessionID: "sess"}, ChunkHeader: baseHeader}
+				downloadReady := common.DownloadReady{NodeReady: common.NodeReady{Accept: true, SessionID: common.NewStreamingSessionID()}, ChunkHeader: baseHeader}
 				mocks.clientPool.On("GetRemoveClientWithRetry", mock.Anything).Return(mockClient, downloadReady, nil).Once()
 
 				// client

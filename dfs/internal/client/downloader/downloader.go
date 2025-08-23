@@ -40,7 +40,7 @@ func NewDownloader(streamer streaming.ClientStreamer, config DownloaderConfig) *
 }
 
 func (d *Downloader) DownloadFile(ctx context.Context, fileInfo common.FileInfo, chunkLocations []common.ChunkLocation,
-	metadataSessionID string, logger *slog.Logger) (string, error) {
+	metadataSessionID common.MetadataSessionID, logger *slog.Logger) (string, error) {
 
 	// Create temporary file
 	tempFile, err := os.CreateTemp(d.config.TempDir, fmt.Sprintf("download_%s.tmp", metadataSessionID))
@@ -140,7 +140,7 @@ func (d *Downloader) processWork(work downloadWork, downloadCtx *downloadContext
 	return fmt.Errorf("failed to download chunk %s", work.chunkID)
 }
 
-func (d *Downloader) downloadChunk(downloadCtx *downloadContext, client clients.IDataNodeClient, chunkHeader common.ChunkHeader, sessionID string) error {
+func (d *Downloader) downloadChunk(downloadCtx *downloadContext, client clients.IDataNodeClient, chunkHeader common.ChunkHeader, sessionID common.StreamingSessionID) error {
 	downloadCtx.logger.Info("Downloading chunk")
 
 	stream, err := client.DownloadChunkStream(downloadCtx.ctx, common.DownloadStreamRequest{

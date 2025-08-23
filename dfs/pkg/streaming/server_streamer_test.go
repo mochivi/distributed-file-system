@@ -50,7 +50,7 @@ func TestServerStreamer_HandleFirstChunk(t *testing.T) {
 				mocks.stream.On("Recv").Return(chunk, nil).Once()
 
 				session := &streamingSession{
-					SessionID: "test-session",
+					SessionID: common.StreamingSessionID("test-session"),
 					ChunkHeader: common.ChunkHeader{
 						ID:       "test-chunk",
 						Index:    0,
@@ -60,10 +60,10 @@ func TestServerStreamer_HandleFirstChunk(t *testing.T) {
 					Status:          SessionActive,
 					runningChecksum: sha256.New(),
 				}
-				mocks.sessionManager.On("GetSession", "test-session").Return(session, nil).Once()
+				mocks.sessionManager.On("GetSession", common.StreamingSessionID("test-session")).Return(session, nil).Once()
 
 				successfulAck := &common.ChunkDataAck{
-					SessionID:     chunk.SessionId,
+					SessionID:     common.StreamingSessionID(chunk.SessionId),
 					Success:       true,
 					BytesReceived: 9,
 					ReadyForNext:  true, // TODO: Requires flushing to be setup to work
@@ -108,7 +108,7 @@ func TestServerStreamer_HandleFirstChunk(t *testing.T) {
 					IsFinal:   false,
 				}
 				mocks.stream.On("Recv").Return(chunk, nil).Once()
-				mocks.sessionManager.On("GetSession", "test-session").Return(nil, ErrSessionNotFound).Once()
+				mocks.sessionManager.On("GetSession", common.StreamingSessionID("test-session")).Return(nil, ErrSessionNotFound).Once()
 			},
 			chunkData:         nil,
 			expectErr:         true,
@@ -174,7 +174,7 @@ func TestServerStreamer_ReceiveChunks(t *testing.T) {
 				mocks.stream.On("Send", ack2.ToProto()).Return(nil).Once()
 			},
 			session: &streamingSession{
-				SessionID: "test-session",
+				SessionID: common.StreamingSessionID("test-session"),
 				ChunkHeader: common.ChunkHeader{
 					ID:       "test-chunk",
 					Index:    0,
@@ -194,7 +194,7 @@ func TestServerStreamer_ReceiveChunks(t *testing.T) {
 				mocks.stream.On("Recv").Return(nil, errors.New("network error")).Once()
 			},
 			session: &streamingSession{
-				SessionID: "test-session",
+				SessionID: common.StreamingSessionID("test-session"),
 				ChunkHeader: common.ChunkHeader{
 					ID:       "test-chunk",
 					Index:    0,
@@ -215,7 +215,7 @@ func TestServerStreamer_ReceiveChunks(t *testing.T) {
 				mocks.stream.On("Recv").Return(chunk, nil).Once()
 			},
 			session: &streamingSession{
-				SessionID: "test-session",
+				SessionID: common.StreamingSessionID("test-session"),
 				ChunkHeader: common.ChunkHeader{
 					ID:       "test-chunk",
 					Index:    0,
@@ -303,7 +303,7 @@ func TestServerStreamer_sendAck(t *testing.T) {
 				mocks.stream.On("Send", ack).Return(nil).Once()
 			},
 			chunk: common.ChunkDataStream{
-				SessionID: "test-session",
+				SessionID: common.StreamingSessionID("test-session"),
 				ChunkID:   "test-chunk",
 				Data:      []byte("test data"),
 				Offset:    0,
@@ -324,7 +324,7 @@ func TestServerStreamer_sendAck(t *testing.T) {
 				mocks.stream.On("Send", ack).Return(errors.New("send failed")).Once()
 			},
 			chunk: common.ChunkDataStream{
-				SessionID: "test-session",
+				SessionID: common.StreamingSessionID("test-session"),
 				ChunkID:   "test-chunk",
 				Data:      []byte("test data"),
 				Offset:    0,
@@ -377,7 +377,7 @@ func TestServerStreamer_handleFinalChunk(t *testing.T) {
 		{
 			name: "success: finalize session",
 			session: &streamingSession{
-				SessionID: "test-session",
+				SessionID: common.StreamingSessionID("test-session"),
 				ChunkHeader: common.ChunkHeader{
 					ID:       "test-chunk",
 					Index:    0,
@@ -392,7 +392,7 @@ func TestServerStreamer_handleFinalChunk(t *testing.T) {
 		{
 			name: "error: finalize session fails",
 			session: &streamingSession{
-				SessionID: "test-session",
+				SessionID: common.StreamingSessionID("test-session"),
 				ChunkHeader: common.ChunkHeader{
 					ID:       "test-chunk",
 					Index:    0,
@@ -414,7 +414,7 @@ func TestServerStreamer_handleFinalChunk(t *testing.T) {
 			// Pretend chunk was written chunks have been written to the session
 			tc.session.startStreamingSession()
 			tc.session.write(common.ChunkDataStream{
-				SessionID: "test-session",
+				SessionID: common.StreamingSessionID("test-session"),
 				ChunkID:   "test-chunk",
 				Data:      []byte("test data"),
 			})
@@ -451,7 +451,7 @@ func TestServerStreamer_sendFinalAck(t *testing.T) {
 				mocks.stream.On("Send", mock.AnythingOfType("*proto.ChunkDataAck")).Return(nil).Once()
 			},
 			chunk: common.ChunkDataStream{
-				SessionID: "test-session",
+				SessionID: common.StreamingSessionID("test-session"),
 				ChunkID:   "test-chunk",
 				Data:      []byte("test data"),
 				Offset:    0,
@@ -466,7 +466,7 @@ func TestServerStreamer_sendFinalAck(t *testing.T) {
 				mocks.stream.On("Send", mock.AnythingOfType("*proto.ChunkDataAck")).Return(errors.New("send failed")).Once()
 			},
 			chunk: common.ChunkDataStream{
-				SessionID: "test-session",
+				SessionID: common.StreamingSessionID("test-session"),
 				ChunkID:   "test-chunk",
 				Data:      []byte("test data"),
 				Offset:    0,
@@ -524,7 +524,7 @@ func TestServerStreamer_SendFinalReplicasAck(t *testing.T) {
 				mocks.stream.On("Send", mock.AnythingOfType("*proto.ChunkDataAck")).Return(nil).Once()
 			},
 			session: &streamingSession{
-				SessionID: "test-session",
+				SessionID: common.StreamingSessionID("test-session"),
 				ChunkHeader: common.ChunkHeader{
 					ID:       "test-chunk",
 					Index:    0,

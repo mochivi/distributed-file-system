@@ -3,6 +3,8 @@ package streaming
 import (
 	"errors"
 	"fmt"
+
+	"github.com/mochivi/distributed-file-system/internal/common"
 )
 
 var (
@@ -27,11 +29,11 @@ var (
 )
 
 type StreamingError struct {
-	Op        string // Operation that failed
-	Err       error  // Underlying error
-	SessionID string // Context
-	ChunkID   string // Context
-	Offset    int64  // Context for streaming
+	Op        string                    // Operation that failed
+	Err       error                     // Underlying error
+	SessionID common.StreamingSessionID // Context
+	ChunkID   string                    // Context
+	Offset    int64                     // Context for streaming
 }
 
 func (e *StreamingError) Error() string {
@@ -47,7 +49,7 @@ func (e *StreamingError) Unwrap() error {
 }
 
 // Helper constructors for common error scenarios
-func NewChunkFrameReadError(sessionID, chunkID string, offset int64, err error) *StreamingError {
+func NewChunkFrameReadError(sessionID common.StreamingSessionID, chunkID string, offset int64, err error) *StreamingError {
 	return &StreamingError{
 		Op:        "chunk_frame_read",
 		Err:       fmt.Errorf("%w: %v", ErrFrameReadFailed, err),
@@ -57,7 +59,7 @@ func NewChunkFrameReadError(sessionID, chunkID string, offset int64, err error) 
 	}
 }
 
-func NewChunkFrameWriteError(sessionID, chunkID string, offset int, err error) *StreamingError {
+func NewChunkFrameWriteError(sessionID common.StreamingSessionID, chunkID string, offset int, err error) *StreamingError {
 	return &StreamingError{
 		Op:        "chunk_frame_write",
 		Err:       fmt.Errorf("%w: %v", ErrFrameWriteFailed, err),
@@ -67,7 +69,7 @@ func NewChunkFrameWriteError(sessionID, chunkID string, offset int, err error) *
 	}
 }
 
-func NewStreamSendError(sessionID, chunkID string, offset int64, err error) *StreamingError {
+func NewStreamSendError(sessionID common.StreamingSessionID, chunkID string, offset int64, err error) *StreamingError {
 	return &StreamingError{
 		Op:        "stream_send",
 		Err:       fmt.Errorf("%w: %v", ErrStreamSendFailed, err),
@@ -77,10 +79,10 @@ func NewStreamSendError(sessionID, chunkID string, offset int64, err error) *Str
 	}
 }
 
-func NewStreamReceiveError(sessionID string, offset int, err error) *StreamingError {
+func NewStreamReceiveError(sessionID common.StreamingSessionID, offset int, err error) *StreamingError {
 	return &StreamingError{
 		Op:        "stream_receive",
-		Err:       fmt.Errorf("%w: %v", ErrStreamSendFailed, err),
+		Err:       fmt.Errorf("%w: %v", ErrStreamReceiveFailed, err),
 		SessionID: sessionID,
 		Offset:    int64(offset),
 	}

@@ -29,12 +29,12 @@ func (s *service) prepareChunkUpload(ctx context.Context, req common.UploadChunk
 	if existing, err := s.sessionManager.LoadByChunk(req.ChunkHeader.ID); err == nil {
 		if !existing.Status.IsValid() {
 			s.sessionManager.Delete(existing.SessionID)
-			logger.Debug("Deleted invalid session", slog.String(common.LogStreamingSessionID, existing.SessionID))
+			logger.Debug("Deleted invalid session", slog.String(common.LogStreamingSessionID, existing.SessionID.String()))
 			return common.NodeReady{Accept: false, Message: "Invalid session"}, nil
 		}
 
 		// If is valid session, return early
-		logger.Debug("Session already active", slog.String(common.LogStreamingSessionID, existing.SessionID))
+		logger.Debug("Session already active", slog.String(common.LogStreamingSessionID, existing.SessionID.String()))
 		return common.NodeReady{Accept: true, Message: "Session already active", SessionID: existing.SessionID}, nil
 	}
 
@@ -44,7 +44,7 @@ func (s *service) prepareChunkUpload(ctx context.Context, req common.UploadChunk
 		return common.NodeReady{}, fmt.Errorf("failed to store streaming session: %w", err)
 	}
 
-	logger.Info("Prepared chunk upload", slog.String(common.LogStreamingSessionID, session.SessionID))
+	logger.Info("Prepared chunk upload", slog.String(common.LogStreamingSessionID, session.SessionID.String()))
 	return common.NodeReady{Accept: true, Message: "Ready to receive chunk data", SessionID: session.SessionID}, nil
 }
 
@@ -65,7 +65,7 @@ func (s *service) prepareChunkDownload(ctx context.Context, req common.DownloadC
 		return common.DownloadReady{}, fmt.Errorf("failed to store streaming session: %w", err)
 	}
 
-	logger.Info("Prepared chunk download", slog.String(common.LogStreamingSessionID, session.SessionID))
+	logger.Info("Prepared chunk download", slog.String(common.LogStreamingSessionID, session.SessionID.String()))
 	return common.DownloadReady{
 		NodeReady:   common.NodeReady{Accept: true, Message: "Ready to download chunk data", SessionID: session.SessionID},
 		ChunkHeader: chunkHeader,

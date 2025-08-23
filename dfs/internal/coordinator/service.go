@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
@@ -70,7 +69,7 @@ func (s *service) downloadFile(ctx context.Context, req common.DownloadRequest) 
 	return common.DownloadResponse{
 		FileInfo:       *fileInfo,
 		ChunkLocations: chunkLocations,
-		SessionID:      uuid.NewString(), // TODO: this should be a session id that is used to track the download, not used for now
+		SessionID:      common.NewMetadataSessionID(),
 	}, nil
 }
 

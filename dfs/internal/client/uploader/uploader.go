@@ -153,10 +153,8 @@ func (u *Uploader) processWork(work UploaderWork, clientPool client_pool.ClientP
 		if err != nil {
 			return fmt.Errorf("failed to connect to all provided clients")
 		}
-
-		streamingSessionID := response.(string) // should panic if fails anyway
-
-		replicatedNodes, err = u.uploadChunk(work, client, streamingSessionID, uploadCtx)
+		sessionID := common.StreamingSessionID(response.(string)) // should panic if fails anyway
+		replicatedNodes, err = u.uploadChunk(work, client, sessionID, uploadCtx)
 
 		if err != nil {
 			retryCount++
@@ -181,7 +179,7 @@ func (u *Uploader) processWork(work UploaderWork, clientPool client_pool.ClientP
 	return nil
 }
 
-func (u *Uploader) uploadChunk(work UploaderWork, client clients.IDataNodeClient, streamingSessionID string,
+func (u *Uploader) uploadChunk(work UploaderWork, client clients.IDataNodeClient, sessionID common.StreamingSessionID,
 	uploadCtx *uploadContext) ([]*common.NodeInfo, error) {
 
 	workLogger := logging.OperationLogger(uploadCtx.logger, "upload_chunk", slog.String("chunk_id", work.chunkHeader.ID))
@@ -195,7 +193,7 @@ func (u *Uploader) uploadChunk(work UploaderWork, client clients.IDataNodeClient
 
 	// Stream chunk to peer
 	uploadParams := streaming.UploadChunkStreamParams{
-		SessionID:   streamingSessionID,
+		SessionID:   sessionID,
 		ChunkHeader: work.chunkHeader,
 		Data:        work.data,
 	}

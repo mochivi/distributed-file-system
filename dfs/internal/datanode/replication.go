@@ -138,7 +138,7 @@ func (rm *ParalellReplicationService) tryStartReplication(ctx context.Context, c
 	client, response, err := clientPool.GetRemoveClientWithRetry(func(client clients.IDataNodeClient) (bool, any, error) {
 		replicateChunkResponse, err := client.ReplicateChunk(ctx, chunkHeader)
 		if err != nil {
-			return false, "", err
+			return false, common.StreamingSessionID(""), err
 		}
 		return replicateChunkResponse.Accept, replicateChunkResponse.SessionID, nil
 	})
@@ -147,20 +147,19 @@ func (rm *ParalellReplicationService) tryStartReplication(ctx context.Context, c
 		<-semaphore // Release semaphore slot
 		return err  // It only fails if there are no longer any available client to try
 	}
-
-	streamingSessionID := response.(string) // should panic if fails anyway
+	sessionID := response.(common.StreamingSessionID) // should panic if fails anyway
 
 	// Start replication goroutine
 	wg.Add(1)
 	activeReplications.Add(1)
-	go rm.replicateToClient(ctx, client, streamingSessionID, chunkHeader, data, logger,
+	go rm.replicateToClient(ctx, client, sessionID, chunkHeader, data, logger,
 		wg, semaphore, errChan, replicatedNodes, acceptedCount, activeReplications)
 
 	return nil
 }
 
 // replicateToClient handles replication to a single client
-func (rm *ParalellReplicationService) replicateToClient(ctx context.Context, client clients.IDataNodeClient, sessionID string,
+func (rm *ParalellReplicationService) replicateToClient(ctx context.Context, client clients.IDataNodeClient, sessionID common.StreamingSessionID,
 	chunkHeader common.ChunkHeader, data []byte, logger *slog.Logger, wg *sync.WaitGroup, semaphore chan struct{},
 	errChan chan error, replicatedNodes *ReplicatedNodes, acceptedCount *atomic.Int64, activeReplications *atomic.Int64) {
 
@@ -207,7 +206,7 @@ func (rm *ParalellReplicationService) waitAndValidateResults(wg *sync.WaitGroup,
 }
 
 func (rm *ParalellReplicationService) replicate(ctx context.Context, client clients.IDataNodeClient, chunkHeader common.ChunkHeader,
-	sessionID string, data []byte, clientLogger *slog.Logger) error {
+	sessionID common.StreamingSessionID, data []byte, clientLogger *slog.Logger) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

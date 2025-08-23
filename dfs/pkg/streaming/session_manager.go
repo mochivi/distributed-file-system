@@ -6,31 +6,30 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mochivi/distributed-file-system/internal/common"
 	"github.com/mochivi/distributed-file-system/internal/config"
 )
 
 // streamingSessionManager handles currently open chunk streaming sessions with clients
 type streamingSessionManager struct {
-	sessions map[string]*streamingSession
+	sessions map[common.StreamingSessionID]*streamingSession
 	mu       sync.RWMutex
 	config   config.StreamingSessionManagerConfig
 	logger   *slog.Logger
 }
 
 func NewStreamingSessionManager(config config.StreamingSessionManagerConfig, logger *slog.Logger) *streamingSessionManager {
-	return &streamingSessionManager{sessions: make(map[string]*streamingSession), config: config, logger: logger}
+	return &streamingSessionManager{sessions: make(map[common.StreamingSessionID]*streamingSession), config: config, logger: logger}
 }
 
 func (sm *streamingSessionManager) NewSession(ctx context.Context, chunkHeader common.ChunkHeader, propagate bool) *streamingSession {
-	sessionID := uuid.New().String()
+	sessionID := common.NewStreamingSessionID()
 	session := NewStreamingSession(ctx, sessionID, chunkHeader, propagate)
 	session.ExpiresAt = time.Now().Add(sm.config.SessionTimeout)
 	return session
 }
 
-func (sm *streamingSessionManager) GetSession(sessionID string) (*streamingSession, error) {
+func (sm *streamingSessionManager) GetSession(sessionID common.StreamingSessionID) (*streamingSession, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
@@ -48,7 +47,7 @@ func (sm *streamingSessionManager) GetSession(sessionID string) (*streamingSessi
 	return session, nil
 }
 
-func (sm *streamingSessionManager) Store(sessionID string, session *streamingSession) error {
+func (sm *streamingSessionManager) Store(sessionID common.StreamingSessionID, session *streamingSession) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -62,7 +61,7 @@ func (sm *streamingSessionManager) Store(sessionID string, session *streamingSes
 	return nil
 }
 
-func (sm *streamingSessionManager) Load(sessionID string) (*streamingSession, error) {
+func (sm *streamingSessionManager) Load(sessionID common.StreamingSessionID) (*streamingSession, error) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	session, ok := sm.sessions[sessionID]
@@ -72,7 +71,7 @@ func (sm *streamingSessionManager) Load(sessionID string) (*streamingSession, er
 	return session, nil
 }
 
-func (sm *streamingSessionManager) Delete(sessionID string) {
+func (sm *streamingSessionManager) Delete(sessionID common.StreamingSessionID) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	delete(sm.sessions, sessionID)

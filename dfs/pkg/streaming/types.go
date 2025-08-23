@@ -34,7 +34,7 @@ func (c *clientStreamer) Config() *config.StreamerConfig {
 
 type UploadChunkStreamParams struct {
 	// Retrieve session
-	SessionID string
+	SessionID common.StreamingSessionID
 
 	// Chunk data
 	ChunkHeader common.ChunkHeader
@@ -42,7 +42,7 @@ type UploadChunkStreamParams struct {
 }
 
 type DownloadChunkStreamParams struct {
-	SessionID   string
+	SessionID   common.StreamingSessionID
 	ChunkHeader common.ChunkHeader
 }
 
@@ -61,7 +61,7 @@ type ServerStreamer interface {
 	// Upload side -- receiving chunks
 	HandleFirstChunkFrame(stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) (*streamingSession, error)
 	ReceiveChunkFrames(session *streamingSession, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) ([]byte, error)
-	SendFinalAck(sessionID string, bytesReceived int, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error
+	SendFinalAck(sessionID common.StreamingSessionID, bytesReceived int, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error
 	SendFinalReplicasAck(session *streamingSession, replicaNodes []*common.NodeInfo, stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error
 
 	// Download side - sending chunks
@@ -84,10 +84,10 @@ func NewServerStreamer(sessionManager SessionManager, config config.StreamerConf
 // SessionManager is used by the datanode to control currently active sessions
 type SessionManager interface {
 	NewSession(ctx context.Context, chunkHeader common.ChunkHeader, propagate bool) *streamingSession
-	GetSession(sessionID string) (*streamingSession, error)
-	Store(sessionID string, session *streamingSession) error
-	Load(sessionID string) (*streamingSession, error)
-	Delete(sessionID string)
+	GetSession(sessionID common.StreamingSessionID) (*streamingSession, error)
+	Store(sessionID common.StreamingSessionID, session *streamingSession) error
+	Load(sessionID common.StreamingSessionID) (*streamingSession, error)
+	Delete(sessionID common.StreamingSessionID)
 	ExistsForChunk(chunkID string) bool
 	LoadByChunk(chunkID string) (*streamingSession, error)
 }
@@ -116,7 +116,7 @@ const (
 type streamingSession struct {
 	ctx context.Context
 
-	SessionID string
+	SessionID common.StreamingSessionID
 	CreatedAt time.Time
 	ExpiresAt time.Time
 
@@ -133,7 +133,7 @@ type streamingSession struct {
 	Status SessionStatus
 }
 
-func NewStreamingSession(ctx context.Context, sessionID string, chunkHeader common.ChunkHeader, propagate bool) *streamingSession {
+func NewStreamingSession(ctx context.Context, sessionID common.StreamingSessionID, chunkHeader common.ChunkHeader, propagate bool) *streamingSession {
 	return &streamingSession{
 		ctx:       ctx,
 		SessionID: sessionID,

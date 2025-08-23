@@ -110,7 +110,7 @@ func (s *serverStreamer) handleFinalChunk(session *streamingSession) error {
 	return nil
 }
 
-func (s *serverStreamer) SendFinalAck(sessionID string, bytesReceived int,
+func (s *serverStreamer) SendFinalAck(sessionID common.StreamingSessionID, bytesReceived int,
 	stream grpc.BidiStreamingServer[proto.ChunkDataStream, proto.ChunkDataAck]) error {
 
 	finalAck := common.ChunkDataAck{
@@ -148,7 +148,7 @@ func (s *serverStreamer) SendFinalReplicasAck(session *streamingSession, replica
 
 // SendChunkFrames is a pure function, as it requires no dependencies
 // so, we keep it simple
-func SendChunkFrames(reader io.Reader, streamFrameSize int, chunkID, sessionID string, totalSize int,
+func SendChunkFrames(reader io.Reader, streamFrameSize int, chunkID string, sessionID common.StreamingSessionID, totalSize int,
 	stream grpc.ServerStreamingServer[proto.ChunkDataStream]) error {
 	buffer := make([]byte, streamFrameSize)
 	offset := int64(0)
@@ -163,7 +163,7 @@ func SendChunkFrames(reader io.Reader, streamFrameSize int, chunkID, sessionID s
 		}
 
 		if err := stream.Send(&proto.ChunkDataStream{
-			SessionId: sessionID,
+			SessionId: sessionID.String(),
 			ChunkId:   chunkID,
 			Data:      buffer[:n],
 			Offset:    offset,
