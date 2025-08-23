@@ -38,7 +38,11 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		return nil, err
 	}
 
-	return resp.ToProto(), nil
+	protoResp, err := resp.ToProto()
+	if err != nil {
+		return nil, apperr.Internal(err) // server tried to send an invalid response
+	}
+	return protoResp, nil
 }
 
 // Client request for a file download
@@ -99,7 +103,7 @@ func (c *Coordinator) DeleteFile(ctx context.Context, pb *proto.DeleteRequest) (
 func (c *Coordinator) ConfirmUpload(ctx context.Context, pb *proto.ConfirmUploadRequest) (*proto.ConfirmUploadResponse, error) {
 	req := common.ConfirmUploadRequestFromProto(pb)
 	ctx, _ = logging.FromContextWithOperation(ctx, common.OpCommit,
-		slog.String(common.LogMetadataSessionID, req.SessionID))
+		slog.String(common.LogMetadataSessionID, req.SessionID.String()))
 
 	resp, err := c.service.confirmUpload(ctx, req)
 	if err != nil {

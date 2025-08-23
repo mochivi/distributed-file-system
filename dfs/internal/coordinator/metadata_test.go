@@ -24,9 +24,9 @@ func TestTrackUpload(t *testing.T) {
 		Checksum: "checksum",
 	}
 	chunkIDs := chunk.FormatChunkIDs(chunk.HashFilepath(req.Path), 3)
-	sessionID := "test-session"
+	sessionID := common.MetadataSessionID("test-session")
 
-	manager.trackUpload(sessionID, req, chunkIDs)
+	manager.trackUpload(common.MetadataSessionID(sessionID), req, chunkIDs)
 
 	// Use reflection or a test helper to inspect internal state if necessary,
 	// but for this case we can test the outcome via the commit method.
@@ -43,18 +43,18 @@ func TestTrackUpload(t *testing.T) {
 func TestCommit(t *testing.T) {
 	testCases := []struct {
 		name          string
-		sessionID     string
+		sessionID     common.MetadataSessionID
 		commitTimeout time.Duration
-		setupManager  func(*metadataSessionManager, string)
+		setupManager  func(*metadataSessionManager, common.MetadataSessionID)
 		setupMocks    func(*metadata.MockMetadataStore)
 		expectErr     bool
 		testChunkInfo []common.ChunkInfo
 	}{
 		{
 			name:          "success",
-			sessionID:     "test-session-success",
+			sessionID:     common.MetadataSessionID("test-session-success"),
 			commitTimeout: 5 * time.Second,
-			setupManager: func(m *metadataSessionManager, sid string) {
+			setupManager: func(m *metadataSessionManager, sid common.MetadataSessionID) {
 				m.trackUpload(sid, common.UploadRequest{Path: "/test/success.txt"}, []string{"chunk1"})
 			},
 			setupMocks: func(ms *metadata.MockMetadataStore) {
@@ -65,17 +65,17 @@ func TestCommit(t *testing.T) {
 		},
 		{
 			name:          "error: session not found",
-			sessionID:     "non-existent-session",
+			sessionID:     common.MetadataSessionID("non-existent-session"),
 			commitTimeout: 5 * time.Second,
-			setupManager:  func(m *metadataSessionManager, sid string) {},
+			setupManager:  func(m *metadataSessionManager, sid common.MetadataSessionID) {},
 			setupMocks:    func(ms *metadata.MockMetadataStore) {},
 			expectErr:     true,
 		},
 		{
 			name:          "error: session expired",
-			sessionID:     "test-session-expired",
+			sessionID:     common.MetadataSessionID("test-session-expired"),
 			commitTimeout: 1 * time.Millisecond,
-			setupManager: func(m *metadataSessionManager, sid string) {
+			setupManager: func(m *metadataSessionManager, sid common.MetadataSessionID) {
 				m.trackUpload(sid, common.UploadRequest{Path: "/test/expired.txt"}, []string{"chunk1"})
 				time.Sleep(2 * time.Millisecond) // Ensure session expires
 			},
@@ -84,9 +84,9 @@ func TestCommit(t *testing.T) {
 		},
 		{
 			name:          "error: metadata store failure",
-			sessionID:     "test-session-store-failure",
+			sessionID:     common.MetadataSessionID("test-session-store-failure"),
 			commitTimeout: 5 * time.Second,
-			setupManager: func(m *metadataSessionManager, sid string) {
+			setupManager: func(m *metadataSessionManager, sid common.MetadataSessionID) {
 				m.trackUpload(sid, common.UploadRequest{Path: "/test/store_failure.txt"}, []string{"chunk1"})
 			},
 			setupMocks: func(ms *metadata.MockMetadataStore) {

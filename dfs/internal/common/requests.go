@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -321,7 +322,7 @@ func UploadRequestFromProto(pb *proto.UploadRequest) (UploadRequest, error) {
 		Checksum:  pb.Checksum,
 	}
 	if err := uploadRequest.validate(); err != nil {
-		return UploadRequest{}, err
+		return UploadRequest{}, fmt.Errorf("%w: %w", ErrValidation, err)
 	}
 	return uploadRequest, nil
 }
@@ -336,11 +337,18 @@ func (r *UploadRequest) ToProto() *proto.UploadRequest {
 }
 
 func (r UploadRequest) validate() error {
+	errs := make([]error, 0)
 	if r.ChunkSize < 1*1024*1024 { // 1MB minimun chunksize allowed
-		return fmt.Errorf("%w: chunkSize cannot be lower than 1MB", ErrValidation)
+		errs = append(errs, errors.New("chunkSize cannot be lower than 1MB"))
 	}
 	if r.ChunkSize > 128*1024*1024 { // 128MB maximum chunksize allowed
-		return fmt.Errorf("%w: chunksize cannot be larger than 128MB", ErrValidation)
+		errs = append(errs, errors.New("chunksize cannot be larger than 128MB"))
+	}
+	if r.Size <= 0 {
+		errs = append(errs, errors.New("file size must be larger than 0"))
+	}
+	if len(errs) != 0 {
+		return errors.Join(errs...)
 	}
 	return nil
 }
@@ -348,7 +356,7 @@ func (r UploadRequest) validate() error {
 type UploadResponse struct {
 	ChunkIDs  []string
 	Nodes     []*NodeInfo
-	SessionID string
+	SessionID MetadataSessionID
 }
 
 func UploadResponseFromProto(pb *proto.UploadResponse) UploadResponse {
@@ -359,19 +367,40 @@ func UploadResponseFromProto(pb *proto.UploadResponse) UploadResponse {
 	return UploadResponse{
 		ChunkIDs:  pb.ChunkIds,
 		Nodes:     nodes,
-		SessionID: pb.SessionId}
+		SessionID: MetadataSessionID(pb.SessionId),
+	}
 }
 
-func (ur UploadResponse) ToProto() *proto.UploadResponse {
-	protoNodes := make([]*proto.NodeInfo, 0, len(ur.Nodes))
-	for _, node := range ur.Nodes {
+func (r UploadResponse) ToProto() (*proto.UploadResponse, error) {
+	if err := r.validate(); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrValidation, err)
+	}
+	protoNodes := make([]*proto.NodeInfo, 0, len(r.Nodes))
+	for _, node := range r.Nodes {
 		protoNodes = append(protoNodes, node.ToProto())
 	}
 	return &proto.UploadResponse{
-		ChunkIds:  ur.ChunkIDs,
+		ChunkIds:  r.ChunkIDs,
 		Nodes:     protoNodes,
-		SessionId: ur.SessionID,
+		SessionId: r.SessionID.String(),
+	}, nil
+}
+
+func (r UploadResponse) validate() error {
+	errs := make([]error, 0)
+	if len(r.Nodes) == 0 {
+		errs = append(errs, fmt.Errorf("no nodes to upload to"))
 	}
+	if len(r.ChunkIDs) == 0 {
+		errs = append(errs, fmt.Errorf("no chunks to upload"))
+	}
+	if err := r.SessionID.valid(); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) != 0 {
+		return errors.Join(errs...)
+	}
+	return nil
 }
 
 // Download
@@ -450,7 +479,7 @@ func (dr DeleteResponse) ToProto() *proto.DeleteResponse {
 }
 
 type ConfirmUploadRequest struct {
-	SessionID  string
+	SessionID  MetadataSessionID
 	ChunkInfos []ChunkInfo
 }
 
@@ -459,7 +488,7 @@ func ConfirmUploadRequestFromProto(pb *proto.ConfirmUploadRequest) ConfirmUpload
 	for _, chunkInfo := range pb.ChunkInfos {
 		chunkInfos = append(chunkInfos, ChunkInfoFromProto(chunkInfo))
 	}
-	return ConfirmUploadRequest{SessionID: pb.SessionId, ChunkInfos: chunkInfos}
+	return ConfirmUploadRequest{SessionID: MetadataSessionID(pb.SessionId), ChunkInfos: chunkInfos}
 }
 
 func (cur ConfirmUploadRequest) ToProto() *proto.ConfirmUploadRequest {
@@ -467,7 +496,7 @@ func (cur ConfirmUploadRequest) ToProto() *proto.ConfirmUploadRequest {
 	for _, chunkInfo := range cur.ChunkInfos {
 		chunkInfos = append(chunkInfos, chunkInfo.ToProto())
 	}
-	return &proto.ConfirmUploadRequest{SessionId: cur.SessionID, ChunkInfos: chunkInfos}
+	return &proto.ConfirmUploadRequest{SessionId: cur.SessionID.String(), ChunkInfos: chunkInfos}
 }
 
 type ConfirmUploadResponse struct {

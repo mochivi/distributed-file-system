@@ -44,7 +44,7 @@ func TestService_UploadFile(t *testing.T) {
 		name         string
 		setupMocks   func(*serviceMocks)
 		req          common.UploadRequest
-		expectedResp func(sessionID string) common.UploadResponse
+		expectedResp func(sessionID common.MetadataSessionID) common.UploadResponse
 		expectErr    bool
 	}{
 		{
@@ -61,7 +61,7 @@ func TestService_UploadFile(t *testing.T) {
 				Size:      (1 * 1024 * 1024) - 1, // 1MB - 1B
 				Checksum:  "test-checksum",
 			},
-			expectedResp: func(sessionID string) common.UploadResponse {
+			expectedResp: func(sessionID common.MetadataSessionID) common.UploadResponse {
 				return common.UploadResponse{
 					SessionID: sessionID,
 					ChunkIDs:  []string{chunk.FormatChunkID("test.txt", 0)},
@@ -84,7 +84,7 @@ func TestService_UploadFile(t *testing.T) {
 				Size:      (2 * 1024 * 1024) - 1, // 2MB - 1B
 				Checksum:  "test-checksum",
 			},
-			expectedResp: func(sessionID string) common.UploadResponse {
+			expectedResp: func(sessionID common.MetadataSessionID) common.UploadResponse {
 				return common.UploadResponse{
 					SessionID: sessionID,
 					ChunkIDs:  []string{chunk.FormatChunkID("test.txt", 0), chunk.FormatChunkID("test.txt", 1)},
@@ -355,10 +355,10 @@ func TestService_ConfirmUpload(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(mocks *serviceMocks) {
-				mocks.metadataManager.On("commit", mock.Anything, "test-session", mock.Anything, mocks.metaStore).Return(nil).Once()
+				mocks.metadataManager.On("commit", mock.Anything, common.MetadataSessionID("test-session"), mock.Anything, mocks.metaStore).Return(nil).Once()
 			},
 			req: common.ConfirmUploadRequest{
-				SessionID: "test-session",
+				SessionID: common.MetadataSessionID("test-session"),
 			},
 			expectedResp: common.ConfirmUploadResponse{Success: true},
 			expectErr:    false,
@@ -367,10 +367,10 @@ func TestService_ConfirmUpload(t *testing.T) {
 		{
 			name: "error: commit fails",
 			setupMocks: func(mocks *serviceMocks) {
-				mocks.metadataManager.On("commit", mock.Anything, "test-session-fail", mock.Anything, mocks.metaStore).Return(assert.AnError).Once()
+				mocks.metadataManager.On("commit", mock.Anything, common.MetadataSessionID("test-session-fail"), mock.Anything, mocks.metaStore).Return(assert.AnError).Once()
 			},
 			req: common.ConfirmUploadRequest{
-				SessionID: "test-session-fail",
+				SessionID: common.MetadataSessionID("test-session-fail"),
 			},
 			expectedResp: common.ConfirmUploadResponse{},
 			expectErr:    true,

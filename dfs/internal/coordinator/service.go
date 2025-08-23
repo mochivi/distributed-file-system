@@ -16,11 +16,7 @@ func (s *service) uploadFile(ctx context.Context, req common.UploadRequest) (com
 	logger := logging.FromContext(ctx)
 
 	// Calculate number of chunks needed
-	chunkSize := req.ChunkSize
-	if chunkSize == 0 {
-		chunkSize = s.config.ChunkSize
-	}
-	numChunks := (req.Size + chunkSize - 1) / chunkSize
+	numChunks := (req.Size + req.ChunkSize - 1) / req.ChunkSize
 	logger = logging.ExtendLogger(logger, slog.Int(common.LogNumChunks, numChunks))
 
 	// Select some nodes for the client to upload to
@@ -33,10 +29,10 @@ func (s *service) uploadFile(ctx context.Context, req common.UploadRequest) (com
 	chunkIDs := chunk.FormatChunkIDs(chunkPrefix, numChunks)
 
 	// Create metadata commit session for the upload
-	sessionID := uuid.NewString()
+	sessionID := common.NewMetadataSessionID()
 	go s.metadataManager.trackUpload(sessionID, req, chunkIDs)
 
-	logger.Debug("Tracking file upload", slog.String(common.LogMetadataSessionID, sessionID))
+	logger.Debug("Tracking file upload", slog.String(common.LogMetadataSessionID, sessionID.String()))
 	return common.UploadResponse{
 		ChunkIDs:  chunkIDs,
 		Nodes:     nodes,

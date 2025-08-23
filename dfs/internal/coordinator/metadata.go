@@ -14,8 +14,8 @@ import (
 )
 
 type MetadataSessionManager interface {
-	trackUpload(sessionID string, req common.UploadRequest, chunkIDs []string)
-	commit(ctx context.Context, sessionID string, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error
+	trackUpload(sessionID common.MetadataSessionID, req common.UploadRequest, chunkIDs []string)
+	commit(ctx context.Context, sessionID common.MetadataSessionID, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error
 }
 
 type metadataSessionManager struct {
@@ -26,7 +26,7 @@ type metadataSessionManager struct {
 }
 
 type metadataUploadSession struct {
-	id       string
+	id       common.MetadataSessionID
 	exp      time.Time
 	fileInfo *common.FileInfo
 }
@@ -41,7 +41,7 @@ func NewMetadataSessionManager(commitTimeout time.Duration, logger *slog.Logger)
 	return manager
 }
 
-func newMetadataUploadSession(sessionID string, exp time.Duration, fileInfo *common.FileInfo) metadataUploadSession {
+func newMetadataUploadSession(sessionID common.MetadataSessionID, exp time.Duration, fileInfo *common.FileInfo) metadataUploadSession {
 	return metadataUploadSession{
 		id:       sessionID,
 		exp:      time.Now().Add(exp),
@@ -49,7 +49,7 @@ func newMetadataUploadSession(sessionID string, exp time.Duration, fileInfo *com
 	}
 }
 
-func (m *metadataSessionManager) trackUpload(sessionID string, req common.UploadRequest, chunkIDs []string) {
+func (m *metadataSessionManager) trackUpload(sessionID common.MetadataSessionID, req common.UploadRequest, chunkIDs []string) {
 	// Create chunk info array
 	chunkInfos := make([]common.ChunkInfo, len(chunkIDs))
 	for i := range chunkIDs {
@@ -72,19 +72,19 @@ func (m *metadataSessionManager) trackUpload(sessionID string, req common.Upload
 		CreatedAt:  time.Now(),
 		Checksum:   req.Checksum,
 	}
-	m.logger.Info("Tracking upload session", slog.String(common.LogMetadataSessionID, sessionID),
+	m.logger.Info("Tracking upload session", slog.String(common.LogMetadataSessionID, sessionID.String()),
 		slog.String(common.LogFilePath, req.Path), slog.Int(common.LogNumChunks, len(chunkIDs)))
 
 	m.mu.Lock()
-	m.sessions[sessionID] = newMetadataUploadSession(sessionID, m.commitTimeout, fileInfo)
+	m.sessions[sessionID.String()] = newMetadataUploadSession(sessionID, m.commitTimeout, fileInfo)
 	m.mu.Unlock()
 }
 
-func (m *metadataSessionManager) commit(ctx context.Context, sessionID string, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error {
+func (m *metadataSessionManager) commit(ctx context.Context, sessionID common.MetadataSessionID, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	session, ok := m.sessions[sessionID]
+	session, ok := m.sessions[sessionID.String()]
 	if !ok {
 		return errors.New("session not found")
 	}
@@ -106,6 +106,6 @@ func (m *metadataSessionManager) commit(ctx context.Context, sessionID string, c
 	}
 
 	// Clean up the session
-	delete(m.sessions, sessionID)
+	delete(m.sessions, sessionID.String())
 	return nil
 }
