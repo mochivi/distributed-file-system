@@ -23,12 +23,12 @@ import (
 func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (*proto.UploadResponse, error) {
 	req, err := common.UploadRequestFromProto(pb)
 	if err != nil {
-		return nil, apperr.InvalidArgument("Request validation failed", err)
+		return nil, apperr.InvalidArgument("Validation error", err)
 	}
 	ctx, _ = logging.FromContextWithOperation(ctx, common.OpUpload,
-		slog.String(common.LogFilePath, req.Path),
-		slog.Int(common.LogFileSize, req.Size),
-		slog.Int(common.LogChunkSize, req.ChunkSize))
+		slog.String(common.LogFilePath, req.Path.String()),
+		slog.Int(common.LogFileSize, int(req.Size)),
+		slog.Int(common.LogChunkSize, int(req.ChunkSize)))
 
 	resp, err := c.service.uploadFile(ctx, req)
 	if err != nil {
@@ -38,18 +38,17 @@ func (c *Coordinator) UploadFile(ctx context.Context, pb *proto.UploadRequest) (
 		return nil, err
 	}
 
-	protoResp, err := resp.ToProto()
-	if err != nil {
-		return nil, apperr.Internal(err) // server tried to send an invalid response
-	}
-	return protoResp, nil
+	return resp.ToProto(), nil
 }
 
 // Client request for a file download
 func (c *Coordinator) DownloadFile(ctx context.Context, pb *proto.DownloadRequest) (*proto.DownloadResponse, error) {
-	req := common.DownloadRequestFromProto(pb)
+	req, err := common.DownloadRequestFromProto(pb)
+	if err != nil {
+		return nil, apperr.InvalidArgument("Validation error", err)
+	}
 	ctx, _ = logging.FromContextWithOperation(ctx, common.OpDownload,
-		slog.String(common.LogFilePath, req.Path))
+		slog.String(common.LogFilePath, req.Path.String()))
 
 	resp, err := c.service.downloadFile(ctx, req)
 	if err != nil {
@@ -69,7 +68,7 @@ func (c *Coordinator) DownloadFile(ctx context.Context, pb *proto.DownloadReques
 func (c *Coordinator) ListFiles(ctx context.Context, pb *proto.ListRequest) (*proto.ListResponse, error) {
 	req := common.ListRequestFromProto(pb)
 	ctx, _ = logging.FromContextWithOperation(ctx, common.OpList,
-		slog.String(common.LogDirectory, req.Directory))
+		slog.String(common.LogDirectory, req.Directory.String()))
 
 	resp, err := c.service.listFiles(ctx, req)
 	if err != nil {
@@ -87,7 +86,7 @@ func (c *Coordinator) ListFiles(ctx context.Context, pb *proto.ListRequest) (*pr
 func (c *Coordinator) DeleteFile(ctx context.Context, pb *proto.DeleteRequest) (*proto.DeleteResponse, error) {
 	req := common.DeleteRequestFromProto(pb)
 	ctx, _ = logging.FromContextWithOperation(ctx, common.OpDelete,
-		slog.String(common.LogFilePath, req.Path))
+		slog.String(common.LogFilePath, req.Path.String()))
 
 	resp, err := c.service.deleteFile(ctx, req)
 	if err != nil {
@@ -101,7 +100,10 @@ func (c *Coordinator) DeleteFile(ctx context.Context, pb *proto.DeleteRequest) (
 }
 
 func (c *Coordinator) ConfirmUpload(ctx context.Context, pb *proto.ConfirmUploadRequest) (*proto.ConfirmUploadResponse, error) {
-	req := common.ConfirmUploadRequestFromProto(pb)
+	req, err := common.ConfirmUploadRequestFromProto(pb)
+	if err != nil {
+		return nil, apperr.InvalidArgument("Validation error", err)
+	}
 	ctx, _ = logging.FromContextWithOperation(ctx, common.OpCommit,
 		slog.String(common.LogMetadataSessionID, req.SessionID.String()))
 

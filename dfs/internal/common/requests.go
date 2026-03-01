@@ -14,11 +14,15 @@ type UploadChunkRequest struct {
 	Propagate   bool
 }
 
-func UploadChunkRequestFromProto(pb *proto.UploadChunkRequest) UploadChunkRequest {
-	return UploadChunkRequest{
-		ChunkHeader: ChunkHeaderFromProto(pb.ChunkHeader),
-		Propagate:   pb.Propagate,
+func UploadChunkRequestFromProto(pb *proto.UploadChunkRequest) (UploadChunkRequest, error) {
+	header, err := ChunkHeaderFromProto(pb.ChunkHeader)
+	if err != nil {
+		return UploadChunkRequest{}, err
 	}
+	return UploadChunkRequest{
+		ChunkHeader: header,
+		Propagate:   pb.Propagate,
+	}, nil
 }
 
 func (ucr UploadChunkRequest) ToProto() *proto.UploadChunkRequest {
@@ -52,14 +56,19 @@ func (cuu NodeReady) ToProto() *proto.NodeReady {
 }
 
 type DownloadChunkRequest struct {
-	ChunkID string
+	ChunkID ChunkID
 }
 
-func DownloadChunkRequestFromProto(pb *proto.DownloadChunkRequest) DownloadChunkRequest {
-	return DownloadChunkRequest{ChunkID: pb.ChunkId}
+func DownloadChunkRequestFromProto(pb *proto.DownloadChunkRequest) (DownloadChunkRequest, error) {
+	chunkID, err := NewChunkID(pb.ChunkId)
+	if err != nil {
+		return DownloadChunkRequest{}, err
+	}
+	return DownloadChunkRequest{ChunkID: chunkID}, nil
 }
+
 func (r DownloadChunkRequest) ToProto() *proto.DownloadChunkRequest {
-	return &proto.DownloadChunkRequest{ChunkId: r.ChunkID}
+	return &proto.DownloadChunkRequest{ChunkId: r.ChunkID.String()}
 }
 
 type DownloadReady struct {
@@ -67,11 +76,15 @@ type DownloadReady struct {
 	ChunkHeader ChunkHeader
 }
 
-func DownloadReadyFromProto(pb *proto.DownloadReady) DownloadReady {
+func DownloadReadyFromProto(pb *proto.DownloadReady) (DownloadReady, error) {
+	header, err := ChunkHeaderFromProto(pb.ChunkHeader)
+	if err != nil {
+		return DownloadReady{}, err
+	}
 	return DownloadReady{
 		NodeReady:   NodeReadyFromProto(pb.Ready),
-		ChunkHeader: ChunkHeaderFromProto(pb.ChunkHeader),
-	}
+		ChunkHeader: header,
+	}, nil
 }
 
 func (r DownloadReady) ToProto() *proto.DownloadReady {
@@ -105,15 +118,19 @@ func (r DownloadStreamRequest) ToProto() *proto.DownloadStreamRequest {
 }
 
 type DeleteChunkRequest struct {
-	ChunkID string
+	ChunkID ChunkID
 }
 
-func DeleteChunkRequestFromProto(pb *proto.DeleteChunkRequest) DeleteChunkRequest {
-	return DeleteChunkRequest{ChunkID: pb.ChunkId}
+func DeleteChunkRequestFromProto(pb *proto.DeleteChunkRequest) (DeleteChunkRequest, error) {
+	chunkID, err := NewChunkID(pb.ChunkId)
+	if err != nil {
+		return DeleteChunkRequest{}, err
+	}
+	return DeleteChunkRequest{ChunkID: chunkID}, nil
 }
 
 func (r DeleteChunkRequest) ToProto() *proto.DeleteChunkRequest {
-	return &proto.DeleteChunkRequest{ChunkId: r.ChunkID}
+	return &proto.DeleteChunkRequest{ChunkId: r.ChunkID.String()}
 }
 
 type DeleteChunkResponse struct {
@@ -136,20 +153,28 @@ func (r DeleteChunkResponse) ToProto() *proto.DeleteChunkResponse {
 }
 
 type BulkDeleteChunkRequest struct {
-	ChunkIDs []string
+	ChunkIDs []ChunkID
 	Reason   string
 }
 
 func BulkDeleteChunkRequestFromProto(pb *proto.BulkDeleteChunkRequest) BulkDeleteChunkRequest {
+	chunkIDs := make([]ChunkID, 0, len(pb.ChunkIds))
+	for _, chunkID := range pb.ChunkIds {
+		chunkIDs = append(chunkIDs, ChunkID(chunkID))
+	}
 	return BulkDeleteChunkRequest{
-		ChunkIDs: pb.ChunkIds,
+		ChunkIDs: chunkIDs,
 		Reason:   pb.Reason,
 	}
 }
 
 func (r BulkDeleteChunkRequest) ToProto() *proto.BulkDeleteChunkRequest {
+	chunkIDs := make([]string, 0, len(r.ChunkIDs))
+	for _, chunkID := range r.ChunkIDs {
+		chunkIDs = append(chunkIDs, chunkID.String())
+	}
 	return &proto.BulkDeleteChunkRequest{
-		ChunkIds: r.ChunkIDs,
+		ChunkIds: chunkIDs,
 		Reason:   r.Reason,
 	}
 }
@@ -157,28 +182,36 @@ func (r BulkDeleteChunkRequest) ToProto() *proto.BulkDeleteChunkRequest {
 type BulkDeleteChunkResponse struct {
 	Success bool
 	Message string
-	Failed  []string
+	Failed  []ChunkID
 }
 
 func BulkDeleteChunkResponseFromProto(pb *proto.BulkDeleteChunkResponse) BulkDeleteChunkResponse {
+	chunkIDs := make([]ChunkID, 0, len(pb.Failed))
+	for _, chunkID := range pb.Failed {
+		chunkIDs = append(chunkIDs, ChunkID(chunkID))
+	}
 	return BulkDeleteChunkResponse{
 		Success: pb.Success,
 		Message: pb.Message,
-		Failed:  pb.Failed,
+		Failed:  chunkIDs,
 	}
 }
 
 func (r BulkDeleteChunkResponse) ToProto() *proto.BulkDeleteChunkResponse {
+	chunkIDs := make([]string, 0, len(r.Failed))
+	for _, chunkID := range r.Failed {
+		chunkIDs = append(chunkIDs, chunkID.String())
+	}
 	return &proto.BulkDeleteChunkResponse{
 		Success: r.Success,
 		Message: r.Message,
-		Failed:  r.Failed,
+		Failed:  chunkIDs,
 	}
 }
 
 type ChunkDataStream struct {
 	SessionID       StreamingSessionID
-	ChunkID         string
+	ChunkID         ChunkID
 	Data            []byte
 	Offset          int
 	IsFinal         bool
@@ -188,7 +221,7 @@ type ChunkDataStream struct {
 func ChunkDataStreamFromProto(pb *proto.ChunkDataStream) ChunkDataStream {
 	return ChunkDataStream{
 		SessionID:       StreamingSessionID(pb.SessionId),
-		ChunkID:         pb.ChunkId,
+		ChunkID:         ChunkID(pb.ChunkId), // We don't check on every loop as this is validated in the initial stream request
 		Data:            pb.Data,
 		Offset:          int(pb.Offset),
 		IsFinal:         pb.IsFinal,
@@ -199,7 +232,7 @@ func ChunkDataStreamFromProto(pb *proto.ChunkDataStream) ChunkDataStream {
 func (s ChunkDataStream) ToProto() *proto.ChunkDataStream {
 	return &proto.ChunkDataStream{
 		SessionId:       s.SessionID.String(),
-		ChunkId:         s.ChunkID,
+		ChunkId:         s.ChunkID.String(),
 		Data:            s.Data,
 		Offset:          int64(s.Offset),
 		IsFinal:         s.IsFinal,
@@ -272,14 +305,6 @@ func (r HealthCheckResponse) ToProto() *proto.HealthCheckResponse {
 	return &proto.HealthCheckResponse{Status: r.Status.ToProto()}
 }
 
-type NodeUpdateType int
-
-const (
-	NODE_ADDED NodeUpdateType = iota
-	NODE_REMOVED
-	NODE_UPDATED
-)
-
 type NodeUpdate struct {
 	Version   int64
 	Type      NodeUpdateType
@@ -308,53 +333,46 @@ func (r NodeUpdate) ToProto() *proto.NodeUpdate {
 // Coordinator requests
 // Upload
 type UploadRequest struct {
-	Path      string // Path to upload the file
-	Size      int    // File size in bytes
-	ChunkSize int    // What chunkSize to break it down into
-	Checksum  string // File sha256 checksum
+	Path      FilePath
+	Size      FileSize
+	ChunkSize ChunkSize
+	Checksum  string
 }
 
 func UploadRequestFromProto(pb *proto.UploadRequest) (UploadRequest, error) {
-	uploadRequest := UploadRequest{
-		Path:      pb.Path,
-		Size:      int(pb.Size),
-		ChunkSize: int(pb.ChunkSize),
-		Checksum:  pb.Checksum,
+	filepath, err := NewFilePath(pb.Path)
+	if err != nil {
+		return UploadRequest{}, err
 	}
-	if err := uploadRequest.validate(); err != nil {
-		return UploadRequest{}, fmt.Errorf("%w: %w", ErrValidation, err)
+	filesize, err := NewFileSize(pb.Size)
+	if err != nil {
+		return UploadRequest{}, err
+	}
+	chunksize, err := NewChunkSize(pb.ChunkSize)
+	if err != nil {
+		return UploadRequest{}, err
+	}
+
+	uploadRequest := UploadRequest{
+		Path:      filepath,
+		Size:      filesize,
+		ChunkSize: chunksize,
+		Checksum:  pb.Checksum,
 	}
 	return uploadRequest, nil
 }
 
 func (r *UploadRequest) ToProto() *proto.UploadRequest {
 	return &proto.UploadRequest{
-		Path:      r.Path,
+		Path:      r.Path.String(),
 		Size:      int64(r.Size),
 		ChunkSize: int64(r.ChunkSize),
 		Checksum:  r.Checksum,
 	}
 }
 
-func (r UploadRequest) validate() error {
-	errs := make([]error, 0)
-	if r.ChunkSize < 1*1024*1024 { // 1MB minimun chunksize allowed
-		errs = append(errs, errors.New("chunkSize cannot be lower than 1MB"))
-	}
-	if r.ChunkSize > 128*1024*1024 { // 128MB maximum chunksize allowed
-		errs = append(errs, errors.New("chunksize cannot be larger than 128MB"))
-	}
-	if r.Size <= 0 {
-		errs = append(errs, errors.New("file size must be larger than 0"))
-	}
-	if len(errs) != 0 {
-		return errors.Join(errs...)
-	}
-	return nil
-}
-
 type UploadResponse struct {
-	ChunkIDs  []string
+	ChunkIDs  []ChunkID
 	Nodes     []*NodeInfo
 	SessionID MetadataSessionID
 }
@@ -364,26 +382,31 @@ func UploadResponseFromProto(pb *proto.UploadResponse) UploadResponse {
 	for _, node := range pb.Nodes {
 		nodes = append(nodes, NodeInfoFromProto(node))
 	}
+	chunkIDs := make([]ChunkID, 0, len(pb.ChunkIds))
+	for _, chunkID := range pb.ChunkIds {
+		chunkIDs = append(chunkIDs, ChunkID(chunkID))
+	}
 	return UploadResponse{
-		ChunkIDs:  pb.ChunkIds,
+		ChunkIDs:  chunkIDs,
 		Nodes:     nodes,
 		SessionID: MetadataSessionID(pb.SessionId),
 	}
 }
 
-func (r UploadResponse) ToProto() (*proto.UploadResponse, error) {
-	if err := r.validate(); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrValidation, err)
-	}
+func (r UploadResponse) ToProto() *proto.UploadResponse {
 	protoNodes := make([]*proto.NodeInfo, 0, len(r.Nodes))
 	for _, node := range r.Nodes {
 		protoNodes = append(protoNodes, node.ToProto())
 	}
+	chunkIDs := make([]string, 0, len(r.ChunkIDs))
+	for _, chunkID := range r.ChunkIDs {
+		chunkIDs = append(chunkIDs, chunkID.String())
+	}
 	return &proto.UploadResponse{
-		ChunkIds:  r.ChunkIDs,
+		ChunkIds:  chunkIDs,
 		Nodes:     protoNodes,
 		SessionId: r.SessionID.String(),
-	}, nil
+	}
 }
 
 func (r UploadResponse) validate() error {
@@ -394,7 +417,7 @@ func (r UploadResponse) validate() error {
 	if len(r.ChunkIDs) == 0 {
 		errs = append(errs, fmt.Errorf("no chunks to upload"))
 	}
-	if err := r.SessionID.valid(); err != nil {
+	if err := r.SessionID.validate(); err != nil {
 		errs = append(errs, err)
 	}
 	if len(errs) != 0 {
@@ -405,15 +428,26 @@ func (r UploadResponse) validate() error {
 
 // Download
 type DownloadRequest struct {
-	Path string
+	Path FilePath
 }
 
-func DownloadRequestFromProto(pb *proto.DownloadRequest) DownloadRequest {
-	return DownloadRequest{Path: pb.Path}
+func DownloadRequestFromProto(pb *proto.DownloadRequest) (DownloadRequest, error) {
+	downloadRequest := DownloadRequest{Path: FilePath(pb.Path)}
+	if err := downloadRequest.validate(); err != nil {
+		return DownloadRequest{}, fmt.Errorf("%w: %w", ErrValidation, err)
+	}
+	return downloadRequest, nil
+}
+
+func (r DownloadRequest) validate() error {
+	if err := r.Path.validate(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r DownloadRequest) ToProto() *proto.DownloadRequest {
-	return &proto.DownloadRequest{Path: r.Path}
+	return &proto.DownloadRequest{Path: r.Path.String()}
 }
 
 type DownloadResponse struct {
@@ -422,16 +456,30 @@ type DownloadResponse struct {
 	SessionID      MetadataSessionID
 }
 
-func DownloadResponseFromProto(pb *proto.DownloadResponse) DownloadResponse {
+func DownloadResponseFromProto(pb *proto.DownloadResponse) (DownloadResponse, error) {
 	chunkLocations := make([]ChunkLocation, 0, len(pb.ChunkLocations))
 	for _, chunkLocation := range pb.ChunkLocations {
 		chunkLocations = append(chunkLocations, ChunkLocationFromProto(chunkLocation))
 	}
-	return DownloadResponse{
-		FileInfo:       FileInfoFromProto(pb.FileInfo),
+
+	// Validate
+	errs := make([]error, 0)
+	fileInfo, err := FileInfoFromProto(pb.FileInfo)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) != 0 {
+		return DownloadResponse{}, errors.Join(errs...)
+	}
+
+	// Create and return download response
+	downloadResponse := DownloadResponse{
+		FileInfo:       fileInfo,
 		ChunkLocations: chunkLocations,
 		SessionID:      MetadataSessionID(pb.SessionId),
 	}
+
+	return downloadResponse, nil
 }
 
 func (r DownloadResponse) ToProto() *proto.DownloadResponse {
@@ -439,6 +487,7 @@ func (r DownloadResponse) ToProto() *proto.DownloadResponse {
 	for _, item := range r.ChunkLocations {
 		protoChunkLocations = append(protoChunkLocations, item.ToProto())
 	}
+
 	return &proto.DownloadResponse{
 		FileInfo:       r.FileInfo.ToProto(),
 		ChunkLocations: protoChunkLocations,
@@ -448,15 +497,15 @@ func (r DownloadResponse) ToProto() *proto.DownloadResponse {
 
 // Delete
 type DeleteRequest struct {
-	Path string
+	Path FilePath
 }
 
 func DeleteRequestFromProto(pb *proto.DeleteRequest) DeleteRequest {
-	return DeleteRequest{Path: pb.Path}
+	return DeleteRequest{Path: FilePath(pb.Path)}
 }
 
 func (r DeleteRequest) ToProto() *proto.DeleteRequest {
-	return &proto.DeleteRequest{Path: r.Path}
+	return &proto.DeleteRequest{Path: r.Path.String()}
 }
 
 type DeleteResponse struct {
@@ -483,12 +532,16 @@ type ConfirmUploadRequest struct {
 	ChunkInfos []ChunkInfo
 }
 
-func ConfirmUploadRequestFromProto(pb *proto.ConfirmUploadRequest) ConfirmUploadRequest {
+func ConfirmUploadRequestFromProto(pb *proto.ConfirmUploadRequest) (ConfirmUploadRequest, error) {
 	chunkInfos := make([]ChunkInfo, 0, len(pb.ChunkInfos))
 	for _, chunkInfo := range pb.ChunkInfos {
-		chunkInfos = append(chunkInfos, ChunkInfoFromProto(chunkInfo))
+		chunkinfo, err := ChunkInfoFromProto(chunkInfo)
+		if err != nil {
+			return ConfirmUploadRequest{}, err
+		}
+		chunkInfos = append(chunkInfos, chunkinfo)
 	}
-	return ConfirmUploadRequest{SessionID: MetadataSessionID(pb.SessionId), ChunkInfos: chunkInfos}
+	return ConfirmUploadRequest{SessionID: MetadataSessionID(pb.SessionId), ChunkInfos: chunkInfos}, nil
 }
 
 func (r ConfirmUploadRequest) ToProto() *proto.ConfirmUploadRequest {
@@ -514,32 +567,31 @@ func (r ConfirmUploadResponse) ToProto() *proto.ConfirmUploadResponse {
 
 // List
 type ListRequest struct {
-	Directory string
+	Directory FilePath
 }
 
 func ListRequestFromProto(pb *proto.ListRequest) ListRequest {
-	directory := pb.Directory
-	if directory == "" {
-		directory = "/"
-	}
-	return ListRequest{Directory: directory}
+	return ListRequest{Directory: FilePath(pb.Directory)}
 }
 
 func (r ListRequest) ToProto() *proto.ListRequest {
-	return &proto.ListRequest{Directory: r.Directory}
+	return &proto.ListRequest{Directory: r.Directory.String()}
 }
 
 type ListResponse struct {
 	Files []*FileInfo
 }
 
-func ListResponseFromProto(pb *proto.ListResponse) ListResponse {
+func ListResponseFromProto(pb *proto.ListResponse) (ListResponse, error) {
 	files := make([]*FileInfo, 0, len(pb.Files))
 	for _, file := range pb.Files {
-		info := FileInfoFromProto(file)
+		info, err := FileInfoFromProto(file)
+		if err != nil {
+			return ListResponse{}, err
+		}
 		files = append(files, &info)
 	}
-	return ListResponse{Files: files}
+	return ListResponse{Files: files}, nil
 }
 
 func (lr ListResponse) ToProto() *proto.ListResponse {
@@ -700,7 +752,7 @@ func (r ListNodesResponse) ToProto() *proto.ListNodesResponse {
 
 // ChunkLocation represents where some chunk should be stored (primary node + endpoint)
 type ChunkLocation struct {
-	ChunkID string
+	ChunkID ChunkID
 	Nodes   []*NodeInfo
 }
 
@@ -709,8 +761,12 @@ func ChunkLocationFromProto(pb *proto.ChunkLocation) ChunkLocation {
 	for _, node := range pb.Nodes {
 		nodes = append(nodes, NodeInfoFromProto(node))
 	}
+	id, err := NewChunkID(pb.ChunkId)
+	if err != nil {
+		return ChunkLocation{}
+	}
 	return ChunkLocation{
-		ChunkID: pb.ChunkId,
+		ChunkID: id,
 		Nodes:   nodes,
 	}
 }
@@ -721,7 +777,7 @@ func (l *ChunkLocation) ToProto() *proto.ChunkLocation {
 		nodes = append(nodes, node.ToProto())
 	}
 	return &proto.ChunkLocation{
-		ChunkId: l.ChunkID,
+		ChunkId: l.ChunkID.String(),
 		Nodes:   nodes,
 	}
 }

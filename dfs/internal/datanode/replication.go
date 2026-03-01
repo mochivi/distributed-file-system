@@ -56,7 +56,7 @@ func NewParalellReplicationService(config config.ParallelReplicationServiceConfi
 func (rm *ParalellReplicationService) Replicate(clientPool client_pool.ClientPool, chunkHeader common.ChunkHeader,
 	data []byte, requiredReplicas int) ([]*common.NodeInfo, error) {
 
-	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", chunkHeader.ID))
+	logger := logging.OperationLogger(rm.logger, "send_replicate_chunk", slog.String("chunk_id", chunkHeader.ID.String()))
 
 	// Early validation
 	if clientPool.Len() < requiredReplicas {

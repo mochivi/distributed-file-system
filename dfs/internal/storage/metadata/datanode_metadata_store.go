@@ -18,23 +18,23 @@ func NewDatanodeMetadataStore(coordinator clients.ICoordinatorClient) *DatanodeM
 	return &DatanodeMetadataStore{coordinator: coordinator}
 }
 
-func (m *DatanodeMetadataStore) PutFile(ctx context.Context, path string, info *common.FileInfo) error {
+func (m *DatanodeMetadataStore) PutFile(ctx context.Context, path common.FilePath, info *common.FileInfo) error {
 	return nil
 }
 
-func (m *DatanodeMetadataStore) GetFile(ctx context.Context, path string) (*common.FileInfo, error) {
+func (m *DatanodeMetadataStore) GetFile(ctx context.Context, path common.FilePath) (*common.FileInfo, error) {
 	return nil, nil
 }
 
-func (m *DatanodeMetadataStore) DeleteFile(ctx context.Context, path string) error {
+func (m *DatanodeMetadataStore) DeleteFile(ctx context.Context, path common.FilePath) error {
 	return nil
 }
 
-func (m *DatanodeMetadataStore) ListFiles(ctx context.Context, directory string, recursive bool) ([]*common.FileInfo, error) {
+func (m *DatanodeMetadataStore) ListFiles(ctx context.Context, directory common.FilePath, recursive bool) ([]*common.FileInfo, error) {
 	return nil, nil
 }
 
-func (m *DatanodeMetadataStore) GetChunksForNode(ctx context.Context, nodeID string) (map[string]*common.ChunkHeader, error) {
+func (m *DatanodeMetadataStore) GetChunksForNode(ctx context.Context, nodeID string) (map[common.ChunkID]*common.ChunkHeader, error) {
 	return nil, nil
 }
 

@@ -28,7 +28,7 @@ type DownloaderConfig struct {
 }
 
 type downloadWork struct {
-	chunkID    string
+	chunkID    common.ChunkID
 	clientPool client_pool.ClientPool
 }
 
@@ -131,7 +131,9 @@ func (d *Downloader) processWork(work downloadWork, downloadCtx *downloadContext
 		downloadChunkResponse := response.(common.DownloadReady) // should panic if fails anyway
 
 		if err := d.downloadChunk(downloadCtx, client, downloadChunkResponse.ChunkHeader, downloadChunkResponse.SessionID); err != nil {
-			downloadCtx.logger.Error("Failed to download chunk", slog.String("chunk_id", downloadChunkResponse.ChunkHeader.ID), slog.String("error", err.Error()))
+			downloadCtx.logger.Error("Failed to download chunk",
+				slog.String(common.LogChunkID, downloadChunkResponse.ChunkHeader.ID.String()),
+				slog.String(common.LogError, err.Error()))
 			continue
 		}
 		return nil
@@ -183,7 +185,7 @@ func (d *Downloader) queueWork(downloadCtx *downloadContext) error {
 		}
 
 		if len(location.Nodes) == 0 {
-			downloadCtx.logger.Error("No nodes available for chunk", slog.String("chunk_id", location.ChunkID))
+			downloadCtx.logger.Error("No nodes available for chunk", slog.String(common.LogChunkID, location.ChunkID.String()))
 			return fmt.Errorf("no nodes available for chunk %s", location.ChunkID)
 		}
 

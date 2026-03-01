@@ -14,7 +14,7 @@ import (
 )
 
 type MetadataSessionManager interface {
-	trackUpload(sessionID common.MetadataSessionID, req common.UploadRequest, chunkIDs []string)
+	trackUpload(sessionID common.MetadataSessionID, req common.UploadRequest, chunkIDs []common.ChunkID)
 	commit(ctx context.Context, sessionID common.MetadataSessionID, chunkInfos []common.ChunkInfo, metaStore metadata.MetadataStore) error
 }
 
@@ -49,14 +49,13 @@ func newMetadataUploadSession(sessionID common.MetadataSessionID, exp time.Durat
 	}
 }
 
-func (m *metadataSessionManager) trackUpload(sessionID common.MetadataSessionID, req common.UploadRequest, chunkIDs []string) {
+func (m *metadataSessionManager) trackUpload(sessionID common.MetadataSessionID, req common.UploadRequest, chunkIDs []common.ChunkID) {
 	// Create chunk info array
 	chunkInfos := make([]common.ChunkInfo, len(chunkIDs))
 	for i := range chunkIDs {
-		chunkID := chunkIDs[i]
 		chunkInfos[i] = common.ChunkInfo{
 			Header: common.ChunkHeader{
-				ID:       chunkID,
+				ID:       chunkIDs[i],
 				Size:     0,  // Will be updated when chunk is stored
 				Checksum: "", // Will be updated when chunk is stored
 			},
@@ -67,13 +66,13 @@ func (m *metadataSessionManager) trackUpload(sessionID common.MetadataSessionID,
 	fileInfo := &common.FileInfo{
 		Path:       req.Path,
 		Size:       req.Size,
-		ChunkCount: len(chunkIDs),
+		ChunkCount: common.ChunkCount(len(chunkInfos)),
 		Chunks:     chunkInfos,
 		CreatedAt:  time.Now(),
 		Checksum:   req.Checksum,
 	}
 	m.logger.Info("Tracking upload session", slog.String(common.LogMetadataSessionID, sessionID.String()),
-		slog.String(common.LogFilePath, req.Path), slog.Int(common.LogNumChunks, len(chunkIDs)))
+		slog.String(common.LogFilePath, req.Path.String()), slog.Int(common.LogNumChunks, len(chunkIDs)))
 
 	m.mu.Lock()
 	m.sessions[sessionID.String()] = newMetadataUploadSession(sessionID, m.commitTimeout, fileInfo)
@@ -99,7 +98,7 @@ func (m *metadataSessionManager) commit(ctx context.Context, sessionID common.Me
 	fileInfo := session.fileInfo
 	fileInfo.Chunks = chunkInfos
 
-	m.logger.Info("Committing metadata for file", slog.String(common.LogFilePath, fileInfo.Path),
+	m.logger.Info("Committing metadata for file", slog.String(common.LogFilePath, fileInfo.Path.String()),
 		slog.Int(common.LogNumChunks, len(chunkInfos)))
 	if err := metaStore.PutFile(ctx, fileInfo.Path, fileInfo); err != nil {
 		return fmt.Errorf("failed to store file metadata: %w", err)

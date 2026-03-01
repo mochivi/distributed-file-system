@@ -74,7 +74,11 @@ func (c *DataNodeClient) PrepareChunkDownload(ctx context.Context, req common.Do
 		err = handlegRPCError(err, req.ChunkID)
 		return common.DownloadReady{}, err
 	}
-	return common.DownloadReadyFromProto(resp), nil
+	downloadReady, err := common.DownloadReadyFromProto(resp)
+	if err != nil {
+		return common.DownloadReady{}, err
+	}
+	return downloadReady, nil
 }
 
 // client -> node

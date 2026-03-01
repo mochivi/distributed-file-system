@@ -20,10 +20,10 @@ func (m *MockMetadataScanner) GetDeletedFiles(ctx context.Context, olderThan tim
 	return args.Get(0).([]*common.FileInfo), args.Error(1)
 }
 
-func (m *MockMetadataScanner) GetChunksForNode(ctx context.Context, nodeID string) (map[string]*common.ChunkHeader, error) {
+func (m *MockMetadataScanner) GetChunksForNode(ctx context.Context, nodeID string) (map[common.ChunkID]*common.ChunkHeader, error) {
 	args := m.Called(ctx, nodeID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(map[string]*common.ChunkHeader), args.Error(1)
+	return args.Get(0).(map[common.ChunkID]*common.ChunkHeader), args.Error(1)
 }

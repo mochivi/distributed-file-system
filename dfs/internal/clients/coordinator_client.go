@@ -68,7 +68,11 @@ func (c *CoordinatorClient) DownloadFile(ctx context.Context, req common.Downloa
 	if err != nil {
 		return common.DownloadResponse{}, err
 	}
-	return common.DownloadResponseFromProto(resp), nil
+	downloadResponse, err := common.DownloadResponseFromProto(resp)
+	if err != nil {
+		return common.DownloadResponse{}, err
+	}
+	return downloadResponse, nil
 }
 
 func (c *CoordinatorClient) DeleteFile(ctx context.Context, req common.DeleteRequest, opts ...grpc.CallOption) (common.DeleteResponse, error) {
@@ -92,7 +96,11 @@ func (c *CoordinatorClient) ListFiles(ctx context.Context, req common.ListReques
 	if err != nil {
 		return common.ListResponse{}, err
 	}
-	return common.ListResponseFromProto(resp), nil
+	listResponse, err := common.ListResponseFromProto(resp)
+	if err != nil {
+		return common.ListResponse{}, err
+	}
+	return listResponse, nil
 }
 
 func (c *CoordinatorClient) RegisterDataNode(ctx context.Context, req common.RegisterDataNodeRequest, opts ...grpc.CallOption) (common.RegisterDataNodeResponse, error) {

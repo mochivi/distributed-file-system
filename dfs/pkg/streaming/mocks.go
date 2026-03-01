@@ -105,12 +105,12 @@ func (m *MockStreamingSessionManager) Delete(sessionID common.StreamingSessionID
 	m.Called(sessionID)
 }
 
-func (m *MockStreamingSessionManager) ExistsForChunk(chunkID string) bool {
+func (m *MockStreamingSessionManager) ExistsForChunk(chunkID common.ChunkID) bool {
 	args := m.Called(chunkID)
 	return args.Bool(0)
 }
 
-func (m *MockStreamingSessionManager) LoadByChunk(chunkID string) (*streamingSession, error) {
+func (m *MockStreamingSessionManager) LoadByChunk(chunkID common.ChunkID) (*streamingSession, error) {
 	args := m.Called(chunkID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

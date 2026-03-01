@@ -32,7 +32,7 @@ type StreamingError struct {
 	Op        string                    // Operation that failed
 	Err       error                     // Underlying error
 	SessionID common.StreamingSessionID // Context
-	ChunkID   string                    // Context
+	ChunkID   common.ChunkID            // Context
 	Offset    int64                     // Context for streaming
 }
 
@@ -49,7 +49,7 @@ func (e *StreamingError) Unwrap() error {
 }
 
 // Helper constructors for common error scenarios
-func NewChunkFrameReadError(sessionID common.StreamingSessionID, chunkID string, offset int64, err error) *StreamingError {
+func NewChunkFrameReadError(sessionID common.StreamingSessionID, chunkID common.ChunkID, offset int64, err error) *StreamingError {
 	return &StreamingError{
 		Op:        "chunk_frame_read",
 		Err:       fmt.Errorf("%w: %v", ErrFrameReadFailed, err),
@@ -59,7 +59,7 @@ func NewChunkFrameReadError(sessionID common.StreamingSessionID, chunkID string,
 	}
 }
 
-func NewChunkFrameWriteError(sessionID common.StreamingSessionID, chunkID string, offset int, err error) *StreamingError {
+func NewChunkFrameWriteError(sessionID common.StreamingSessionID, chunkID common.ChunkID, offset int, err error) *StreamingError {
 	return &StreamingError{
 		Op:        "chunk_frame_write",
 		Err:       fmt.Errorf("%w: %v", ErrFrameWriteFailed, err),
@@ -69,7 +69,7 @@ func NewChunkFrameWriteError(sessionID common.StreamingSessionID, chunkID string
 	}
 }
 
-func NewStreamSendError(sessionID common.StreamingSessionID, chunkID string, offset int64, err error) *StreamingError {
+func NewStreamSendError(sessionID common.StreamingSessionID, chunkID common.ChunkID, offset int64, err error) *StreamingError {
 	return &StreamingError{
 		Op:        "stream_send",
 		Err:       fmt.Errorf("%w: %v", ErrStreamSendFailed, err),
@@ -79,7 +79,7 @@ func NewStreamSendError(sessionID common.StreamingSessionID, chunkID string, off
 	}
 }
 
-func NewStreamReceiveError(sessionID common.StreamingSessionID, offset int, err error) *StreamingError {
+func NewStreamReceiveError(sessionID common.StreamingSessionID, chunkID common.ChunkID, offset int, err error) *StreamingError {
 	return &StreamingError{
 		Op:        "stream_receive",
 		Err:       fmt.Errorf("%w: %v", ErrStreamReceiveFailed, err),

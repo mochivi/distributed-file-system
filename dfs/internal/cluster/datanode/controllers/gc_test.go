@@ -18,46 +18,46 @@ import (
 func TestFindOrphanedChunks(t *testing.T) {
 	tests := []struct {
 		name           string
-		expectedChunks map[string]*common.ChunkHeader
-		actualChunks   map[string]common.ChunkHeader
-		expectedOrphan []string
+		expectedChunks map[common.ChunkID]*common.ChunkHeader
+		actualChunks   map[common.ChunkID]common.ChunkHeader
+		expectedOrphan []common.ChunkID
 	}{
 		{
 			name: "no-orphans",
-			expectedChunks: map[string]*common.ChunkHeader{
+			expectedChunks: map[common.ChunkID]*common.ChunkHeader{
 				"chunk-1": {ID: "chunk-1"},
 				"chunk-2": {ID: "chunk-2"},
 			},
-			actualChunks: map[string]common.ChunkHeader{
+			actualChunks: map[common.ChunkID]common.ChunkHeader{
 				"chunk-1": {ID: "chunk-1"},
 				"chunk-2": {ID: "chunk-2"},
 			},
-			expectedOrphan: []string{},
+			expectedOrphan: []common.ChunkID{},
 		},
 		{
 			name: "some-orphans",
-			expectedChunks: map[string]*common.ChunkHeader{
+			expectedChunks: map[common.ChunkID]*common.ChunkHeader{
 				"chunk-1": {ID: "chunk-1"},
 			},
-			actualChunks: map[string]common.ChunkHeader{
+			actualChunks: map[common.ChunkID]common.ChunkHeader{
 				"chunk-1": {ID: "chunk-1"},
 				"chunk-3": {ID: "chunk-3"},
 			},
-			expectedOrphan: []string{"chunk-3"},
+			expectedOrphan: []common.ChunkID{"chunk-3"},
 		},
 		{
 			name:           "all-orphans",
-			expectedChunks: map[string]*common.ChunkHeader{},
-			actualChunks: map[string]common.ChunkHeader{
+			expectedChunks: map[common.ChunkID]*common.ChunkHeader{},
+			actualChunks: map[common.ChunkID]common.ChunkHeader{
 				"chunk-1": {ID: "chunk-1"},
 			},
-			expectedOrphan: []string{"chunk-1"},
+			expectedOrphan: []common.ChunkID{"chunk-1"},
 		},
 		{
 			name:           "empty-actual",
-			expectedChunks: map[string]*common.ChunkHeader{"chunk-1": {ID: "chunk-1"}},
-			actualChunks:   map[string]common.ChunkHeader{},
-			expectedOrphan: []string{},
+			expectedChunks: map[common.ChunkID]*common.ChunkHeader{"chunk-1": {ID: "chunk-1"}},
+			actualChunks:   map[common.ChunkID]common.ChunkHeader{},
+			expectedOrphan: []common.ChunkID{},
 		},
 	}
 
@@ -71,8 +71,8 @@ func TestFindOrphanedChunks(t *testing.T) {
 
 func TestGetChunks(t *testing.T) {
 	sampleHeader := common.ChunkHeader{ID: "chunk1"}
-	expected := map[string]*common.ChunkHeader{"chunk1": &sampleHeader}
-	actual := map[string]common.ChunkHeader{"chunk1": sampleHeader}
+	expected := map[common.ChunkID]*common.ChunkHeader{"chunk1": &sampleHeader}
+	actual := map[common.ChunkID]common.ChunkHeader{"chunk1": sampleHeader}
 
 	tests := []struct {
 		name        string
@@ -130,8 +130,8 @@ func TestOrphanedChunksGCController_run(t *testing.T) {
 	header1 := common.ChunkHeader{ID: "chunk-1"}
 	header2 := common.ChunkHeader{ID: "chunk-2"}
 
-	expectedChunks := map[string]*common.ChunkHeader{"chunk-1": &header1}
-	actualChunks := map[string]common.ChunkHeader{"chunk-1": header1, "chunk-2": header2}
+	expectedChunks := map[common.ChunkID]*common.ChunkHeader{"chunk-1": &header1}
+	actualChunks := map[common.ChunkID]common.ChunkHeader{"chunk-1": header1, "chunk-2": header2}
 
 	cfg := config.DefaultOrphanedChunksGCControllerConfig()
 	logger := logging.NewTestLogger(slog.LevelError, true)
@@ -149,7 +149,7 @@ func TestOrphanedChunksGCController_run(t *testing.T) {
 				scanner.On("GetChunksForNode", mock.Anything, "node-1").Return(expectedChunks, nil).Once()
 				store.On("GetHeaders", mock.Anything).Return(actualChunks, nil).Once()
 				// Expect BulkDelete called with orphaned ["chunk-2"]
-				store.On("BulkDelete", mock.Anything, cfg.MaxConcurrentDeletes, []string{"chunk-2"}).Return([]string{}, nil).Once()
+				store.On("BulkDelete", mock.Anything, cfg.MaxConcurrentDeletes, []common.ChunkID{"chunk-2"}).Return([]common.ChunkID{}, nil).Once()
 			},
 			expectedErr:  nil,
 			expectedFail: []string{},

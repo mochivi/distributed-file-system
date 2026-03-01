@@ -71,9 +71,9 @@ func (c *OrphanedChunksGCController) Run() error {
 	}
 }
 
-func handleFailed(failed []string) {}
+func handleFailed(failed []common.ChunkID) {}
 
-func (c *OrphanedChunksGCController) run(ctx context.Context) ([]string, error) {
+func (c *OrphanedChunksGCController) run(ctx context.Context) ([]common.ChunkID, error) {
 	if c.running {
 		c.logger.Error("Tried to start GC cycle while already running")
 		return nil, nil
@@ -100,11 +100,11 @@ func (c *OrphanedChunksGCController) run(ctx context.Context) ([]string, error) 
 }
 
 func getChunks(ctx context.Context, nodeID string, scanner shared.MetadataScannerProvider,
-	store chunk.ChunkStorage) (map[string]*common.ChunkHeader, map[string]common.ChunkHeader, error) {
+	store chunk.ChunkStorage) (map[common.ChunkID]*common.ChunkHeader, map[common.ChunkID]common.ChunkHeader, error) {
 
 	g, ctx := errgroup.WithContext(ctx)
-	var actualChunks map[string]common.ChunkHeader
-	var expectedChunks map[string]*common.ChunkHeader
+	var actualChunks map[common.ChunkID]common.ChunkHeader
+	var expectedChunks map[common.ChunkID]*common.ChunkHeader
 
 	// Run metadata scanner to retrieve chunks for node from metadata store
 	g.Go(func() error {
@@ -139,10 +139,10 @@ func getChunks(ctx context.Context, nodeID string, scanner shared.MetadataScanne
 	return expectedChunks, actualChunks, nil
 }
 
-func findOrphanedChunks(expectedChunks map[string]*common.ChunkHeader,
-	actualChunks map[string]common.ChunkHeader) []string {
+func findOrphanedChunks(expectedChunks map[common.ChunkID]*common.ChunkHeader,
+	actualChunks map[common.ChunkID]common.ChunkHeader) []common.ChunkID {
 
-	orphaned := make([]string, 0, len(actualChunks))
+	orphaned := make([]common.ChunkID, 0, len(actualChunks))
 	for id := range actualChunks {
 		if _, ok := expectedChunks[id]; !ok {
 			orphaned = append(orphaned, id)

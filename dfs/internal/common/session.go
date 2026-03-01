@@ -2,6 +2,7 @@ package common
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 )
@@ -13,9 +14,9 @@ type StreamingSessionID string
 func NewStreamingSessionID() StreamingSessionID {
 	return StreamingSessionID(uuid.NewString())
 }
-func (s StreamingSessionID) valid() error {
+func (s StreamingSessionID) validate() error {
 	if s == "" {
-		return ErrInvalidSessionID
+		return fmt.Errorf("%w: session id is required", ErrInvalidSessionID)
 	}
 	return nil
 }
@@ -28,9 +29,9 @@ type MetadataSessionID string
 func NewMetadataSessionID() MetadataSessionID {
 	return MetadataSessionID(uuid.NewString())
 }
-func (s MetadataSessionID) valid() error {
+func (s MetadataSessionID) validate() error {
 	if s == "" {
-		return ErrInvalidSessionID
+		return fmt.Errorf("%w: session id is required", ErrInvalidSessionID)
 	}
 	return nil
 }

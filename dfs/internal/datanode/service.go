@@ -79,7 +79,7 @@ func (s *service) deleteChunk(ctx context.Context, req common.DeleteChunkRequest
 		return common.DeleteChunkResponse{}, fmt.Errorf("failed to check if chunk exists: %w", err)
 	}
 
-	logger.Debug("Deleting chunk", slog.String(common.LogChunkID, req.ChunkID))
+	logger.Debug("Deleting chunk", slog.String(common.LogChunkID, req.ChunkID.String()))
 	if err := s.store.Delete(ctx, req.ChunkID); err != nil {
 		return common.DeleteChunkResponse{}, fmt.Errorf("failed to delete chunk: %w", err)
 	}
@@ -92,7 +92,7 @@ func (s *service) bulkDeleteChunk(ctx context.Context, req common.BulkDeleteChun
 	logger := logging.FromContext(ctx)
 
 	type result struct {
-		chunkID string
+		chunkID common.ChunkID
 		success bool
 		err     error
 	}
@@ -142,7 +142,7 @@ func (s *service) bulkDeleteChunk(ctx context.Context, req common.BulkDeleteChun
 	}()
 
 	// Collect results
-	var failures []string
+	var failures []common.ChunkID
 	for res := range results {
 		if !res.success {
 			failures = append(failures, res.chunkID)
@@ -224,7 +224,7 @@ func (s *service) downloadChunkStream(req common.DownloadStreamRequest, stream p
 
 	logger.Debug("Sending chunk frames to peer")
 	reader := bytes.NewReader(chunkData)
-	if err := streaming.SendChunkFrames(reader, req.ChunkStreamSize, session.ChunkHeader.ID, session.SessionID, len(chunkData), stream); err != nil {
+	if err := streaming.SendChunkFrames(reader, req.ChunkStreamSize, session.ChunkHeader.ID.String(), session.SessionID, len(chunkData), stream); err != nil {
 		return fmt.Errorf("failed to send chunk frames: %w", err)
 	}
 	return nil

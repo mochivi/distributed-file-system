@@ -102,7 +102,11 @@ func (s *ProtoSerializer) DeserializeHeader(reader io.Reader) (common.ChunkHeade
 	if err := pb.Unmarshal(headerBytes, headerPB); err != nil {
 		return common.ChunkHeader{}, fmt.Errorf("%w: %w", ErrDeserializeHeader, err)
 	}
-	return common.ChunkHeaderFromProto(headerPB), nil
+	header, err := common.ChunkHeaderFromProto(headerPB)
+	if err != nil {
+		return common.ChunkHeader{}, fmt.Errorf("%w: %w", ErrDeserializeHeader, err)
+	}
+	return header, nil
 }
 
 func (s *ProtoSerializer) HeaderSize(chunkHeader common.ChunkHeader) (int, error) {

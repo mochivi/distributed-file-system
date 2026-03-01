@@ -24,8 +24,11 @@ const (
 // PrepareChunkUpload is received only if the node is a primary receiver, should reply to accept the chunk
 // and create a streaming session for the chunk data stream
 func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.UploadChunkRequest) (*proto.NodeReady, error) {
-	req := common.UploadChunkRequestFromProto(pb)
-	ctx, _ = logging.FromContextWithOperation(ctx, common.OpUpload, slog.String(common.LogChunkID, req.ChunkHeader.ID))
+	req, err := common.UploadChunkRequestFromProto(pb)
+	if err != nil {
+		return nil, apperr.InvalidArgument("Validation error", err)
+	}
+	ctx, _ = logging.FromContextWithOperation(ctx, common.OpUpload, slog.String(common.LogChunkID, req.ChunkHeader.ID.String()))
 
 	resp, err := s.service.prepareChunkUpload(ctx, req)
 	if err != nil {
@@ -39,8 +42,11 @@ func (s *DataNodeServer) PrepareChunkUpload(ctx context.Context, pb *proto.Uploa
 
 // TODO: add a different session for download, as it is not the same as the upload session
 func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.DownloadChunkRequest) (*proto.DownloadReady, error) {
-	req := common.DownloadChunkRequestFromProto(pb)
-	ctx, _ = logging.FromContextWithOperation(ctx, common.OpDownload, slog.String(common.LogChunkID, req.ChunkID))
+	req, err := common.DownloadChunkRequestFromProto(pb)
+	if err != nil {
+		return nil, apperr.InvalidArgument("Validation error", err)
+	}
+	ctx, _ = logging.FromContextWithOperation(ctx, common.OpDownload, slog.String(common.LogChunkID, req.ChunkID.String()))
 
 	resp, err := s.service.prepareChunkDownload(ctx, req)
 	if err != nil {
@@ -56,8 +62,11 @@ func (s *DataNodeServer) PrepareChunkDownload(ctx context.Context, pb *proto.Dow
 }
 
 func (s *DataNodeServer) DeleteChunk(ctx context.Context, pb *proto.DeleteChunkRequest) (*proto.DeleteChunkResponse, error) {
-	req := common.DeleteChunkRequestFromProto(pb)
-	ctx, _ = logging.FromContextWithOperation(ctx, common.OpDelete, slog.String(common.LogChunkID, req.ChunkID))
+	req, err := common.DeleteChunkRequestFromProto(pb)
+	if err != nil {
+		return nil, apperr.InvalidArgument("Validation error", err)
+	}
+	ctx, _ = logging.FromContextWithOperation(ctx, common.OpDelete, slog.String(common.LogChunkID, req.ChunkID.String()))
 
 	resp, err := s.service.deleteChunk(ctx, req)
 	if err != nil {

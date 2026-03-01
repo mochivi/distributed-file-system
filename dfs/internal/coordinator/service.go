@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
-	"github.com/mochivi/distributed-file-system/internal/storage/chunk"
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
@@ -15,7 +14,7 @@ func (s *service) uploadFile(ctx context.Context, req common.UploadRequest) (com
 	logger := logging.FromContext(ctx)
 
 	// Calculate number of chunks needed
-	numChunks := (req.Size + req.ChunkSize - 1) / req.ChunkSize
+	numChunks := (int(req.Size) + int(req.ChunkSize) - 1) / int(req.ChunkSize)
 	logger = logging.ExtendLogger(logger, slog.Int(common.LogNumChunks, numChunks))
 
 	// Select some nodes for the client to upload to
@@ -24,8 +23,8 @@ func (s *service) uploadFile(ctx context.Context, req common.UploadRequest) (com
 		return common.UploadResponse{}, err
 	}
 
-	chunkPrefix := chunk.HashFilepath(req.Path)
-	chunkIDs := chunk.FormatChunkIDs(chunkPrefix, numChunks)
+	chunkPrefix := common.HashFilepath(req.Path.String())
+	chunkIDs := common.FormatChunkIDs(chunkPrefix, numChunks)
 
 	// Create metadata commit session for the upload
 	sessionID := common.NewMetadataSessionID()
@@ -55,8 +54,8 @@ func (s *service) downloadFile(ctx context.Context, req common.DownloadRequest) 
 	for i, chunk := range fileInfo.Chunks {
 		nodes, err := s.clusterStateHistoryManager.GetAvailableNodesForChunk(chunk.Replicas)
 		if err != nil {
-			logger.Error("Failed to get available node for chunk", slog.String(common.LogChunkID, chunk.Header.ID), slog.String(common.LogError, err.Error()))
-			return common.DownloadResponse{}, fmt.Errorf("failed to get available nodes for chunk %s: %w", chunk.Header.ID, err)
+			logger.Error("Failed to get available node for chunk", slog.String(common.LogChunkID, chunk.Header.ID.String()), slog.String(common.LogError, err.Error()))
+			return common.DownloadResponse{}, fmt.Errorf("failed to get available nodes for chunk %s: %w", chunk.Header.ID.String(), err)
 		}
 
 		chunkLocations[i] = common.ChunkLocation{

@@ -44,7 +44,7 @@ func setupSampleMetadata(nNodes int, metadata [][][]string) (map[string]*common.
 		chunks := make([]common.ChunkInfo, 0, chunkCount)
 		fileReplicas := metadata[fileNum]
 
-		fileInfo := &common.FileInfo{Deleted: true, ChunkCount: chunkCount, Chunks: chunks}
+		fileInfo := &common.FileInfo{Deleted: true, ChunkCount: common.ChunkCount(chunkCount), Chunks: chunks}
 
 		for chunkNum := range chunkCount {
 			// Create the replicas slice
@@ -58,7 +58,7 @@ func setupSampleMetadata(nNodes int, metadata [][][]string) (map[string]*common.
 			// Create the chunk representation
 			chunk := common.ChunkInfo{
 				Header: common.ChunkHeader{
-					ID: fmt.Sprintf("f%d-c%d", fileNum, chunkNum),
+					ID: common.ChunkID(fmt.Sprintf("f%d-c%d", fileNum, chunkNum)),
 				},
 				Replicas: chunkReplicas,
 			}

@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/mochivi/distributed-file-system/internal/common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 // Custom error types for better error handling
 type ChunkError struct {
-	ChunkID string
+	ChunkID common.ChunkID
 	Code    codes.Code
 	Message string
 	Err     error
@@ -26,7 +27,7 @@ func (e ChunkError) Unwrap() error {
 
 // Specific error types
 type ChunkNotFoundError struct {
-	ChunkID string
+	ChunkID common.ChunkID
 	Message string
 }
 
@@ -43,7 +44,7 @@ func (e ServerUnavailableError) Error() string {
 }
 
 type RequestTimeoutError struct {
-	ChunkID string
+	ChunkID common.ChunkID
 	Message string
 }
 
@@ -59,7 +60,7 @@ func (e *InternalServerError) Error() string {
 	return fmt.Sprintf("internal server error: %s", e.Message)
 }
 
-func handlegRPCError(err error, chunkID string) error {
+func handlegRPCError(err error, chunkID common.ChunkID) error {
 	if err == nil {
 		return nil
 	}

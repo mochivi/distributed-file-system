@@ -52,6 +52,7 @@ const (
 	LogSuccessCount = "success_count"
 	LogFailureCount = "failure_count"
 	LogNumUpdates   = "num_updates"
+	LogMessage      = "message"
 )
 
 // Component names

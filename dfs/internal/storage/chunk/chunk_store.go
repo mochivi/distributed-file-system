@@ -2,7 +2,6 @@ package chunk
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -10,8 +9,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/mochivi/distributed-file-system/internal/common"
@@ -46,7 +43,7 @@ func (d *ChunkDiskStorage) Store(ctx context.Context, chunkHeader common.ChunkHe
 	}
 
 	_, logger := logging.FromContextWithOperation(ctx, common.OpPutChunk,
-		slog.String(common.LogChunkID, chunkHeader.ID),
+		slog.String(common.LogChunkID, chunkHeader.ID.String()),
 		slog.String(common.LogFilePath, fullPath))
 
 	// Extract the directory path from the full file path
@@ -83,14 +80,14 @@ func (d *ChunkDiskStorage) Store(ctx context.Context, chunkHeader common.ChunkHe
 }
 
 // Get returns the data of a chunk with the header.
-func (d *ChunkDiskStorage) Get(ctx context.Context, chunkID string) (common.ChunkHeader, []byte, error) {
+func (d *ChunkDiskStorage) Get(ctx context.Context, chunkID common.ChunkID) (common.ChunkHeader, []byte, error) {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return common.ChunkHeader{}, nil, err
 	}
 
 	ctx, logger := logging.FromContextWithOperation(ctx, common.OpGetChunk,
-		slog.String(common.LogChunkID, chunkID),
+		slog.String(common.LogChunkID, chunkID.String()),
 		slog.String(common.LogFilePath, fullPath))
 
 	header, err := d.GetHeader(ctx, chunkID)
@@ -108,13 +105,13 @@ func (d *ChunkDiskStorage) Get(ctx context.Context, chunkID string) (common.Chun
 }
 
 // GetData returns the data of a chunk without the header.
-func (d *ChunkDiskStorage) GetData(ctx context.Context, chunkID string) ([]byte, error) {
+func (d *ChunkDiskStorage) GetData(ctx context.Context, chunkID common.ChunkID) ([]byte, error) {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return nil, err
 	}
 	_, logger := logging.FromContextWithOperation(ctx, common.OpGetData,
-		slog.String(common.LogChunkID, chunkID),
+		slog.String(common.LogChunkID, chunkID.String()),
 		slog.String(common.LogFilePath, fullPath))
 
 	file, err := d.fs.Open(fullPath)
@@ -138,13 +135,13 @@ func (d *ChunkDiskStorage) GetData(ctx context.Context, chunkID string) ([]byte,
 }
 
 // GetHeader returns the header of a chunk.
-func (d *ChunkDiskStorage) GetHeader(ctx context.Context, chunkID string) (common.ChunkHeader, error) {
+func (d *ChunkDiskStorage) GetHeader(ctx context.Context, chunkID common.ChunkID) (common.ChunkHeader, error) {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return common.ChunkHeader{}, err
 	}
 	_, logger := logging.FromContextWithOperation(ctx, common.OpGetHeader,
-		slog.String(common.LogChunkID, chunkID),
+		slog.String(common.LogChunkID, chunkID.String()),
 		slog.String(common.LogFilePath, fullPath))
 
 	file, err := d.fs.Open(fullPath)
@@ -167,7 +164,7 @@ func (d *ChunkDiskStorage) GetHeader(ctx context.Context, chunkID string) (commo
 // TODO: implement a worker pool design instead to handle larger loads more effectively
 // TODO: in the future, it would be valuable to return the accumulated errors of corrupted files
 // TODO: or, at least take action for those items in some way
-func (d *ChunkDiskStorage) GetHeaders(ctx context.Context) (map[string]common.ChunkHeader, error) {
+func (d *ChunkDiskStorage) GetHeaders(ctx context.Context) (map[common.ChunkID]common.ChunkHeader, error) {
 	ctx, logger := logging.FromContextWithOperation(ctx, common.OpGetHeaders)
 
 	// Queue work into channel
@@ -232,7 +229,7 @@ func (d *ChunkDiskStorage) GetHeaders(ctx context.Context) (map[string]common.Ch
 	}()
 
 	// Inneficient, would be best to know how many files are stored first and adding capacity
-	headers := make(map[string]common.ChunkHeader, 0)
+	headers := make(map[common.ChunkID]common.ChunkHeader, 0)
 outer:
 	for {
 		select {
@@ -241,7 +238,7 @@ outer:
 				break outer
 			}
 			if res.err != nil {
-				logger.Warn("Corrupted file", slog.String(common.LogChunkID, res.header.ID), slog.String(common.LogError, res.err.Error()))
+				logger.Warn("Corrupted file", slog.String(common.LogChunkID, res.header.ID.String()), slog.String(common.LogError, res.err.Error()))
 				continue // No action on reading errors for now
 			}
 			// This should be fine as there is only one file per chunk ID, so no overwrites
@@ -255,13 +252,13 @@ outer:
 	return headers, nil
 }
 
-func (d *ChunkDiskStorage) Delete(ctx context.Context, chunkID string) error {
+func (d *ChunkDiskStorage) Delete(ctx context.Context, chunkID common.ChunkID) error {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return err
 	}
 	_, logger := logging.FromContextWithOperation(ctx, common.OpDeleteChunk,
-		slog.String(common.LogChunkID, chunkID),
+		slog.String(common.LogChunkID, chunkID.String()),
 		slog.String(common.LogFilePath, fullPath))
 
 	if err := d.fs.Remove(fullPath); err != nil {
@@ -296,7 +293,7 @@ func (d *ChunkDiskStorage) Delete(ctx context.Context, chunkID string) error {
 //
 // TODO: maybe move into a worker pool design, if too many chunks are attemped to be deleted
 // TODO: it could cause a lot of goroutines to just stand around
-func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes int, chunkIDs []string) ([]string, error) {
+func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes int, chunkIDs []common.ChunkID) ([]common.ChunkID, error) {
 	if len(chunkIDs) == 0 {
 		return nil, nil
 	}
@@ -307,7 +304,7 @@ func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes 
 	var wg sync.WaitGroup
 
 	type result struct {
-		id  string
+		id  common.ChunkID
 		err error
 	}
 	resultCh := make(chan result, len(chunkIDs))
@@ -315,7 +312,7 @@ func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes 
 	// Launch all goroutines - not the best
 	for _, chunkID := range chunkIDs {
 		wg.Add(1)
-		go func(id string) {
+		go func(id common.ChunkID) {
 			defer wg.Done()
 
 			// Try to acquire lock or return on context cancellation
@@ -346,8 +343,8 @@ func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes 
 
 	// Process results, use sets for faster lookups
 	// We do not check the context here, as we should return the list of failed/pending chunks
-	failed := make(map[string]bool, 0)
-	deleted := make(map[string]bool, 0)
+	failed := make(map[common.ChunkID]bool, 0)
+	deleted := make(map[common.ChunkID]bool, 0)
 	for res := range resultCh {
 		if res.err != nil {
 			failed[res.id] = true
@@ -370,7 +367,7 @@ func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes 
 	}
 
 	// Convert failed map to slice for return
-	failedSlice := make([]string, 0, len(failed))
+	failedSlice := make([]common.ChunkID, 0, len(failed))
 	for id := range failed {
 		failedSlice = append(failedSlice, id)
 	}
@@ -379,7 +376,7 @@ func (d *ChunkDiskStorage) BulkDelete(ctx context.Context, maxConcurrentDeletes 
 	return failedSlice, fmt.Errorf("failed to delete %d out of %d chunks", len(failed), len(chunkIDs))
 }
 
-func (d *ChunkDiskStorage) Exists(ctx context.Context, chunkID string) error {
+func (d *ChunkDiskStorage) Exists(ctx context.Context, chunkID common.ChunkID) error {
 	fullPath, err := d.getChunkPath(chunkID)
 	if err != nil {
 		return err
@@ -395,16 +392,16 @@ func (d *ChunkDiskStorage) Exists(ctx context.Context, chunkID string) error {
 }
 
 // TODO: results could be cached to avoid re-reading the directory every time if it is called often
-func (d *ChunkDiskStorage) List(ctx context.Context) ([]string, error) {
+func (d *ChunkDiskStorage) List(ctx context.Context) ([]common.ChunkID, error) {
 	_, logger := logging.FromContextWithOperation(ctx, common.OpListChunks)
-	var chunks []string
+	var chunks []common.ChunkID
 
 	err := afero.Walk(d.fs, d.config.RootDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() {
-			chunks = append(chunks, info.Name())
+			chunks = append(chunks, common.ChunkID(info.Name()))
 		}
 		return nil
 	})
@@ -417,41 +414,14 @@ func (d *ChunkDiskStorage) List(ctx context.Context) ([]string, error) {
 	return chunks, nil
 }
 
-// validateChunkID checks if the chunk ID is in the correct format
-func (d *ChunkDiskStorage) validateChunkID(chunkID string) error {
-	parts := strings.Split(chunkID, "_")
-	if len(parts) != 2 {
-		return errors.New("invalid format")
-	}
-
-	// Ensure the first part (path hash) is valid hex and 8 bytes long
-	decoded, err := hex.DecodeString(parts[0])
-	if err != nil {
-		return errors.New("invalid path hash")
-	}
-	if len(decoded) != 8 {
-		return errors.New("invalid path hash length")
-	}
-
-	// Second part should be a number
-	if _, err := strconv.Atoi(parts[1]); err != nil {
-		return errors.New("invalid chunk number")
-	}
-
-	return nil
-}
-
 // getChunkPath generates a nested path from a chunkID to prevent having too many files in a single directory.
 // For example, a chunkID of "f1d2d2f924e9..." will be stored at "<rootDir>/f1/d2/f1d2d2f924e9...".
-func (d *ChunkDiskStorage) getChunkPath(chunkID string) (string, error) {
-	if err := d.validateChunkID(chunkID); err != nil {
-		return "", fmt.Errorf("%w: %s", ErrInvalidChunkID, chunkID)
+func (d *ChunkDiskStorage) getChunkPath(chunkID common.ChunkID) (string, error) {
+	relPath, err := chunkID.GetChunkRelativePath()
+	if err != nil {
+		return "", err
 	}
-
-	// Use the first 4 characters of the path hash to create 2 levels of directories
-	dir1 := chunkID[0:2]
-	dir2 := chunkID[2:4]
-	return filepath.Join(d.config.RootDir, dir1, dir2, chunkID), nil
+	return filepath.Join(d.config.RootDir, relPath), nil
 }
 
 // isDirEmpty checks if a directory is empty.

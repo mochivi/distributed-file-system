@@ -13,40 +13,46 @@ import (
 	"github.com/mochivi/distributed-file-system/pkg/logging"
 )
 
-func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chunksize int) ([]common.ChunkInfo, error) {
-	logger := logging.ExtendLogger(c.logger, slog.String("operation", "upload_file"), slog.String("path", path))
+func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, cs int) ([]common.ChunkInfo, error) {
+	logger := logging.ExtendLogger(c.logger, slog.String(common.LogOperation, common.OpUpload), slog.String(common.LogFilePath, path))
 
 	// Stat the file to get the file info
 	fileInfo, err := file.Stat()
 	if err != nil {
-		logger.Error("Failed to stat file", slog.String("error", err.Error()))
+		logger.Error("Failed to stat file", slog.String(common.LogError, err.Error()))
 		return nil, fmt.Errorf("failed to stat file: %w", err)
+	}
+	chunksize, err := common.NewChunkSize(int64(cs))
+	if err != nil {
+		logger.Error("Failed to create chunk size", slog.String(common.LogError, err.Error()))
+		return nil, fmt.Errorf("failed to create chunk size: %w", err)
 	}
 
 	checksum, err := chunk.CalculateFileChecksum(file)
 	if err != nil {
-		logger.Error("Failed to calculate checksum", slog.String("error", err.Error()))
+		logger.Error("Failed to calculate checksum", slog.String(common.LogError, err.Error()))
 		return nil, fmt.Errorf("failed to calculate checksum")
 	}
 
 	uploadRequest := common.UploadRequest{
-		Path:      filepath.Join(path, fileInfo.Name()),
-		Size:      int(fileInfo.Size()),
+		Path:      common.FilePath(filepath.Join(path, fileInfo.Name())),
+		Size:      common.FileSize(fileInfo.Size()),
 		ChunkSize: chunksize,
 		Checksum:  checksum,
 	}
-	logger.Info("Prepared UploadRequest", slog.Any("upload_request", uploadRequest))
+	logger.Info("Prepared UploadRequest")
 
 	uploadResponse, err := c.coordinatorClient.UploadFile(ctx, uploadRequest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to submit upload request: %w", err)
 	}
-	metadataSessionLogger := logging.ExtendLogger(logger, slog.String("metadata_session_id", uploadResponse.SessionID.String()), slog.String("coordinator_id", c.coordinatorClient.Node().ID))
+	metadataSessionLogger := logging.ExtendLogger(logger, slog.String(common.LogMetadataSessionID, uploadResponse.SessionID.String()),
+		slog.String(common.ComponentCoordinator, c.coordinatorClient.Node().ID))
 	metadataSessionLogger.Info("Received UploadResponse")
 
 	clientPool, err := client_pool.NewRotatingClientPool(uploadResponse.Nodes)
 	if err != nil {
-		logger.Error("Failed to create client pool", slog.String("error", err.Error()))
+		logger.Error("Failed to create client pool", slog.String(common.LogError, err.Error()))
 		return nil, fmt.Errorf("failed to create client pool: %w", err)
 	}
 
@@ -63,12 +69,12 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 	}
 	confirmUploadResponse, err := c.coordinatorClient.ConfirmUpload(ctx, confirmUploadRequest)
 	if err != nil {
-		metadataSessionLogger.Error("Failed to confirm upload", slog.String("error", err.Error()))
+		metadataSessionLogger.Error("Failed to confirm upload", slog.String(common.LogError, err.Error()))
 		return nil, fmt.Errorf("failed to confirm upload: %w", err)
 	}
 
 	if !confirmUploadResponse.Success {
-		metadataSessionLogger.Error("Failed to confirm upload", slog.String("message", confirmUploadResponse.Message))
+		metadataSessionLogger.Error("Failed to confirm upload", slog.String(common.LogMessage, confirmUploadResponse.Message))
 		return nil, fmt.Errorf("failed to confirm upload")
 	}
 
@@ -76,17 +82,23 @@ func (c *Client) UploadFile(ctx context.Context, file *os.File, path string, chu
 }
 
 func (c *Client) DownloadFile(ctx context.Context, path string) (string, error) {
-	logger := logging.ExtendLogger(c.logger, slog.String("operation", "download_file"), slog.String("path", path))
+	logger := logging.ExtendLogger(c.logger, slog.String(common.LogOperation, common.OpDownload), slog.String(common.LogFilePath, path))
 
-	downloadResponse, err := c.coordinatorClient.DownloadFile(ctx, common.DownloadRequest{Path: path})
+	filepath, err := common.NewFilePath(path)
 	if err != nil {
-		logger.Error("Failed to download file", slog.String("error", err.Error()))
-		return "", fmt.Errorf("failed to download file %s: %w", path, err)
+		logger.Error("Failed to create path", slog.String(common.LogError, err.Error()))
+		return "", fmt.Errorf("failed to create path: %w", err)
+	}
+
+	downloadResponse, err := c.coordinatorClient.DownloadFile(ctx, common.DownloadRequest{Path: filepath})
+	if err != nil {
+		logger.Error("Failed to download file", slog.String(common.LogError, err.Error()))
+		return "", fmt.Errorf("failed to download file %s: %w", filepath.String(), err)
 	}
 
 	if downloadResponse.SessionID == "" {
-		logger.Error("No session id returned for download file", slog.String("path", path))
-		return "", fmt.Errorf("no session id returned for download file %s", path)
+		logger.Error("No session id returned for download file", slog.String(common.LogFilePath, filepath.String()))
+		return "", fmt.Errorf("no session id returned for download file %s", filepath.String())
 	}
 
 	// Control all the goroutines and requests we will make
@@ -102,20 +114,25 @@ func (c *Client) DownloadFile(ctx context.Context, path string) (string, error) 
 }
 
 func (c *Client) DeleteFile(ctx context.Context, path string) error {
-	logger := logging.ExtendLogger(c.logger, slog.String("operation", "delete_file"), slog.String("path", path))
+	logger := logging.ExtendLogger(c.logger, slog.String(common.LogOperation, common.OpDelete), slog.String(common.LogFilePath, path))
 
-	deleteResponse, err := c.coordinatorClient.DeleteFile(ctx, common.DeleteRequest{Path: path})
+	filepath, err := common.NewFilePath(path)
 	if err != nil {
-		logger.Error("Failed to delete file", slog.String("error", err.Error()))
+		logger.Error("Failed to create path", slog.String(common.LogError, err.Error()))
+		return fmt.Errorf("failed to create path: %w", err)
+	}
+	deleteResponse, err := c.coordinatorClient.DeleteFile(ctx, common.DeleteRequest{Path: filepath})
+	if err != nil {
+		logger.Error("Failed to delete file", slog.String(common.LogError, err.Error()))
 		return fmt.Errorf("failed to delete file %s: %w", path, err)
 	}
 
 	if !deleteResponse.Success {
-		logger.Error("Failed to delete file", slog.String("message", deleteResponse.Message))
+		logger.Error("Failed to delete file", slog.String(common.LogMessage, deleteResponse.Message))
 		return fmt.Errorf("failed to delete file %s", path)
 	}
 
-	logger.Info("File deleted successfully", slog.String("path", path))
+	logger.Info("File deleted successfully", slog.String(common.LogFilePath, path))
 
 	return nil
 }

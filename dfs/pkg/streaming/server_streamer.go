@@ -18,7 +18,7 @@ func (s *serverStreamer) HandleFirstChunkFrame(stream grpc.BidiStreamingServer[p
 		if errors.Is(err, io.EOF) {
 			return nil, err
 		}
-		return nil, NewStreamReceiveError("", 0, err)
+		return nil, NewStreamReceiveError(common.StreamingSessionID(""), common.ChunkID(0), err)
 	}
 
 	chunk := common.ChunkDataStreamFromProto(chunkpb)

@@ -78,7 +78,7 @@ func (sm *streamingSessionManager) Delete(sessionID common.StreamingSessionID) {
 }
 
 // Temporary solution to check if a chunk is already being streamed, stops duplicate requests
-func (sm *streamingSessionManager) ExistsForChunk(chunkID string) bool {
+func (sm *streamingSessionManager) ExistsForChunk(chunkID common.ChunkID) bool {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	for _, session := range sm.sessions {
@@ -89,7 +89,7 @@ func (sm *streamingSessionManager) ExistsForChunk(chunkID string) bool {
 	return false
 }
 
-func (sm *streamingSessionManager) LoadByChunk(chunkID string) (*streamingSession, error) {
+func (sm *streamingSessionManager) LoadByChunk(chunkID common.ChunkID) (*streamingSession, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 

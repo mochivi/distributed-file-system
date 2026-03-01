@@ -39,8 +39,8 @@ func NewUploader(streamer streaming.ClientStreamer, logger *slog.Logger, config 
 	}
 }
 
-func (u *Uploader) UploadFile(ctx context.Context, reader io.ReadCloser, clientPool client_pool.ClientPool, chunkIDs []string,
-	logger *slog.Logger, chunksize int) ([]common.ChunkInfo, error) {
+func (u *Uploader) UploadFile(ctx context.Context, reader io.ReadCloser, clientPool client_pool.ClientPool, chunkIDs []common.ChunkID,
+	logger *slog.Logger, chunksize common.ChunkSize) ([]common.ChunkInfo, error) {
 	defer clientPool.Close()
 
 	// UploadContext is shared by all workers and is used to coordinate the upload process
@@ -93,7 +93,7 @@ func (u *Uploader) waitForCompletion(uploadCtx *uploadContext) error {
 }
 
 // Reads file and queue work
-func (u *Uploader) QueueWork(uploadCtx *uploadContext, reader io.ReadCloser, chunksize int) error {
+func (u *Uploader) QueueWork(uploadCtx *uploadContext, reader io.ReadCloser, chunksize common.ChunkSize) error {
 	defer close(uploadCtx.workChan)
 	defer reader.Close()
 
@@ -117,7 +117,7 @@ func (u *Uploader) QueueWork(uploadCtx *uploadContext, reader io.ReadCloser, chu
 	return nil
 }
 
-func makeChunk(reader io.Reader, chunkID string, index int, chunksize int) (common.ChunkHeader, []byte, error) {
+func makeChunk(reader io.Reader, chunkID common.ChunkID, index int, chunksize common.ChunkSize) (common.ChunkHeader, []byte, error) {
 	chunkData := make([]byte, chunksize)
 	n, err := reader.Read(chunkData)
 	if err != nil && err != io.EOF {
@@ -129,7 +129,7 @@ func makeChunk(reader io.Reader, chunkID string, index int, chunksize int) (comm
 	chunkHeader := common.ChunkHeader{ // TODO: version is not needed as it only might impact the chunk storage mechanism, defined by datanode when chunk is received
 		ID:       chunkID,
 		Index:    index,
-		Size:     int64(len(chunkData)),
+		Size:     common.FileSize(len(chunkData)),
 		Checksum: checksum,
 	}
 
@@ -137,7 +137,7 @@ func makeChunk(reader io.Reader, chunkID string, index int, chunksize int) (comm
 }
 
 func (u *Uploader) processWork(work UploaderWork, clientPool client_pool.ClientPool, uploadCtx *uploadContext) error {
-	workLogger := logging.OperationLogger(uploadCtx.logger, "upload_chunk", slog.String("chunk_id", work.chunkHeader.ID))
+	workLogger := logging.OperationLogger(uploadCtx.logger, common.OpUpload, slog.String(common.LogChunkID, work.chunkHeader.ID.String()))
 
 	retryCount := 0
 	var replicatedNodes []*common.NodeInfo
@@ -182,7 +182,7 @@ func (u *Uploader) processWork(work UploaderWork, clientPool client_pool.ClientP
 func (u *Uploader) uploadChunk(work UploaderWork, client clients.IDataNodeClient, sessionID common.StreamingSessionID,
 	uploadCtx *uploadContext) ([]*common.NodeInfo, error) {
 
-	workLogger := logging.OperationLogger(uploadCtx.logger, "upload_chunk", slog.String("chunk_id", work.chunkHeader.ID))
+	workLogger := logging.OperationLogger(uploadCtx.logger, common.OpUpload, slog.String(common.LogChunkID, work.chunkHeader.ID.String()))
 	workLogger.Info("Streaming chunk")
 
 	stream, err := client.UploadChunkStream(uploadCtx.ctx)
@@ -203,7 +203,7 @@ func (u *Uploader) uploadChunk(work UploaderWork, client clients.IDataNodeClient
 		return nil, fmt.Errorf("failed to stream chunk %s: %w", work.chunkHeader.ID, err)
 	}
 	if replicatedNodes == nil {
-		workLogger.Error("Datanode failed to replicate chunk", slog.String("chunk_id", work.chunkHeader.ID))
+		workLogger.Error("Datanode failed to replicate chunk", slog.String(common.LogChunkID, work.chunkHeader.ID.String()))
 		return nil, fmt.Errorf("datanode failed to replicate chunk %s", work.chunkHeader.ID)
 	}
 

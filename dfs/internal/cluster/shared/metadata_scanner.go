@@ -23,7 +23,7 @@ type MetadataScannerProvider interface {
 
 	// Used by the datanode OrphanedChunksGC
 	// MetadataScannerProvider retrieves all ChunkIDs that the datanode should be storing
-	GetChunksForNode(ctx context.Context, nodeID string) (map[string]*common.ChunkHeader, error)
+	GetChunksForNode(ctx context.Context, nodeID string) (map[common.ChunkID]*common.ChunkHeader, error)
 }
 
 type MetadataScannerService struct {
@@ -58,7 +58,7 @@ func (s *MetadataScannerService) GetDeletedFiles(ctx context.Context, olderThan 
 
 // 1. List all chunks for the node making the request
 // 2. Return the list of chunks
-func (s *MetadataScannerService) GetChunksForNode(ctx context.Context, nodeID string) (map[string]*common.ChunkHeader, error) {
+func (s *MetadataScannerService) GetChunksForNode(ctx context.Context, nodeID string) (map[common.ChunkID]*common.ChunkHeader, error) {
 	chunks, err := s.store.GetChunksForNode(ctx, nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chunks for node: %w", err)

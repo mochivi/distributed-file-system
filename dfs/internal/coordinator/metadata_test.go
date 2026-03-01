@@ -23,7 +23,7 @@ func TestTrackUpload(t *testing.T) {
 		Size:     1024,
 		Checksum: "checksum",
 	}
-	chunkIDs := chunk.FormatChunkIDs(chunk.HashFilepath(req.Path), 3)
+	chunkIDs := chunk.FormatChunkIDs(chunk.HashFilepath(req.Path.String()), 3)
 	sessionID := common.MetadataSessionID("test-session")
 
 	manager.trackUpload(common.MetadataSessionID(sessionID), req, chunkIDs)

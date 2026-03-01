@@ -64,7 +64,7 @@ func (c *DeletedFilesGCController) Run() error {
 // Create batched work items
 type deleteWork struct {
 	client   clients.IDataNodeClient
-	chunkIDs []string
+	chunkIDs []common.ChunkID
 }
 
 func (c *DeletedFilesGCController) tryRun() error {
@@ -119,9 +119,9 @@ func (c *DeletedFilesGCController) run(ctx context.Context, files []*common.File
 	wg.Wait()
 }
 
-func prepareChunkMappings(files []*common.FileInfo, logger *slog.Logger) (map[string][]string, map[string]clients.IDataNodeClient) {
+func prepareChunkMappings(files []*common.FileInfo, logger *slog.Logger) (map[string][]common.ChunkID, map[string]clients.IDataNodeClient) {
 	// Group chunks by node FIRST, then create work items
-	nodeToChunks := make(map[string][]string)
+	nodeToChunks := make(map[string][]common.ChunkID)
 	nodeToClient := make(map[string]clients.IDataNodeClient)
 
 	for _, file := range files {
@@ -142,7 +142,7 @@ func prepareChunkMappings(files []*common.FileInfo, logger *slog.Logger) (map[st
 
 				// Accumulate chunks for this node
 				if _, ok := nodeToChunks[node.ID]; !ok {
-					nodeToChunks[node.ID] = []string{}
+					nodeToChunks[node.ID] = []common.ChunkID{}
 				}
 				nodeToChunks[node.ID] = append(nodeToChunks[node.ID], chunk.Header.ID)
 			}
@@ -153,7 +153,7 @@ func prepareChunkMappings(files []*common.FileInfo, logger *slog.Logger) (map[st
 }
 
 func queueWork(workCh chan<- *deleteWork, nodeToClient map[string]clients.IDataNodeClient,
-	nodeToChunks map[string][]string, batchSize int) {
+	nodeToChunks map[string][]common.ChunkID, batchSize int) {
 
 	defer close(workCh)
 

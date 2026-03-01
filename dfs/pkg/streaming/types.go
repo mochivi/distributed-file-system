@@ -88,8 +88,8 @@ type SessionManager interface {
 	Store(sessionID common.StreamingSessionID, session *streamingSession) error
 	Load(sessionID common.StreamingSessionID) (*streamingSession, error)
 	Delete(sessionID common.StreamingSessionID)
-	ExistsForChunk(chunkID string) bool
-	LoadByChunk(chunkID string) (*streamingSession, error)
+	ExistsForChunk(chunkID common.ChunkID) bool
+	LoadByChunk(chunkID common.ChunkID) (*streamingSession, error)
 }
 
 type SessionStatus int

@@ -12,13 +12,13 @@ import (
 
 // chunkInfoMap stores information about each datanode where chunks are stored
 type chunkInfoMap struct {
-	chunkInfos map[string]*common.ChunkInfo
+	chunkInfos map[common.ChunkID]*common.ChunkInfo
 	mutex      sync.Mutex
 }
 
 func newChunkInfoMap() *chunkInfoMap {
 	return &chunkInfoMap{
-		chunkInfos: make(map[string]*common.ChunkInfo),
+		chunkInfos: make(map[common.ChunkID]*common.ChunkInfo),
 	}
 }
 
@@ -47,8 +47,8 @@ func (c *chunkInfoMap) getChunkInfos() []common.ChunkInfo {
 // UploadContext is used throughout the upload functionality to coordinate the upload process
 type uploadContext struct {
 	// Input params
-	chunkIDs  []string
-	chunksize int
+	chunkIDs  []common.ChunkID
+	chunksize common.ChunkSize
 
 	// Thread safe map to store information of where each chunk is stored as workers upload chunks
 	chunkInfos *chunkInfoMap
@@ -64,7 +64,8 @@ type uploadContext struct {
 	logger   *slog.Logger // scoped to the upload context
 }
 
-func NewUploadContext(ctx context.Context, chunkIDs []string, chunksize int, clientPool client_pool.ClientPool, logger *slog.Logger) *uploadContext {
+func NewUploadContext(ctx context.Context, chunkIDs []common.ChunkID, chunksize common.ChunkSize,
+	clientPool client_pool.ClientPool, logger *slog.Logger) *uploadContext {
 	return &uploadContext{
 		chunkIDs:   chunkIDs,
 		chunksize:  chunksize,
